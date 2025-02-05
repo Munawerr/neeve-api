@@ -1,0 +1,16 @@
+export enum ItemStatus {
+  'Success' = 'Success',
+  'Pending' = 'Pending',
+  'Accepted' = 'Accepted',
+  'Available' = 'Available',
+  'Active' = 'Active',
+  'Approved' = 'Approved',
+  'InActive' = 'InActive',
+  'Rejected' = 'Rejected',
+  'Removed' = 'Removed',
+  'NotAvailable' = 'Not Available',
+  'NotSubmitted' = 'Not Submitted',
+  'NoInfoAdded' = 'No Information Added',
+  'PaymentRequired' = 'Payment Pending',
+  'PaymentSuccess' = 'Payment Success',
+}
