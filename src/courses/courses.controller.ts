@@ -8,19 +8,34 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { S3Service } from '../s3/s3.service';
 
 @Controller('courses')
 export class CoursesController {
-  constructor(private readonly coursesService: CoursesService) {}
+  constructor(
+    private readonly coursesService: CoursesService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async create(@Body() createCourseDto: CreateCourseDto) {
+  @UseInterceptors(FileInterceptor('icon'))
+  async create(
+    @Body() createCourseDto: CreateCourseDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (file) {
+      const iconUrl = await this.s3Service.uploadFile(file);
+      createCourseDto.iconUrl = iconUrl;
+    }
     const course = await this.coursesService.create(createCourseDto);
     return {
       status: HttpStatus.OK,
@@ -59,10 +74,16 @@ export class CoursesController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('icon'))
   async update(
     @Param('id') id: string,
     @Body() updateCourseDto: UpdateCourseDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
+    if (file) {
+      const iconUrl = await this.s3Service.uploadFile(file);
+      updateCourseDto.iconUrl = iconUrl;
+    }
     const updatedCourse = await this.coursesService.update(id, updateCourseDto);
     return {
       status: HttpStatus.OK,
