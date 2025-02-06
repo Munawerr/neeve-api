@@ -1,18 +1,14 @@
-import {
-  Controller,
-  Body,
-  Post,
-  UseGuards,
-  Get,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Body, Post, Get, HttpStatus } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
-import { LocalAuthGuard } from './auth/local-auth.guard';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { Messages } from './utils/messages';
-import { ForgotPasswordDto, VerifyOtpDto, ResendOtpDto, ResetPasswordDto } from './dto/auth.dto';
+import {
+  ForgotPasswordDto,
+  VerifyOtpDto,
+  ResendOtpDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 
 @Controller()
@@ -27,11 +23,11 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @UseGuards(LocalAuthGuard)
   @Post('auth/login')
   async login(@Body() loginDto: LoginDto) {
     const { email, password } = loginDto;
     const user = await this.authService.validateUser(email, password);
+
     if (!user || user.status !== 'active') {
       return {
         status: HttpStatus.UNAUTHORIZED,
@@ -39,7 +35,7 @@ export class AppController {
       };
     }
     return {
-      token: this.authService.login(user),
+      token: await this.authService.login(user),
       profile_info: user,
     };
   }
@@ -47,7 +43,10 @@ export class AppController {
   @Post('auth/forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const otp =
+      process.env.NODE_ENV === 'development'
+        ? '0000'
+        : Math.floor(1000 + Math.random() * 9000).toString();
     const token = uuidv4();
     await this.authService.sendOtp(email, otp, token);
     return {
@@ -59,15 +58,16 @@ export class AppController {
 
   @Post('auth/verify-otp')
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
-    const { email, otp, token } = verifyOtpDto;
-    const isValid = await this.authService.verifyOtp(email, otp, token);
-    if (!isValid) {
+    const { otp, token } = verifyOtpDto;
+    const userId = await this.authService.verifyOtp(otp, token);
+    if (!userId) {
       return {
         status: HttpStatus.BAD_REQUEST,
         message: Messages.invalidOtp,
       };
     }
     return {
+      userId,
       status: HttpStatus.OK,
       message: Messages.otpVerified,
     };
@@ -76,7 +76,10 @@ export class AppController {
   @Post('auth/resend-otp')
   async resendOtp(@Body() resendOtpDto: ResendOtpDto) {
     const { email } = resendOtpDto;
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const otp =
+      process.env.NODE_ENV === 'development'
+        ? '0000'
+        : Math.floor(1000 + Math.random() * 9000).toString();
     const token = uuidv4();
     await this.authService.sendOtp(email, otp, token);
     return {
@@ -88,8 +91,12 @@ export class AppController {
 
   @Post('auth/reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    const { email, newPassword, token } = resetPasswordDto;
-    const isReset = await this.authService.resetPassword(email, newPassword, token);
+    const { userId, newPassword, token } = resetPasswordDto;
+    const isReset = await this.authService.resetPassword(
+      userId,
+      newPassword,
+      token,
+    );
     if (!isReset) {
       return {
         status: HttpStatus.BAD_REQUEST,
@@ -100,11 +107,5 @@ export class AppController {
       status: HttpStatus.OK,
       message: Messages.passwordReset,
     };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('profile')
-  getProfile(@Body() req) {
-    return req.user;
   }
 }

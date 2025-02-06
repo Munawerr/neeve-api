@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
+import { User } from '../users/schemas/user.schema';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -12,17 +14,19 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.usersService.findOne(email);
-    if (user && user.password === pass) {
-      const { password, ...result } = user;
-      return result;
+    const user = await this.usersService.findByEmail(email);
+    if (user && (await bcrypt.compare(pass, user.password))) {
+      return user;
     }
     return null;
   }
 
-  async login(user: any) {
-    const payload = { username: user.username, sub: user.id };
-    return this.jwtService.sign(payload);
+  async login(user: User & { _id: string }): Promise<string> {
+    const payload = { username: user.username, sub: user._id.toString() };
+
+    const token = this.jwtService.sign(payload);
+
+    return token;
   }
 
   async sendOtp(email: string, otp: string, token: string): Promise<void> {
@@ -35,28 +39,24 @@ export class AuthService {
     }
   }
 
-  async verifyOtp(email: string, otp: string, token: string): Promise<boolean> {
-    const user = await this.usersService.findByEmail(email);
-    if (
-      user &&
-      user.verificationOtp === otp &&
-      user.verificationToken === token
-    ) {
+  async verifyOtp(otp: string, token: string): Promise<boolean | unknown> {
+    const user = await this.usersService.findByTokenAndOTP(token, otp);
+    if (user) {
       user.verificationOtp = '';
       await user.save();
-      return true;
+      return user._id;
     }
     return false;
   }
 
   async resetPassword(
-    email: string,
+    id: string,
     newPassword: string,
     token: string,
   ): Promise<boolean> {
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findOne(id);
     if (user && user.verificationToken === token) {
-      user.password = newPassword;
+      user.password = await bcrypt.hash(newPassword, 10);
       user.verificationToken = '';
       await user.save();
       return true;
