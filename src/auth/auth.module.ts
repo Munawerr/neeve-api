@@ -13,8 +13,8 @@ import { MailModule } from 'src/mail/mail.module';
     PassportModule,
     MailModule,
     JwtModule.register({
-      secret: 'your_jwt_secret_key',
-      signOptions: { expiresIn: '60s' },
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN },
     }),
   ],
   providers: [AuthService, JwtStrategy, MailService],

@@ -3,17 +3,17 @@ export class ForgotPasswordDto {
 }
 
 export class VerifyOtpDto {
-  email: string;
   otp: string;
   token: string;
 }
 
 export class ResendOtpDto {
   email: string;
+  token: string;
 }
 
 export class ResetPasswordDto {
-  email: string;
+  userId: string;
   newPassword: string;
   token: string;
 }
