@@ -11,7 +11,9 @@ import {
 } from './dto/auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './users/schemas/user.schema'; // Import UserStatus
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('app')
 @Controller()
 export class AppController {
   constructor(
@@ -20,11 +22,17 @@ export class AppController {
   ) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get Hello message' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Hello message retrieved successfully' })
   getHello(): string {
     return this.appService.getHello();
   }
 
   @Post('auth/login')
+  @ApiOperation({ summary: 'User login' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   async login(@Body() loginDto: LoginDto): Promise<{
     status?: number;
     message?: string;
@@ -49,6 +57,9 @@ export class AppController {
   }
 
   @Post('auth/forgot-password')
+  @ApiOperation({ summary: 'Forgot password' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OTP sent successfully' })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
     const otp =
@@ -65,6 +76,10 @@ export class AppController {
   }
 
   @Post('auth/verify-otp')
+  @ApiOperation({ summary: 'Verify OTP' })
+  @ApiBody({ type: VerifyOtpDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OTP verified successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid OTP' })
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
     const { otp, token } = verifyOtpDto;
     const userId = await this.authService.verifyOtp(otp, token);
@@ -82,6 +97,9 @@ export class AppController {
   }
 
   @Post('auth/resend-otp')
+  @ApiOperation({ summary: 'Resend OTP' })
+  @ApiBody({ type: ResendOtpDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OTP resent successfully' })
   async resendOtp(@Body() resendOtpDto: ResendOtpDto) {
     const { email } = resendOtpDto;
     const otp =
@@ -98,6 +116,10 @@ export class AppController {
   }
 
   @Post('auth/reset-password')
+  @ApiOperation({ summary: 'Reset password' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid token' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     const { userId, newPassword, token } = resetPasswordDto;
     const isReset = await this.authService.resetPassword(

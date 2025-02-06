@@ -21,7 +21,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateStudentUserDto } from './dto/create-student-user.dto';
 import { UpdateInstituteUserDto } from './dto/update-institute-user.dto';
 import { UpdateStudentUserDto } from './dto/update-student-user.dto';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 
+@ApiTags('users')
 @Controller('users')
 export class UsersController {
   constructor(
@@ -31,6 +33,11 @@ export class UsersController {
 
   @Put(':id/profile')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Profile updated successfully' })
   async updateProfile(
     @Param('id') id: string,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -49,6 +56,10 @@ export class UsersController {
   @Put(':id/profile/image')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload profile image' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Profile image updated successfully' })
   async uploadImage(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
@@ -65,6 +76,10 @@ export class UsersController {
   @Put(':id/profile/cover')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload profile cover' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Profile cover updated successfully' })
   async uploadCover(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
@@ -81,6 +96,10 @@ export class UsersController {
   @Post('institute')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create institute user' })
+  @ApiBody({ type: CreateInstituteUserDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Institute user created successfully' })
   async createInstituteUser(
     @Body() createInstituteUserDto: CreateInstituteUserDto,
     @UploadedFile() file?: Express.Multer.File,
@@ -99,6 +118,11 @@ export class UsersController {
   @Put('institute/:id')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update institute user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: UpdateInstituteUserDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Institute user updated successfully' })
   async updateInstituteUser(
     @Param('id') id: string,
     @Body() UpdateInstituteUserDto: UpdateInstituteUserDto,
@@ -118,6 +142,10 @@ export class UsersController {
 
   @Get('institute/:id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get institute user by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Institute user retrieved successfully' })
   async getInstituteUser(@Param('id') id: string) {
     const user = await this.usersService.getInstituteUser(id);
     return {
@@ -129,6 +157,12 @@ export class UsersController {
 
   @Get('institutes')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all institute users' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Institute users retrieved successfully' })
   async getAllInstituteUsers(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
@@ -148,6 +182,10 @@ export class UsersController {
 
   @Delete('institute/:id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete institute user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Institute user deleted successfully' })
   async deleteInstituteUser(@Param('id') id: string) {
     const deletedUser = await this.usersService.deleteInstituteUser(id);
     return {
@@ -160,6 +198,10 @@ export class UsersController {
   @Post('student')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create student user' })
+  @ApiBody({ type: CreateStudentUserDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Student user created successfully' })
   async createStudentUser(
     @Body() createStudentUserDto: CreateStudentUserDto,
     @UploadedFile() file?: Express.Multer.File,
@@ -178,6 +220,11 @@ export class UsersController {
   @Put('student/:id')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update student user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: UpdateStudentUserDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Student user updated successfully' })
   async updateStudentUser(
     @Param('id') id: string,
     @Body() UpdateStudentUserDto: UpdateStudentUserDto,
@@ -197,6 +244,10 @@ export class UsersController {
 
   @Get('student/:id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get student user by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Student user retrieved successfully' })
   async getStudentUser(@Param('id') id: string) {
     const user = await this.usersService.getStudentUser(id);
     return {
@@ -208,6 +259,13 @@ export class UsersController {
 
   @Get('students')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all student users' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'institute', required: false })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Student users retrieved successfully' })
   async getAllStudentUsers(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
@@ -229,6 +287,10 @@ export class UsersController {
 
   @Delete('student/:id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete student user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Student user deleted successfully' })
   async deleteStudentUser(@Param('id') id: string) {
     const deletedUser = await this.usersService.deleteStudentUser(id);
     return {
