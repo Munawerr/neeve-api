@@ -17,7 +17,9 @@ import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { S3Service } from '../s3/s3.service';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 
+@ApiTags('courses')
 @Controller('courses')
 export class CoursesController {
   constructor(
@@ -28,6 +30,10 @@ export class CoursesController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('icon'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new course' })
+  @ApiBody({ type: CreateCourseDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Course created successfully' })
   async create(
     @Body() createCourseDto: CreateCourseDto,
     @UploadedFile() file: Express.Multer.File,
@@ -46,6 +52,9 @@ export class CoursesController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all courses' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Courses retrieved successfully' })
   async findAll() {
     const courses = await this.coursesService.findAll();
     return {
@@ -57,6 +66,11 @@ export class CoursesController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a course by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Course retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.EXPECTATION_FAILED, description: 'Course not found' })
   async findOne(@Param('id') id: string) {
     const course = await this.coursesService.findOne(id);
     if (!course) {
@@ -75,6 +89,11 @@ export class CoursesController {
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('icon'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a course' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: UpdateCourseDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Course updated successfully' })
   async update(
     @Param('id') id: string,
     @Body() updateCourseDto: UpdateCourseDto,
@@ -94,6 +113,10 @@ export class CoursesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a course' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Course deleted successfully' })
   async remove(@Param('id') id: string) {
     await this.coursesService.remove(id);
     return {

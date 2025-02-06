@@ -16,7 +16,9 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 import { CoursesService } from '../courses/courses.service';
 import { ClassesService } from '../classes/classes.service';
 import { SubjectsService } from '../subjects/subjects.service';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 
+@ApiTags('packages')
 @Controller('packages')
 export class PackagesController {
   constructor(
@@ -28,6 +30,10 @@ export class PackagesController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new package' })
+  @ApiBody({ type: CreatePackageDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Package created successfully' })
   async create(@Body() createPackageDto: CreatePackageDto) {
     const { course, class: classId, subjects, ...rest } = createPackageDto;
     const courseEntity = await this.coursesService.findOne(course);
@@ -61,6 +67,9 @@ export class PackagesController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all packages' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Packages retrieved successfully' })
   async findAll() {
     const packages = await this.packagesService.findAll();
     return {
@@ -72,6 +81,11 @@ export class PackagesController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a package by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Package retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.EXPECTATION_FAILED, description: 'Package not found' })
   async findOne(@Param('id') id: string) {
     const packageEntity = await this.packagesService.findOne(id);
     if (!packageEntity) {
@@ -89,6 +103,11 @@ export class PackagesController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a package' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: UpdatePackageDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Package updated successfully' })
   async update(
     @Param('id') id: string,
     @Body() updatePackageDto: UpdatePackageDto,
@@ -124,6 +143,10 @@ export class PackagesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a package' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Package deleted successfully' })
   async remove(@Param('id') id: string) {
     await this.packagesService.remove(id);
     return {
