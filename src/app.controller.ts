@@ -10,6 +10,7 @@ import {
   ResetPasswordDto,
 } from './dto/auth.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { User } from './users/schemas/user.schema'; // Import UserStatus
 
 @Controller()
 export class AppController {
@@ -24,7 +25,12 @@ export class AppController {
   }
 
   @Post('auth/login')
-  async login(@Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto): Promise<{
+    status?: number;
+    message?: string;
+    token?: string;
+    profile_info?: User;
+  }> {
     const { email, password } = loginDto;
     const user = await this.authService.validateUser(email, password);
 
@@ -37,6 +43,8 @@ export class AppController {
     return {
       token: await this.authService.login(user),
       profile_info: user,
+      status: HttpStatus.OK,
+      message: 'Login' + Messages.successful,
     };
   }
 

@@ -3,10 +3,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CoursesController } from './courses.controller';
 import { CoursesService } from './courses.service';
 import { Course, CourseSchema } from './schemas/course.schema';
+import { S3Service } from 'src/s3/s3.service';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Course.name, schema: CourseSchema }])],
+  imports: [
+    MongooseModule.forFeature([{ name: Course.name, schema: CourseSchema }]),
+  ],
   controllers: [CoursesController],
-  providers: [CoursesService],
+  providers: [CoursesService, S3Service],
 })
 export class CoursesModule {}

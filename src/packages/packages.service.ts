@@ -7,7 +7,9 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 
 @Injectable()
 export class PackagesService {
-  constructor(@InjectModel(Package.name) private packageModel: Model<Package>) {}
+  constructor(
+    @InjectModel(Package.name) private packageModel: Model<Package>,
+  ) {}
 
   create(createPackageDto: CreatePackageDto): Promise<Package> {
     const createdPackage = new this.packageModel(createPackageDto);
@@ -19,10 +21,18 @@ export class PackagesService {
   }
 
   findOne(id: string): Promise<Package | null> {
-    return this.packageModel.findById(id).exec();
+    return this.packageModel
+      .findById(id)
+      .populate('course')
+      .populate('class')
+      .populate('subjects')
+      .exec();
   }
 
-  update(id: string, updatePackageDto: UpdatePackageDto): Promise<Package | null> {
+  update(
+    id: string,
+    updatePackageDto: UpdatePackageDto,
+  ): Promise<Package | null> {
     return this.packageModel
       .findByIdAndUpdate(id, updatePackageDto, { new: true })
       .exec();

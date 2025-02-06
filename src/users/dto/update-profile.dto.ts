@@ -11,14 +11,6 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
-  instituteRegNo?: string;
-
-  @IsOptional()
-  @IsString()
-  packageCode?: string;
-
-  @IsOptional()
-  @IsString()
   full_name?: string;
 
   readonly bio?: string;

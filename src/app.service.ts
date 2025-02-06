@@ -60,7 +60,7 @@ export class AppService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     const adminUser = new this.userModel({
-      username: 'admin',
+      full_name: 'Admin User',
       password: hashedPassword,
       email: 'admin@neeve.io', // Add email address
       role: adminRole._id, // Use admin role ID

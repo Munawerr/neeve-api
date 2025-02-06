@@ -25,7 +25,11 @@ export class SubjectsService {
   }
 
   async findByIds(ids: string[]): Promise<Subject[]> {
-    return this.subjectModel.find({ _id: { $in: ids } }).exec();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return [];
+    }
+    const result = await this.subjectModel.find({ _id: { $in: ids } }).exec();
+    return result;
   }
 
   update(
