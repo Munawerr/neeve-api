@@ -10,6 +10,8 @@ import { SubjectsModule } from './subjects/subjects.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors(); // Enable CORS
+
   const config = new DocumentBuilder()
     .setTitle('Neeve API')
     .setDescription('The Neeve API description')
