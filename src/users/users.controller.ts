@@ -241,10 +241,17 @@ export class UsersController {
   async getInstituteUser(@Param('id') id: string) {
     try {
       const user = await this.usersService.getInstituteUser(id);
+      if (user) {
+        const { password, ...userWithoutPassword } = user.toObject();
+        return {
+          status: HttpStatus.OK,
+          message: 'Institute user retrieved successfully',
+          data: userWithoutPassword,
+        };
+      }
       return {
-        status: HttpStatus.OK,
-        message: 'Institute user retrieved successfully',
-        data: user,
+        status: HttpStatus.NOT_FOUND,
+        message: 'Institute user not found',
       };
     } catch (error) {
       return {
@@ -282,7 +289,7 @@ export class UsersController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to retrieve courses for institute',
   })
-  async getAllCoursesForInstitute(@Param('id') id: string) {
+  async getDataForInstitute(@Param('id') id: string) {
     try {
       const instituteUser = await this.usersService.getInstituteUser(id, true);
 
@@ -292,19 +299,18 @@ export class UsersController {
           message: 'Expectation failed! unable to retrieve data',
         };
       }
+
       const courseIds = instituteUser.packages.map((pkg) =>
         pkg.course.toString(),
       );
 
-      const courses = await this.CoursesService.findByIds(courseIds);
+      const distinctCourseIds = [...new Set(courseIds)];
+      const courses = await this.CoursesService.findByIds(distinctCourseIds);
 
       return {
         status: HttpStatus.OK,
         message: 'Data retrieved successfully',
-        data: {
-          courses,
-          packages: instituteUser.packages,
-        },
+        data: { profile_info: instituteUser, courses },
       };
     } catch (error) {
       return {
@@ -478,10 +484,17 @@ export class UsersController {
   async getStudentUser(@Param('id') id: string) {
     try {
       const user = await this.usersService.getStudentUser(id);
+      if (user) {
+        const { password, ...userWithoutPassword } = user.toObject();
+        return {
+          status: HttpStatus.OK,
+          message: 'Student user retrieved successfully',
+          data: userWithoutPassword,
+        };
+      }
       return {
-        status: HttpStatus.OK,
-        message: 'Student user retrieved successfully',
-        data: user,
+        status: HttpStatus.NOT_FOUND,
+        message: 'Student user not found',
       };
     } catch (error) {
       return {
