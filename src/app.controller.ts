@@ -12,6 +12,8 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './users/schemas/user.schema'; // Import UserStatus
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { CoursesService } from './courses/courses.service';
+import { Course } from './courses/schemas/course.schema';
 
 @ApiTags('app')
 @Controller()
@@ -19,11 +21,15 @@ export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly authService: AuthService,
+    private readonly coursesService: CoursesService,
   ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get Hello message' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Hello message retrieved successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Hello message retrieved successfully',
+  })
   getHello(): string {
     return this.appService.getHello();
   }
@@ -37,7 +43,8 @@ export class AppController {
     status?: number;
     message?: string;
     token?: string;
-    profile_info?: User;
+    profile_info?: Object;
+    courses?: Course[];
   }> {
     const { email, password } = loginDto;
     const user = await this.authService.validateUser(email, password);
@@ -48,9 +55,18 @@ export class AppController {
         message: Messages.notAuthorized,
       };
     }
+
+    const courseIds = user.packages.map((pkg) => pkg.course.toString());
+
+    const distinctCourseIds = [...new Set(courseIds)];
+    const courses = await this.coursesService.findByIds(distinctCourseIds);
+
+    const { password: _, packages, ...userWithoutSensitiveInfo } = user.toObject();
+
     return {
       token: await this.authService.login(user),
-      profile_info: user,
+      profile_info: userWithoutSensitiveInfo,
+      courses,
       status: HttpStatus.OK,
       message: 'Login' + Messages.successful,
     };
@@ -78,7 +94,10 @@ export class AppController {
   @Post('auth/verify-otp')
   @ApiOperation({ summary: 'Verify OTP' })
   @ApiBody({ type: VerifyOtpDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'OTP verified successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'OTP verified successfully',
+  })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid OTP' })
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
     const { otp, token } = verifyOtpDto;
@@ -99,7 +118,10 @@ export class AppController {
   @Post('auth/resend-otp')
   @ApiOperation({ summary: 'Resend OTP' })
   @ApiBody({ type: ResendOtpDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'OTP resent successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'OTP resent successfully',
+  })
   async resendOtp(@Body() resendOtpDto: ResendOtpDto) {
     const { email } = resendOtpDto;
     const otp =
@@ -118,7 +140,10 @@ export class AppController {
   @Post('auth/reset-password')
   @ApiOperation({ summary: 'Reset password' })
   @ApiBody({ type: ResetPasswordDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Password reset successfully',
+  })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid token' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     const { userId, newPassword, token } = resetPasswordDto;

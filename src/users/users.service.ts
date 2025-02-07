@@ -29,7 +29,12 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    return this.userModel
+      .findOne({ email })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
   }
 
   async findByTokenAndOTP(
@@ -101,9 +106,13 @@ export class UsersService {
     populatePkgs = false,
   ): Promise<User | null> {
     if (populatePkgs) {
-      return this.userModel.findById(id).populate('packages').exec();
+      return this.userModel
+        .findById(id)
+        .populate('role')
+        .populate('packages')
+        .exec();
     } else {
-      return this.userModel.findById(id).exec();
+      return this.userModel.findById(id).populate('role').exec();
     }
   }
 

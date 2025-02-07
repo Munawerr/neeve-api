@@ -16,7 +16,14 @@ import { SubjectsModule } from './subjects/subjects.module';
 import { CoursesModule } from './courses/courses.module';
 import { ClassesModule } from './classes/classes.module';
 import { PackagesModule } from './packages/packages.module';
+import { Chapter, ChapterSchema } from './chapters/schemas/chapter.schema';
+import {
+  SubChapter,
+  SubChapterSchema,
+} from './subChapters/schemas/subChapter.schema';
 import * as env from 'dotenv';
+import { ChaptersModule } from './chapters/chapters.module';
+import { SubChaptersModule } from './subChapters/subChapters.module';
 env.config();
 
 const DB_URL: string = String(process.env.DB_URL);
@@ -37,6 +44,8 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
       { name: Class.name, schema: ClassSchema },
       { name: Subject.name, schema: SubjectSchema },
       { name: Package.name, schema: PackageSchema },
+      { name: Chapter.name, schema: PackageSchema },
+      { name: SubChapter.name, schema: PackageSchema },
     ]), // Add schema
     UsersModule,
     AuthModule,
@@ -44,6 +53,8 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
     CoursesModule,
     ClassesModule,
     PackagesModule,
+    ChaptersModule,
+    SubChaptersModule,
   ],
   controllers: [AppController],
   providers: [AppService, AuthService],
