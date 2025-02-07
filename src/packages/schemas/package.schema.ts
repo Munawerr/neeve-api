@@ -7,16 +7,16 @@ import { Subject } from '../../subjects/schemas/subject.schema';
 @Schema()
 export class Package extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Course' })
-  course: Course;
+  course: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Class' })
-  class: Class;
+  class: Types.ObjectId;
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
     validate: [arrayLimit, '{PATH} exceeds the limit of 6'],
   })
-  subjects: Subject[];
+  subjects: mongoose.Schema.Types.ObjectId[];
 
   @Prop({ required: true })
   code: string;

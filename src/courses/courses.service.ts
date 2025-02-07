@@ -22,6 +22,10 @@ export class CoursesService {
     return this.courseModel.findById(id).exec();
   }
 
+  findByIds(ids: string[]): Promise<Course[]> {
+    return this.courseModel.find({ _id: { $in: ids } }).exec();
+  }
+
   update(id: string, updateCourseDto: UpdateCourseDto): Promise<Course | null> {
     return this.courseModel
       .findByIdAndUpdate(id, updateCourseDto, { new: true })
