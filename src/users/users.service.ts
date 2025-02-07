@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
+import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
 
 import { User } from './schemas/user.schema';
@@ -11,12 +11,16 @@ import { CreateStudentUserDto } from './dto/create-student-user.dto';
 import { S3Service } from '../s3/s3.service';
 import { UpdateInstituteUserDto } from './dto/update-institute-user.dto';
 import { UpdateStudentUserDto } from './dto/update-student-user.dto';
+import { Package } from 'src/packages/schemas/package.schema';
+import { Course } from 'src/courses/schemas/course.schema';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Role.name) private roleModel: Model<Role>, // Inject role model
+    @InjectModel(Role.name) private roleModel: Model<Role>,
+    @InjectModel(Role.name) private courseModel: Model<Course>,
+    @InjectModel(Role.name) private packageModel: Model<Package>,
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
@@ -92,8 +96,15 @@ export class UsersService {
       .exec();
   }
 
-  async getInstituteUser(id: string): Promise<User | null> {
-    return this.userModel.findById(id).exec();
+  async getInstituteUser(
+    id: string,
+    populatePkgs = false,
+  ): Promise<User | null> {
+    if (populatePkgs) {
+      return this.userModel.findById(id).populate('packages').exec();
+    } else {
+      return this.userModel.findById(id).exec();
+    }
   }
 
   async getAllInstituteUsers(

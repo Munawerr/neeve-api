@@ -8,7 +8,6 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { Role, RoleSchema } from './roles/schemas/role.schema';
 import { User, UserSchema } from './users/schemas/user.schema'; // Import User schema
-import * as env from 'dotenv';
 import { Course, CourseSchema } from './courses/schemas/course.schema';
 import { Class, ClassSchema } from './classes/schemas/class.schema';
 import { Subject, SubjectSchema } from './subjects/schemas/subject.schema';
@@ -17,6 +16,7 @@ import { SubjectsModule } from './subjects/subjects.module';
 import { CoursesModule } from './courses/courses.module';
 import { ClassesModule } from './classes/classes.module';
 import { PackagesModule } from './packages/packages.module';
+import * as env from 'dotenv';
 env.config();
 
 const DB_URL: string = String(process.env.DB_URL);
