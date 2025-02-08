@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   UseGuards,
+  Headers,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
@@ -29,9 +30,8 @@ import {
 import { CoursesService } from './courses/courses.service';
 import { Course } from './courses/schemas/course.schema';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { User } from './users/schemas/user.schema';
 import { UsersService } from './users/users.service';
-import { Role } from './roles/schemas/role.schema';
+import * as jwt from 'jsonwebtoken';
 
 @ApiTags('app')
 @Controller()
@@ -94,7 +94,6 @@ export class AppController {
 
     return {
       token,
-      expiresIn,
       profile_info: userWithoutSensitiveInfo,
       role,
       courses,
@@ -130,28 +129,52 @@ export class AppController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to retrieve courses for institute',
   })
-  async getDataForInstitute(@Param('id') id: string) {
+  async getDataForUser(@Headers('authorization') authHeader: string) {
     try {
-      const instituteUser = await this.usersService.getInstituteUser(id, true);
+      if (!authHeader) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Authorization header not found',
+        };
+      }
 
-      if (!instituteUser) {
+      const token = authHeader.split(' ')[1];
+      let decodedToken;
+      try {
+        decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+      } catch (err) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Invalid token',
+        };
+      }
+
+      const userId = decodedToken.sub;
+      const user = await this.usersService.getInstituteUser(userId, true);
+
+      if (!user) {
         return {
           status: HttpStatus.EXPECTATION_FAILED,
           message: 'Expectation failed! unable to retrieve data',
         };
       }
 
-      const courseIds = instituteUser.packages.map(
-        (pkg) => pkg.toObject().course,
-      );
+      const courseIds = user.packages.map((pkg) => pkg.toObject().course);
 
       const distinctCourseIds = [...new Set(courseIds)];
       const courses = await this.coursesService.findByIds(distinctCourseIds);
 
+      const {
+        password: _,
+        packages,
+        role,
+        ...userWithoutSensitiveInfo
+      } = user.toObject();
+
       return {
         status: HttpStatus.OK,
         message: 'Data retrieved successfully',
-        data: { profile_info: instituteUser, courses },
+        data: { profile_info: userWithoutSensitiveInfo, role, courses },
       };
     } catch (error) {
       return {
