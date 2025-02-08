@@ -13,8 +13,9 @@ export class AppService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.initRolesAndPermissions();
-    await this.createAdminUser(); // Create admin user after initializing roles
+    await this.initRolesAndPermissions().then(async () => {
+      await this.createAdminUser(); // Create admin user after initializing roles
+    });
   }
 
   private async initRolesAndPermissions() {
@@ -25,16 +26,46 @@ export class AppService implements OnModuleInit {
 
     const roles = [
       {
-        name: 'admin',
-        permissions: ['all'],
+        name: 'Admin',
+        slug: 'admin',
+        permissions: [
+          'view_all_analytics',
+          'manage_institutes',
+          'manage_students',
+          'manage_courses',
+          'manage_classes',
+          'manage_subjects',
+          'manage_packages',
+          'manage_all_reports',
+          'manage_tests',
+          'manage_chapters',
+        ],
       },
       {
-        name: 'institute',
-        permissions: ['view_courses', 'manage_courses'],
+        name: 'Institute',
+        slug: 'institute',
+        permissions: [
+          'view_own_analytics',
+          'manage_own_students',
+          'manage_tests',
+          'manage_chapters',
+          'manage_studykit',
+          'manage_course_reports',
+          'manage_subject_reports',
+          'view_discussions',
+          'replay_discussions',
+        ],
       },
       {
-        name: 'student',
-        permissions: ['view_courses'],
+        name: 'Student',
+        slug: 'student',
+        permissions: [
+          'view_own_report',
+          'view_studykit',
+          'view_tests',
+          'view_discussions',
+          'create_discussions',
+        ],
       },
     ];
 
@@ -42,7 +73,7 @@ export class AppService implements OnModuleInit {
   }
 
   private async createAdminUser() {
-    const adminRole = await this.roleModel.findOne({ name: 'admin' });
+    const adminRole = await this.roleModel.findOne({ slug: 'admin' });
 
     if (!adminRole) {
       throw new Error('Admin role not found');

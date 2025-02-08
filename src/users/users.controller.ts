@@ -31,6 +31,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { CoursesService } from 'src/courses/courses.service';
+import { PackagesService } from 'src/packages/packages.service';
 
 @ApiTags('users')
 @Controller('users')
@@ -39,6 +40,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly s3Service: S3Service,
     private readonly CoursesService: CoursesService,
+    private readonly PackagesService: PackagesService,
   ) {}
 
   @Put(':id/profile')
@@ -262,60 +264,54 @@ export class UsersController {
     }
   }
 
-  @Get('institute/:id/data')
+  @Get('institute/:instituteId/course/:courseId/packages')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all courses for an institute' })
-  @ApiParam({ name: 'id', required: true })
+  @ApiOperation({ summary: 'Get all packages for an institute and course' })
+  @ApiParam({ name: 'instituteId', required: true })
+  @ApiParam({ name: 'courseId', required: true })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Data retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'number' },
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          properties: {
-            courses: { type: 'array', items: { type: 'object' } },
-            packages: { type: 'array', items: { type: 'object' } },
-          },
-        },
-      },
-    },
+    description: 'Packages retrieved successfully',
   })
   @ApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Failed to retrieve courses for institute',
+    description: 'Failed to retrieve packages',
   })
-  async getDataForInstitute(@Param('id') id: string) {
+  async getPackagesForInstitute(
+    @Param('instituteId') instituteId: string,
+    @Param('courseId') courseId: string,
+  ) {
     try {
-      const instituteUser = await this.usersService.getInstituteUser(id, true);
-
-      if (!instituteUser) {
-        return {
-          status: HttpStatus.EXPECTATION_FAILED,
-          message: 'Expectation failed! unable to retrieve data',
-        };
-      }
-
-      const courseIds = instituteUser.packages.map((pkg) =>
-        pkg.course.toString(),
+      const instituteUser = await this.usersService.getInstituteUser(
+        instituteId,
+        true,
       );
 
-      const distinctCourseIds = [...new Set(courseIds)];
-      const courses = await this.CoursesService.findByIds(distinctCourseIds);
+      if (instituteUser) {
+        const _packages = instituteUser.packages.filter(
+          (pkg) => pkg.course.toString() === courseId,
+        );
 
-      return {
-        status: HttpStatus.OK,
-        message: 'Data retrieved successfully',
-        data: { profile_info: instituteUser, courses },
-      };
+        const packageIds = _packages.map((pkg) => pkg.toObject()._id);
+
+        const packages = await this.PackagesService.findByIds(packageIds, true);
+
+        return {
+          status: HttpStatus.OK,
+          message: 'Packages retrieved successfully',
+          data: packages,
+        };
+      } else {
+        return {
+          status: HttpStatus.EXPECTATION_FAILED,
+          message: 'Institute user not found',
+        };
+      }
     } catch (error) {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Failed to retrieve courses for institute',
+        message: 'Failed to retrieve packages',
         error: error.message,
       };
     }

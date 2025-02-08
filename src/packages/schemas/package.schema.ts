@@ -1,8 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document, Types } from 'mongoose';
-import { Course } from '../../courses/schemas/course.schema';
-import { Class } from '../../classes/schemas/class.schema';
-import { Subject } from '../../subjects/schemas/subject.schema';
 
 @Schema()
 export class Package extends Document {
