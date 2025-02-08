@@ -103,7 +103,7 @@ export class AppController {
     };
   }
 
-  @Get('auth/:id/data')
+  @Get('auth/data')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all courses for an institute' })
