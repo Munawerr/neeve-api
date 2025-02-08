@@ -105,6 +105,7 @@ export class UsersService {
       return this.userModel
         .findById(id)
         .populate('role')
+        .populate('institute')
         .populate('packages')
         .exec();
     } else {
