@@ -1,4 +1,12 @@
-import { Controller, Body, Post, Get, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Body,
+  Post,
+  Get,
+  HttpStatus,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -10,10 +18,20 @@ import {
   ResetPasswordDto,
 } from './dto/auth.dto';
 import { v4 as uuidv4 } from 'uuid';
-import { User } from './users/schemas/user.schema'; // Import UserStatus
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { CoursesService } from './courses/courses.service';
 import { Course } from './courses/schemas/course.schema';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { User } from './users/schemas/user.schema';
+import { UsersService } from './users/users.service';
+import { Role } from './roles/schemas/role.schema';
 
 @ApiTags('app')
 @Controller()
@@ -22,6 +40,7 @@ export class AppController {
     private readonly appService: AppService,
     private readonly authService: AuthService,
     private readonly coursesService: CoursesService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Get()
@@ -43,7 +62,10 @@ export class AppController {
     status?: number;
     message?: string;
     token?: string;
+    expiresIn?: number;
+    permissions?: string[];
     profile_info?: Object;
+    role?: any;
     courses?: Course[];
   }> {
     const { email, password } = loginDto;
@@ -57,19 +79,87 @@ export class AppController {
     }
 
     const courseIds = user.packages.map((pkg) => pkg.course.toString());
-
     const distinctCourseIds = [...new Set(courseIds)];
     const courses = await this.coursesService.findByIds(distinctCourseIds);
 
-    const { password: _, packages, ...userWithoutSensitiveInfo } = user.toObject();
+    const {
+      password: _,
+      packages,
+      role,
+      ...userWithoutSensitiveInfo
+    } = user.toObject();
+
+    const { token, expiresIn, permissions } =
+      await this.authService.login(user);
 
     return {
-      token: await this.authService.login(user),
+      token,
+      expiresIn,
       profile_info: userWithoutSensitiveInfo,
+      role,
       courses,
       status: HttpStatus.OK,
       message: 'Login' + Messages.successful,
     };
+  }
+
+  @Get('auth/:id/data')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all courses for an institute' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Data retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'number' },
+        message: { type: 'string' },
+        data: {
+          type: 'object',
+          properties: {
+            courses: { type: 'array', items: { type: 'object' } },
+            packages: { type: 'array', items: { type: 'object' } },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve courses for institute',
+  })
+  async getDataForInstitute(@Param('id') id: string) {
+    try {
+      const instituteUser = await this.usersService.getInstituteUser(id, true);
+
+      if (!instituteUser) {
+        return {
+          status: HttpStatus.EXPECTATION_FAILED,
+          message: 'Expectation failed! unable to retrieve data',
+        };
+      }
+
+      const courseIds = instituteUser.packages.map(
+        (pkg) => pkg.toObject().course,
+      );
+
+      const distinctCourseIds = [...new Set(courseIds)];
+      const courses = await this.coursesService.findByIds(distinctCourseIds);
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Data retrieved successfully',
+        data: { profile_info: instituteUser, courses },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve courses for institute',
+        error: error.message,
+      };
+    }
   }
 
   @Post('auth/forgot-password')

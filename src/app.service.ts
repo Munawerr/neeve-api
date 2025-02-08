@@ -13,8 +13,9 @@ export class AppService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.initRolesAndPermissions();
-    await this.createAdminUser(); // Create admin user after initializing roles
+    await this.initRolesAndPermissions().then(async () => {
+      await this.createAdminUser(); // Create admin user after initializing roles
+    });
   }
 
   private async initRolesAndPermissions() {
@@ -25,7 +26,8 @@ export class AppService implements OnModuleInit {
 
     const roles = [
       {
-        name: 'admin',
+        name: 'Admin',
+        slug: 'admin',
         permissions: [
           'view_all_analytics',
           'manage_institutes',
@@ -40,7 +42,8 @@ export class AppService implements OnModuleInit {
         ],
       },
       {
-        name: 'institute',
+        name: 'Institute',
+        slug: 'institute',
         permissions: [
           'view_own_analytics',
           'manage_own_students',
@@ -54,7 +57,8 @@ export class AppService implements OnModuleInit {
         ],
       },
       {
-        name: 'student',
+        name: 'Student',
+        slug: 'student',
         permissions: [
           'view_own_report',
           'view_studykit',
@@ -69,7 +73,7 @@ export class AppService implements OnModuleInit {
   }
 
   private async createAdminUser() {
-    const adminRole = await this.roleModel.findOne({ name: 'admin' });
+    const adminRole = await this.roleModel.findOne({ slug: 'admin' });
 
     if (!adminRole) {
       throw new Error('Admin role not found');

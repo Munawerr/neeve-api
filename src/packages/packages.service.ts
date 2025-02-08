@@ -29,6 +29,18 @@ export class PackagesService {
       .exec();
   }
 
+  findByIds(ids: string[], populateData: boolean = false): Promise<Package[]> {
+    if (populateData) {
+      return this.packageModel
+        .find({ _id: { $in: ids } })
+        .populate('course')
+        .populate('class')
+        .populate('subjects')
+        .exec();
+    }
+    return this.packageModel.find({ _id: { $in: ids } }).exec();
+  }
+
   update(
     id: string,
     updatePackageDto: UpdatePackageDto,

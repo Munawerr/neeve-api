@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
+import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
 
 import { User } from './schemas/user.schema';
@@ -11,16 +11,12 @@ import { CreateStudentUserDto } from './dto/create-student-user.dto';
 import { S3Service } from '../s3/s3.service';
 import { UpdateInstituteUserDto } from './dto/update-institute-user.dto';
 import { UpdateStudentUserDto } from './dto/update-student-user.dto';
-import { Package } from 'src/packages/schemas/package.schema';
-import { Course } from 'src/courses/schemas/course.schema';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Role.name) private roleModel: Model<Role>,
-    @InjectModel(Role.name) private courseModel: Model<Course>,
-    @InjectModel(Role.name) private packageModel: Model<Package>,
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
@@ -146,7 +142,7 @@ export class UsersService {
   private async getInstituteRoleId(): Promise<
     MongooseSchema.Types.ObjectId | unknown
   > {
-    const instituteRole = await this.roleModel.findOne({ name: 'institute' });
+    const instituteRole = await this.roleModel.findOne({ slug: 'institute' });
     if (!instituteRole) {
       throw new Error('Institute role not found');
     }
@@ -220,7 +216,7 @@ export class UsersService {
   private async getStudentRoleId(): Promise<
     MongooseSchema.Types.ObjectId | unknown
   > {
-    const studentRole = await this.roleModel.findOne({ name: 'student' });
+    const studentRole = await this.roleModel.findOne({ slug: 'student' });
     if (!studentRole) {
       throw new Error('Student role not found');
     }

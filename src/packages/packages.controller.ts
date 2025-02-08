@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  SetMetadata,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PackagesService } from './packages.service';
@@ -16,10 +17,18 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 import { CoursesService } from '../courses/courses.service';
 import { ClassesService } from '../classes/classes.service';
 import { SubjectsService } from '../subjects/subjects.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 
 @ApiTags('packages')
 @Controller('packages')
+@UseGuards(JwtAuthGuard)
 export class PackagesController {
   constructor(
     private readonly packagesService: PackagesService,
@@ -29,11 +38,14 @@ export class PackagesController {
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new package' })
   @ApiBody({ type: CreatePackageDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Package created successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Package created successfully',
+  })
+  @SetMetadata('permissions', ['manage_packages'])
   async create(@Body() createPackageDto: CreatePackageDto) {
     const { course, class: classId, subjects, ...rest } = createPackageDto;
     const courseEntity = await this.coursesService.findOne(course);
@@ -66,10 +78,13 @@ export class PackagesController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all packages' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Packages retrieved successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Packages retrieved successfully',
+  })
+  @SetMetadata('permissions', ['manage_packages'])
   async findAll() {
     const packages = await this.packagesService.findAll();
     return {
@@ -80,12 +95,17 @@ export class PackagesController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a package by ID' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Package retrieved successfully' })
-  @ApiResponse({ status: HttpStatus.EXPECTATION_FAILED, description: 'Package not found' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Package retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.EXPECTATION_FAILED,
+    description: 'Package not found',
+  })
   async findOne(@Param('id') id: string) {
     const packageEntity = await this.packagesService.findOne(id);
     if (!packageEntity) {
@@ -102,12 +122,15 @@ export class PackagesController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a package' })
   @ApiParam({ name: 'id', required: true })
   @ApiBody({ type: UpdatePackageDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Package updated successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Package updated successfully',
+  })
+  @SetMetadata('permissions', ['manage_packages'])
   async update(
     @Param('id') id: string,
     @Body() updatePackageDto: UpdatePackageDto,
@@ -142,11 +165,14 @@ export class PackagesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a package' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Package deleted successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Package deleted successfully',
+  })
+  @SetMetadata('permissions', ['manage_packages'])
   async remove(@Param('id') id: string) {
     await this.packagesService.remove(id);
     return {

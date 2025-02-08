@@ -21,12 +21,16 @@ export class AuthService {
     return null;
   }
 
-  async login(user: User): Promise<string> {
-    const payload = { email: user.email, sub: user._id };
+  async login(
+    user: User,
+  ): Promise<{ token: string; expiresIn: number; permissions: string[] }> {
+    const permissions = user.toObject().role?.permissions || [];
 
+    const payload = { permissions, email: user.email, sub: user._id };
     const token = this.jwtService.sign(payload);
+    const expiresIn = this.jwtService.decode(token)['exp'];
 
-    return token;
+    return { token, expiresIn, permissions };
   }
 
   async sendOtp(email: string, otp: string, token: string): Promise<void> {
