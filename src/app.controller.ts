@@ -171,10 +171,21 @@ export class AppController {
         ...userWithoutSensitiveInfo
       } = user.toObject();
 
+      const {
+        token: authToken,
+        expiresIn,
+        permissions,
+      } = await this.authService.login(user);
+
       return {
         status: HttpStatus.OK,
         message: 'Data retrieved successfully',
-        data: { profile_info: userWithoutSensitiveInfo, role, courses },
+        data: {
+          token: authToken,
+          profile_info: userWithoutSensitiveInfo,
+          role,
+          courses,
+        },
       };
     } catch (error) {
       return {
