@@ -8,6 +8,12 @@ export class Subject extends Document {
 
   @Prop({ required: true })
   title: string;
+
+  @Prop({ type: Object, required: true })
+  color: {
+    solid: string;
+    accent: string;
+  };
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);
