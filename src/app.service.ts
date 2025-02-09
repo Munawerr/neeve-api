@@ -53,6 +53,7 @@ export class AppService implements OnModuleInit {
           'manage_course_reports',
           'manage_subject_reports',
           'manage_live_classes',
+          'view_courses',
           'view_discussions',
           'replay_discussions',
         ],
