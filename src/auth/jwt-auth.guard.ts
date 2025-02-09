@@ -55,7 +55,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     userPermissions: string[],
     requiredPermissions: string[],
   ): boolean {
-    return requiredPermissions.every((permission) =>
+    return requiredPermissions.some((permission) =>
       userPermissions.includes(permission),
     );
   }

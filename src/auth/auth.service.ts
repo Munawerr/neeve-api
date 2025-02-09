@@ -26,7 +26,12 @@ export class AuthService {
   ): Promise<{ token: string; expiresIn: number; permissions: string[] }> {
     const permissions = user.toObject().role?.permissions || [];
 
-    const payload = { permissions, email: user.email, sub: user._id };
+    const payload = {
+      permissions,
+      email: user.email,
+      sub: user._id,
+      role: user.toObject().role?.slug,
+    };
     const token = this.jwtService.sign(payload);
     const expiresIn = this.jwtService.decode(token)['exp'];
 
