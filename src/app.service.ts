@@ -52,6 +52,7 @@ export class AppService implements OnModuleInit {
           'manage_studykit',
           'manage_course_reports',
           'manage_subject_reports',
+          'manage_live_classes',
           'view_discussions',
           'replay_discussions',
         ],
@@ -61,6 +62,7 @@ export class AppService implements OnModuleInit {
         slug: 'student',
         permissions: [
           'view_own_report',
+          'view_live_classes',
           'view_studykit',
           'view_tests',
           'view_discussions',
