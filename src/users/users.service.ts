@@ -104,9 +104,14 @@ export class UsersService {
     if (populatePkgs) {
       return this.userModel
         .findById(id)
+        .populate({
+          path: 'packages',
+          populate: {
+            path: 'subjects',
+          },
+        })
         .populate('role')
         .populate('institute')
-        .populate('packages')
         .exec();
     } else {
       return this.userModel.findById(id).populate('role').exec();
