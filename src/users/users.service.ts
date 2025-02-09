@@ -20,7 +20,21 @@ export class UsersService {
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
-  async findOne(id: string): Promise<User | undefined | null> {
+  async findOne(
+    id: string,
+    populatePkGs = false,
+  ): Promise<User | undefined | null> {
+    if (populatePkGs) {
+      return this.userModel
+        .findById(id)
+        .populate({
+          path: 'packages',
+          populate: {
+            path: 'subjects',
+          },
+        })
+        .exec();
+    }
     return this.userModel.findById(id).exec();
   }
 

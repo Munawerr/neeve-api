@@ -9,6 +9,7 @@ import { SubjectsService } from '../subjects/subjects.service';
 import { Course, CourseSchema } from 'src/courses/schemas/course.schema';
 import { Class, ClassSchema } from 'src/classes/schemas/class.schema';
 import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
+import { UsersService } from 'src/users/users.service';
 
 @Module({
   imports: [
@@ -20,6 +21,12 @@ import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
     ]),
   ],
   controllers: [PackagesController],
-  providers: [PackagesService, CoursesService, ClassesService, SubjectsService],
+  providers: [
+    PackagesService,
+    CoursesService,
+    ClassesService,
+    SubjectsService,
+    UsersService,
+  ],
 })
 export class PackagesModule {}

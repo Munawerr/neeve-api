@@ -9,6 +9,8 @@ import {
   UseGuards,
   HttpStatus,
   SetMetadata,
+  Request,
+  Headers,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PackagesService } from './packages.service';
@@ -17,6 +19,7 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 import { CoursesService } from '../courses/courses.service';
 import { ClassesService } from '../classes/classes.service';
 import { SubjectsService } from '../subjects/subjects.service';
+import * as jwt from 'jsonwebtoken';
 import {
   ApiTags,
   ApiOperation,
@@ -25,6 +28,7 @@ import {
   ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
+import { UsersService } from 'src/users/users.service';
 
 @ApiTags('packages')
 @Controller('packages')
@@ -35,6 +39,7 @@ export class PackagesController {
     private readonly coursesService: CoursesService,
     private readonly classesService: ClassesService,
     private readonly subjectsService: SubjectsService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Post()
@@ -85,13 +90,38 @@ export class PackagesController {
     description: 'Packages retrieved successfully',
   })
   @SetMetadata('permissions', ['manage_packages'])
-  async findAll() {
-    const packages = await this.packagesService.findAll();
-    return {
-      status: HttpStatus.OK,
-      message: 'Packages retrieved successfully',
-      data: packages,
-    };
+  async findAll(@Headers('authorization') authHeader: string) {
+    const token = authHeader.split(' ')[1];
+    let decodedToken;
+    try {
+      decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+    } catch (err) {
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid token',
+      };
+    }
+
+    if (decodedToken.role === 'institute') {
+      const user = await this.usersService.findOne(decodedToken.sub, true);
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully',
+        data: user ? user.packages : [],
+      };
+    } else if (decodedToken.role === 'admin') {
+      const packages = await this.packagesService.findAll();
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully',
+        data: packages,
+      };
+    } else {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Access denied',
+      };
+    }
   }
 
   @Get(':id')
