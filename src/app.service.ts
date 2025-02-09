@@ -46,6 +46,7 @@ export class AppService implements OnModuleInit {
         slug: 'institute',
         permissions: [
           'view_own_analytics',
+          'view_own_packages',
           'manage_own_students',
           'manage_tests',
           'manage_chapters',

@@ -89,7 +89,7 @@ export class PackagesController {
     status: HttpStatus.OK,
     description: 'Packages retrieved successfully',
   })
-  @SetMetadata('permissions', ['manage_packages'])
+  @SetMetadata('permissions', ['manage_packages', 'view_own_packages'])
   async findAll(@Headers('authorization') authHeader: string) {
     const token = authHeader.split(' ')[1];
     let decodedToken;
