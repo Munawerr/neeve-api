@@ -44,8 +44,8 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
       { name: Class.name, schema: ClassSchema },
       { name: Subject.name, schema: SubjectSchema },
       { name: Package.name, schema: PackageSchema },
-      { name: Chapter.name, schema: PackageSchema },
-      { name: SubChapter.name, schema: PackageSchema },
+      { name: Chapter.name, schema: ChapterSchema },
+      { name: SubChapter.name, schema: SubChapterSchema },
     ]), // Add schema
     UsersModule,
     AuthModule,

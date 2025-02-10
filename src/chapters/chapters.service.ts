@@ -8,10 +8,11 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 @Injectable()
 export class ChaptersService {
   constructor(
-    @InjectModel(Chapter.name) private chapterModel: Model<Chapter>,
+    @InjectModel(Chapter.name)
+    private chapterModel: Model<Chapter>,
   ) {}
 
-  create(createChapterDto: CreateChapterDto): Promise<Chapter> {
+  async create(createChapterDto: CreateChapterDto): Promise<Chapter> {
     const createdChapter = new this.chapterModel(createChapterDto);
     return createdChapter.save();
   }
@@ -22,6 +23,13 @@ export class ChaptersService {
 
   findOne(id: string): Promise<Chapter | null> {
     return this.chapterModel.findById(id).exec();
+  }
+
+  findAllBySubjectAndInstitute(
+    subject: string,
+    institute: string,
+  ): Promise<Chapter[]> {
+    return this.chapterModel.find({ subject, institute }).exec();
   }
 
   update(

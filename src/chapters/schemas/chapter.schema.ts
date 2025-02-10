@@ -13,7 +13,7 @@ export class Chapter extends Document {
   subject: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  createdBy: MongooseSchema.Types.ObjectId;
+  institute: MongooseSchema.Types.ObjectId;
 
   @Prop([{ type: Types.ObjectId, ref: 'SubChapter' }])
   subChapters: MongooseSchema.Types.ObjectId[];

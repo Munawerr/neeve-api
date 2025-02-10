@@ -9,7 +9,14 @@ import {
   UseGuards,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChaptersService } from './chapters.service';
 import { CreateChapterDto } from './dto/create-chapter.dto';
@@ -25,7 +32,10 @@ export class ChaptersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new chapter' })
   @ApiBody({ type: CreateChapterDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Chapter created successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chapter created successfully',
+  })
   async create(@Body() createChapterDto: CreateChapterDto) {
     const chapter = await this.chaptersService.create(createChapterDto);
     return {
@@ -35,13 +45,24 @@ export class ChaptersController {
     };
   }
 
-  @Get()
+  @Get('subject/:subjectId/institute/:instituteId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all chapters' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Chapters retrieved successfully' })
-  async findAll() {
-    const chapters = await this.chaptersService.findAll();
+  @ApiParam({ name: 'subjectId', required: true })
+  @ApiParam({ name: 'instituteId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chapters retrieved successfully',
+  })
+  async findAll(
+    @Param('subjectId') subjectId: string,
+    @Param('instituteId') instituteId: string,
+  ) {
+    const chapters = await this.chaptersService.findAllBySubjectAndInstitute(
+      subjectId,
+      instituteId,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Chapters retrieved successfully',
@@ -54,8 +75,14 @@ export class ChaptersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a chapter by ID' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Chapter retrieved successfully' })
-  @ApiResponse({ status: HttpStatus.EXPECTATION_FAILED, description: 'Chapter not found' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chapter retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.EXPECTATION_FAILED,
+    description: 'Chapter not found',
+  })
   async findOne(@Param('id') id: string) {
     const chapter = await this.chaptersService.findOne(id);
     if (!chapter) {
@@ -77,7 +104,10 @@ export class ChaptersController {
   @ApiOperation({ summary: 'Update a chapter' })
   @ApiParam({ name: 'id', required: true })
   @ApiBody({ type: UpdateChapterDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Chapter updated successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chapter updated successfully',
+  })
   async update(
     @Param('id') id: string,
     @Body() updateChapterDto: UpdateChapterDto,
@@ -98,7 +128,10 @@ export class ChaptersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a chapter' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Chapter deleted successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Chapter deleted successfully',
+  })
   async remove(@Param('id') id: string) {
     await this.chaptersService.remove(id);
     return {
