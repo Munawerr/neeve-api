@@ -7,11 +7,11 @@ import {
   Param,
   UseGuards,
   Headers,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
-import { LoginDto } from './dto/login.dto';
-import { Messages } from './utils/messages';
 import {
   ForgotPasswordDto,
   VerifyOtpDto,
@@ -33,6 +33,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { UsersService } from './users/users.service';
 import * as jwt from 'jsonwebtoken';
 import { S3Service } from './s3/s3.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('app')
 @Controller()
@@ -292,6 +293,7 @@ export class AppController {
 
   @Post('upload/document')
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload document' })
   @ApiResponse({
@@ -308,7 +310,7 @@ export class AppController {
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file' })
   @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Failed to upload document' })
-  async uploadDocument(@Body() file: Express.Multer.File): Promise<{ status: number, message: string, url?: string }> {
+  async uploadDocument(@UploadedFile() file: Express.Multer.File): Promise<{ status: number, message: string, url?: string }> {
     if (!file) {
       return {
         status: HttpStatus.BAD_REQUEST,
