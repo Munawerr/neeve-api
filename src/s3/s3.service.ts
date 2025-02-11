@@ -27,4 +27,10 @@ export class S3Service {
     const data = await this.s3.upload(params).promise();
     return data.Location;
   }
+
+  async uploadAndSaveDocument(file: Express.Multer.File): Promise<string> {
+    const fileUrl = await this.uploadFile(file);
+    // Here you can add logic to save the file URL to your database if needed
+    return fileUrl;
+  }
 }
