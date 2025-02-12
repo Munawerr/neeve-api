@@ -4,21 +4,11 @@ import {
   Post,
   Get,
   HttpStatus,
-  Param,
   UseGuards,
   Headers,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { AppService } from './app.service';
-import { AuthService } from './auth/auth.service';
-import {
-  ForgotPasswordDto,
-  VerifyOtpDto,
-  ResendOtpDto,
-  ResetPasswordDto,
-} from './dto/auth.dto';
-import { v4 as uuidv4 } from 'uuid';
 import {
   ApiTags,
   ApiOperation,
@@ -27,13 +17,26 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { CoursesService } from './courses/courses.service';
-import { Course } from './courses/schemas/course.schema';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { UsersService } from './users/users.service';
+import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
-import { S3Service } from './s3/s3.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+
+import {
+  ForgotPasswordDto,
+  VerifyOtpDto,
+  ResendOtpDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
+import { AppService } from './app.service';
+import { AuthService } from './auth/auth.service';
+import { CoursesService } from './courses/courses.service';
+import { UsersService } from './users/users.service';
+import { Course } from './courses/schemas/course.schema';
+
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { S3Service } from './s3/s3.service';
+import { Messages } from './utils/messages';
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('app')
 @Controller()
@@ -309,8 +312,13 @@ export class AppController {
     },
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file' })
-  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Failed to upload document' })
-  async uploadDocument(@UploadedFile() file: Express.Multer.File): Promise<{ status: number, message: string, url?: string }> {
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to upload document',
+  })
+  async uploadDocument(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ status: number; message: string; url?: string }> {
     if (!file) {
       return {
         status: HttpStatus.BAD_REQUEST,
