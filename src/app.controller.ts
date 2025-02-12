@@ -333,6 +333,7 @@ export class AppController {
         url: fileUrl,
       };
     } catch (error) {
+      console.log('error', error);
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload document',

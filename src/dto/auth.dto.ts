@@ -2,32 +2,32 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ForgotPasswordDto {
   @ApiProperty({ example: 'user@example.com' })
-  email: string;
+  readonly email: string;
 }
 
 export class VerifyOtpDto {
   @ApiProperty({ example: '1234' })
-  otp: string;
+  readonly otp: string;
 
   @ApiProperty({ example: 'some-uuid-token' })
-  token: string;
+  readonly token: string;
 }
 
 export class ResendOtpDto {
   @ApiProperty({ example: 'user@example.com' })
-  email: string;
+  readonly email: string;
 
   @ApiProperty({ example: 'some-uuid-token' })
-  token: string;
+  readonly token: string;
 }
 
 export class ResetPasswordDto {
   @ApiProperty({ example: 'user-id' })
-  userId: string;
+  readonly userId: string;
 
   @ApiProperty({ example: 'newPassword123' })
-  newPassword: string;
+  readonly newPassword: string;
 
   @ApiProperty({ example: 'some-uuid-token' })
-  token: string;
+  readonly token: string;
 }
