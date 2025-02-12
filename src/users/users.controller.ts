@@ -30,7 +30,6 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CoursesService } from 'src/courses/courses.service';
 import { PackagesService } from 'src/packages/packages.service';
 
 @ApiTags('users')
@@ -39,7 +38,6 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly s3Service: S3Service,
-    private readonly CoursesService: CoursesService,
     private readonly PackagesService: PackagesService,
   ) {}
 

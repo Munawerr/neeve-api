@@ -4,10 +4,10 @@ import mongoose, { Document, Types } from 'mongoose';
 @Schema()
 export class Package extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Course' })
-  course: Types.ObjectId;
+  course: mongoose.Schema.Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Class' })
-  class: Types.ObjectId;
+  class: mongoose.Schema.Types.ObjectId;
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],

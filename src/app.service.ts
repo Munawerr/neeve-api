@@ -38,7 +38,7 @@ export class AppService implements OnModuleInit {
           'manage_packages',
           'manage_all_reports',
           'manage_tests',
-          'manage_chapters',
+          'manage_topics',
         ],
       },
       {
@@ -49,7 +49,7 @@ export class AppService implements OnModuleInit {
           'view_own_packages',
           'manage_own_students',
           'manage_tests',
-          'manage_chapters',
+          'manage_topics',
           'manage_studykit',
           'manage_course_reports',
           'manage_subject_reports',

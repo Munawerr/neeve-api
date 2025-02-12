@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 
-export class CreateChapterDto {
+export class CreateTopicDto {
   @ApiProperty({ example: 'CH101' })
   readonly code: string;
 

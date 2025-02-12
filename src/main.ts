@@ -6,8 +6,8 @@ import { ClassesModule } from './classes/classes.module';
 import { CoursesModule } from './courses/courses.module';
 import { PackagesModule } from './packages/packages.module';
 import { SubjectsModule } from './subjects/subjects.module';
-import { ChaptersModule } from './chapters/chapters.module';
-import { SubChaptersModule } from './subChapters/subChapters.module';
+import { TopicsModule } from './topics/topics.module';
+import { SubTopicsModule } from './subTopics/subTopics.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,8 +27,8 @@ async function bootstrap() {
       PackagesModule,
       SubjectsModule,
       UsersModule,
-      ChaptersModule,
-      SubChaptersModule,
+      TopicsModule,
+      SubTopicsModule,
     ],
   });
   SwaggerModule.setup('docs', app, document);

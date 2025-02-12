@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 
-export class UpdateChapterDto {
+export class UpdateTopicDto {
   @ApiPropertyOptional({ example: 'CH101' })
   readonly code?: string;
 

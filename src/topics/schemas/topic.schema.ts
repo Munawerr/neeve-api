@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 @Schema()
-export class Chapter extends Document {
+export class Topic extends Document {
   @Prop({ required: true })
   code: string;
 
@@ -15,8 +15,8 @@ export class Chapter extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   institute: MongooseSchema.Types.ObjectId;
 
-  @Prop([{ type: Types.ObjectId, ref: 'SubChapter' }])
-  subChapters: MongooseSchema.Types.ObjectId[];
+  @Prop([{ type: Types.ObjectId, ref: 'SubTopic' }])
+  subTopics: MongooseSchema.Types.ObjectId[];
 }
 
-export const ChapterSchema = SchemaFactory.createForClass(Chapter);
+export const TopicSchema = SchemaFactory.createForClass(Topic);
