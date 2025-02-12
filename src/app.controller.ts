@@ -34,7 +34,6 @@ import { UsersService } from './users/users.service';
 import { Course } from './courses/schemas/course.schema';
 
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { S3Service } from './s3/s3.service';
 import { Messages } from './utils/messages';
 import { LoginDto } from './dto/login.dto';
 
@@ -46,7 +45,6 @@ export class AppController {
     private readonly authService: AuthService,
     private readonly coursesService: CoursesService,
     private readonly usersService: UsersService,
-    private readonly s3Service: S3Service,
   ) {}
 
   @Get()
@@ -292,52 +290,5 @@ export class AppController {
       status: HttpStatus.OK,
       message: Messages.passwordReset,
     };
-  }
-
-  @Post('upload/document')
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Upload document' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Document uploaded successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'number' },
-        message: { type: 'string' },
-        url: { type: 'string' },
-      },
-    },
-  })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid file' })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Failed to upload document',
-  })
-  async uploadDocument(
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<{ status: number; message: string; url?: string }> {
-    if (!file) {
-      return {
-        status: HttpStatus.BAD_REQUEST,
-        message: 'File is required',
-      };
-    }
-    try {
-      const fileUrl = await this.s3Service.uploadAndSaveDocument(file);
-      return {
-        status: HttpStatus.OK,
-        message: 'Document uploaded successfully',
-        url: fileUrl,
-      };
-    } catch (error) {
-      console.log('error', error);
-      return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Failed to upload document',
-      };
-    }
   }
 }
