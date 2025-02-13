@@ -22,7 +22,13 @@ export class TopicsService {
   }
 
   findOne(id: string): Promise<Topic | null> {
-    return this.topicModel.findById(id).populate('subTopics').exec();
+    return this.topicModel
+      .findById(id)
+      .populate('subTopics')
+      .populate('studyNotes')
+      .populate('studyPlans')
+      .populate('practiceProblems')
+      .exec();
   }
 
   findAllBySubjectAndInstitute(
@@ -35,10 +41,7 @@ export class TopicsService {
       .exec();
   }
 
-  update(
-    id: string,
-    updateTopicDto: UpdateTopicDto,
-  ): Promise<Topic | null> {
+  update(id: string, updateTopicDto: UpdateTopicDto): Promise<Topic | null> {
     return this.topicModel
       .findByIdAndUpdate(id, updateTopicDto, { new: true })
       .exec();
