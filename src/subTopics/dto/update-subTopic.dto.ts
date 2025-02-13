@@ -8,9 +8,6 @@ export class UpdateSubTopicDto {
   @ApiPropertyOptional({ example: 'Introduction to Organic Chemistry' })
   readonly title?: string;
 
-  @ApiPropertyOptional({ example: '60d0fe4f5311236168a109cc' })
-  readonly topic?: Types.ObjectId;
-
   @ApiPropertyOptional({ example: ['https://example.com/intro1', 'https://example.com/intro2'] })
   readonly introVideoUrls?: string[];
 
