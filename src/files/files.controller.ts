@@ -6,6 +6,7 @@ import {
   UseInterceptors,
   UploadedFile,
   HttpStatus,
+  Get,
 } from '@nestjs/common';
 import { FilesService } from './files.service';
 import { CreateFileDto } from './dtos/create-file.dto';
@@ -79,6 +80,41 @@ export class FilesController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload document',
+      };
+    }
+  }
+
+  @Get('/user/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all files for a user' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Files retrieved successfully',
+    schema: {
+      type: 'array',
+      items: { type: 'object' }, // Return array of file objects
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve files',
+  })
+  async getUserFiles(
+    @Param('userId') userId: string,
+  ): Promise<{ status: number; message: string; files?: File[] }> {
+    try {
+      const files = await this.filesService.findByUserId(userId);
+      return {
+        status: HttpStatus.OK,
+        message: 'Files retrieved successfully',
+        files,
+      };
+    } catch (error) {
+      console.log('error', error);
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve files',
       };
     }
   }

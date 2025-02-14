@@ -13,5 +13,9 @@ export class FilesService {
     return createdFile.save();
   }
 
+  async findByUserId(userId: string): Promise<File[]> {
+    return this.fileModel.find({ user: userId }).exec();
+  }
+
   // Add more methods as needed
 }
