@@ -8,6 +8,7 @@ import { PackagesModule } from './packages/packages.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { TopicsModule } from './topics/topics.module';
 import { SubTopicsModule } from './subTopics/subTopics.module';
+import { FilesModule } from './files/files.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,6 +30,7 @@ async function bootstrap() {
       UsersModule,
       TopicsModule,
       SubTopicsModule,
+      FilesModule,
     ],
   });
   SwaggerModule.setup('docs', app, document);
