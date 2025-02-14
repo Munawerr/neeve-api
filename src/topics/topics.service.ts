@@ -18,7 +18,13 @@ export class TopicsService {
   }
 
   findAll(): Promise<Topic[]> {
-    return this.topicModel.find().populate('subTopics').exec();
+    return this.topicModel
+      .find()
+      .populate('subTopics')
+      .populate('studyNotes')
+      .populate('studyPlans')
+      .populate('practiceProblems')
+      .exec();
   }
 
   findOne(id: string): Promise<Topic | null> {
@@ -37,7 +43,18 @@ export class TopicsService {
   ): Promise<Topic[]> {
     return this.topicModel
       .find({ subject, institute })
-      .populate('subTopics')
+      .populate({
+        path: 'subTopics',
+        model: 'SubTopic',
+        populate: [
+          { path: 'studyNotes', model: 'File' },
+          { path: 'studyPlans', model: 'File' },
+          { path: 'practiceProblems', model: 'File' },
+        ],
+      })
+      .populate('studyNotes')
+      .populate('studyPlans')
+      .populate('practiceProblems')
       .exec();
   }
 
