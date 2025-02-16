@@ -21,7 +21,7 @@ export class Topic extends Document {
   @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Topic' }])
   subTopics: MongooseSchema.Types.ObjectId[];
 
-  @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Test' }])
+  @Prop([{ type: [MongooseSchema.Types.ObjectId], ref: 'Test' }])
   tests: MongooseSchema.Types.ObjectId[];
 
   @Prop([String])

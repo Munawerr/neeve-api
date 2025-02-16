@@ -18,7 +18,4 @@ export class UpdateQuestionDto {
 
   @ApiPropertyOptional({ type: [OptionDto] })
   readonly options?: OptionDto[];
-
-  @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
-  readonly test?: Types.ObjectId;
 }
