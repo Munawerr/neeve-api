@@ -23,6 +23,9 @@ export class Test extends Document {
 
   @Prop({ required: true, enum: TestType })
   testType: TestType;
+
+  @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'Question' })
+  questions: MongooseSchema.Types.ObjectId[];
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);
