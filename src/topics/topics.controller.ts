@@ -74,7 +74,7 @@ export class TopicsController {
         topic.tests = [...topic.tests, ...subTopic.tests];
       });
 
-      const { subTopics, ...rest } = topic;
+      const { subTopics, ...rest } = topic.toObject();
       _topics.push(rest);
     });
 
