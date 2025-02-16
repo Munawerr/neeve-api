@@ -19,7 +19,14 @@ export class TestsService {
   }
 
   async findOne(id: string): Promise<Test | null> {
-    return this.testModel.findById(id).exec();
+    return this.testModel
+      .findById(id)
+      .populate('topic')
+      .populate({
+        path: 'questions',
+        model: 'Question',
+      })
+      .exec();
   }
 
   async update(id: string, updateTestDto: UpdateTestDto): Promise<Test | null> {
