@@ -68,16 +68,20 @@ export class TopicsController {
       instituteId,
     );
 
+    const _topics: any[] = [];
     topics.forEach((topic) => {
       topic.toObject().subTopics.forEach((subTopic) => {
         topic.tests = [...topic.tests, ...subTopic.tests];
       });
+
+      const { subTopics, ...rest } = topic;
+      _topics.push(rest);
     });
 
     return {
       status: HttpStatus.OK,
       message: 'Topics retrieved successfully',
-      data: topics,
+      data: _topics,
     };
   }
 
