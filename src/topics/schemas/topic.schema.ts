@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types, Schema as MongooseSchema } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 
 @Schema()
 export class Topic extends Document {
@@ -9,14 +9,20 @@ export class Topic extends Document {
   @Prop({ required: true })
   title: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Subject', required: true })
+  @Prop({ required: true, default: true })
+  isParent: boolean;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject' })
   subject: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   institute: MongooseSchema.Types.ObjectId;
 
-  @Prop([{ type: Types.ObjectId, ref: 'SubTopic' }])
+  @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Topic' }])
   subTopics: MongooseSchema.Types.ObjectId[];
+
+  @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Test' }])
+  tests: MongooseSchema.Types.ObjectId[];
 
   @Prop([String])
   introVideoUrls: string[];
