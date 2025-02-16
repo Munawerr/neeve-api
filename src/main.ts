@@ -7,8 +7,11 @@ import { CoursesModule } from './courses/courses.module';
 import { PackagesModule } from './packages/packages.module';
 import { SubjectsModule } from './subjects/subjects.module';
 import { TopicsModule } from './topics/topics.module';
-import { SubTopicsModule } from './subTopics/subTopics.module';
 import { FilesModule } from './files/files.module';
+import { TestsModule } from './tests/tests.module';
+import { QuestionsModule } from './questions/questions.module';
+import { ResultsModule } from './results/results.module';
+import { QuestionResultsModule } from './question-results/question-results.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,8 +32,11 @@ async function bootstrap() {
       SubjectsModule,
       UsersModule,
       TopicsModule,
-      SubTopicsModule,
       FilesModule,
+      TestsModule,
+      QuestionsModule,
+      ResultsModule,
+      QuestionResultsModule,
     ],
   });
   SwaggerModule.setup('docs', app, document);

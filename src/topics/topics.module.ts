@@ -3,20 +3,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { TopicsController } from './topics.controller';
 import { TopicsService } from './topics.service';
 import { Topic, TopicSchema } from './schemas/topic.schema';
-import {
-  SubTopic,
-  SubTopicSchema,
-} from 'src/subTopics/schemas/subTopic.schema';
-import { SubTopicsService } from 'src/subTopics/subTopics.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Topic.name, schema: TopicSchema },
-      { name: SubTopic.name, schema: SubTopicSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Topic.name, schema: TopicSchema }]),
   ],
   controllers: [TopicsController],
-  providers: [TopicsService, SubTopicsService],
+  providers: [TopicsService],
 })
 export class TopicsModule {}

@@ -21,17 +21,12 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TopicsService } from './topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
-import { SubTopicsService } from '../subTopics/subTopics.service';
-import { CreateSubTopicDto } from '../subTopics/dto/create-subTopic.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 
 @ApiTags('topics')
 @Controller('topics')
 export class TopicsController {
-  constructor(
-    private readonly topicsService: TopicsService,
-    private readonly subTopicsService: SubTopicsService,
-  ) {}
+  constructor(private readonly topicsService: TopicsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -43,11 +38,46 @@ export class TopicsController {
     description: 'Topic created successfully',
   })
   async create(@Body() createTopicDto: CreateTopicDto) {
-    const topic = await this.topicsService.create(createTopicDto);
+    const topic = await this.topicsService.create({
+      ...createTopicDto,
+      isParent: true,
+    });
     return {
       status: HttpStatus.OK,
       message: 'Topic created successfully',
       data: topic,
+    };
+  }
+
+  @Get('subject/:subjectId/institute/:instituteId/tests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all topics with tests included' })
+  @ApiParam({ name: 'subjectId', required: true })
+  @ApiParam({ name: 'instituteId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Topics retrieved successfully',
+  })
+  async findAllWithTests(
+    @Param('subjectId') subjectId: string,
+    @Param('instituteId') instituteId: string,
+  ) {
+    const topics = await this.topicsService.findWithTestsBySubjectAndInstitute(
+      subjectId,
+      instituteId,
+    );
+
+    topics.forEach((topic) => {
+      topic.toObject().subTopics.forEach((subTopic) => {
+        topic.tests = [...topic.tests, ...subTopic.tests];
+      });
+    });
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Topics retrieved successfully',
+      data: topics,
     };
   }
 
@@ -147,7 +177,7 @@ export class TopicsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a subtopic to a topic' })
-  @ApiBody({ type: CreateSubTopicDto })
+  @ApiBody({ type: CreateTopicDto })
   @ApiParam({ name: 'id', required: true })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -155,7 +185,7 @@ export class TopicsController {
   })
   async addSubTopic(
     @Param('id') id: string,
-    @Body() createSubTopicDto: CreateSubTopicDto,
+    @Body() createTopicDto: CreateTopicDto,
   ) {
     const topic = await this.topicsService.findOne(id);
     if (!topic) {
@@ -164,7 +194,10 @@ export class TopicsController {
         message: 'Topic not found',
       };
     }
-    const subTopic = await this.subTopicsService.create(createSubTopicDto);
+    const subTopic = await this.topicsService.create({
+      ...createTopicDto,
+      isParent: false,
+    });
     topic.subTopics.push(subTopic._id as MongooseSchema.Types.ObjectId);
     await topic.save();
 

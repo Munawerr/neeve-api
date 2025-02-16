@@ -20,7 +20,15 @@ export class TopicsService {
   findAll(): Promise<Topic[]> {
     return this.topicModel
       .find()
-      .populate('subTopics')
+      .populate({
+        path: 'subTopics',
+        model: 'Topic',
+        populate: [
+          { path: 'studyNotes', model: 'File' },
+          { path: 'studyPlans', model: 'File' },
+          { path: 'practiceProblems', model: 'File' },
+        ],
+      })
       .populate('studyNotes')
       .populate('studyPlans')
       .populate('practiceProblems')
@@ -30,22 +38,47 @@ export class TopicsService {
   findOne(id: string): Promise<Topic | null> {
     return this.topicModel
       .findById(id)
-      .populate('subTopics')
+      .populate({
+        path: 'subTopics',
+        model: 'Topic',
+        populate: [
+          { path: 'studyNotes', model: 'File' },
+          { path: 'studyPlans', model: 'File' },
+          { path: 'practiceProblems', model: 'File' },
+        ],
+      })
       .populate('studyNotes')
       .populate('studyPlans')
       .populate('practiceProblems')
       .exec();
   }
 
+  findWithTestsBySubjectAndInstitute(
+    subject: string,
+    institute: string,
+    isParent: boolean = true,
+  ): Promise<Topic[]> {
+    return this.topicModel
+      .find({ subject, institute, isParent })
+      .populate('tests')
+      .populate({
+        path: 'subTopics',
+        model: 'Topic',
+        populate: [{ path: 'tests', model: 'Test' }],
+      })
+      .exec();
+  }
+
   findAllBySubjectAndInstitute(
     subject: string,
     institute: string,
+    isParent: boolean = true,
   ): Promise<Topic[]> {
     return this.topicModel
-      .find({ subject, institute })
+      .find({ subject, institute, isParent })
       .populate({
         path: 'subTopics',
-        model: 'SubTopic',
+        model: 'Topic',
         populate: [
           { path: 'studyNotes', model: 'File' },
           { path: 'studyPlans', model: 'File' },
