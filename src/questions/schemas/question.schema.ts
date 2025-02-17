@@ -20,9 +20,6 @@ export class Question extends Document {
 
   @Prop({ type: [{ text: String, isCorrect: Boolean }], required: true })
   options: Option[];
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Test', required: true })
-  test: MongooseSchema.Types.ObjectId;
 }
 
 export const QuestionSchema = SchemaFactory.createForClass(Question);
