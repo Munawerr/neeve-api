@@ -49,23 +49,23 @@ export class TopicsController {
     };
   }
 
-  @Get('subject/:subjectId/institute/:instituteId/tests')
+  @Get('subject/:subjectId/package/:packageId/tests')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all topics with tests included' })
   @ApiParam({ name: 'subjectId', required: true })
-  @ApiParam({ name: 'instituteId', required: true })
+  @ApiParam({ name: 'packageId', required: true })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Topics retrieved successfully',
   })
   async findAllWithTests(
     @Param('subjectId') subjectId: string,
-    @Param('instituteId') instituteId: string,
+    @Param('packageId') packageId: string,
   ) {
-    const topics = await this.topicsService.findWithTestsBySubjectAndInstitute(
+    const topics = await this.topicsService.findWithTestsBySubjectAndPackage(
       subjectId,
-      instituteId,
+      packageId,
     );
 
     const _topics: any[] = [];
@@ -85,23 +85,23 @@ export class TopicsController {
     };
   }
 
-  @Get('subject/:subjectId/institute/:instituteId')
+  @Get('subject/:subjectId/package/:packageId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all topics' })
   @ApiParam({ name: 'subjectId', required: true })
-  @ApiParam({ name: 'instituteId', required: true })
+  @ApiParam({ name: 'packageId', required: true })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Topics retrieved successfully',
   })
   async findAll(
     @Param('subjectId') subjectId: string,
-    @Param('instituteId') instituteId: string,
+    @Param('packageId') packageId: string,
   ) {
-    const topics = await this.topicsService.findAllBySubjectAndInstitute(
+    const topics = await this.topicsService.findAllBySubjectAndPackage(
       subjectId,
-      instituteId,
+      packageId,
     );
     return {
       status: HttpStatus.OK,

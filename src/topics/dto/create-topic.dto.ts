@@ -12,7 +12,7 @@ export class CreateTopicDto {
   readonly subject?: Types.ObjectId;
 
   @ApiProperty({ example: '60d0fe4f5311236168a109cb' })
-  readonly institute?: Types.ObjectId;
+  readonly package?: Types.ObjectId;
 
   @ApiProperty({
     example: ['https://example.com/intro1', 'https://example.com/intro2'],

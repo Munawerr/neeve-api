@@ -12,11 +12,14 @@ export class Topic extends Document {
   @Prop({ required: true, default: true })
   isParent: boolean;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Package' })
+  package: MongooseSchema.Types.ObjectId;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject' })
   subject: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
-  institute: MongooseSchema.Types.ObjectId;
+  user: MongooseSchema.Types.ObjectId;
 
   @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Topic' }])
   subTopics: MongooseSchema.Types.ObjectId[];
