@@ -53,13 +53,13 @@ export class TopicsService {
       .exec();
   }
 
-  findWithTestsBySubjectAndInstitute(
+  findWithTestsBySubjectAndPackage(
     subject: string,
-    institute: string,
+    pkg: string,
     isParent: boolean = true,
   ): Promise<Topic[]> {
     return this.topicModel
-      .find({ subject, institute, isParent })
+      .find({ subject, package: pkg, isParent })
       .populate('tests')
       .populate({
         path: 'subTopics',
@@ -69,13 +69,13 @@ export class TopicsService {
       .exec();
   }
 
-  findAllBySubjectAndInstitute(
+  findAllBySubjectAndPackage(
     subject: string,
-    institute: string,
+    pkg: string,
     isParent: boolean = true,
   ): Promise<Topic[]> {
     return this.topicModel
-      .find({ subject, institute, isParent })
+      .find({ subject, package: pkg, isParent })
       .populate({
         path: 'subTopics',
         model: 'Topic',
