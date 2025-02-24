@@ -4,6 +4,7 @@ import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { User } from '../users/schemas/user.schema';
 import * as bcrypt from 'bcrypt';
+import { hostname } from 'os';
 
 @Injectable()
 export class AuthService {
@@ -44,7 +45,10 @@ export class AuthService {
       user.verificationOtp = otp;
       user.verificationToken = token;
       await user.save();
-      await this.mailService.sendOtp(email, otp);
+
+      if (hostname() !== 'Munawer-PC') {
+        await this.mailService.sendOtp(email, otp);
+      }
     }
   }
 
@@ -65,8 +69,18 @@ export class AuthService {
   ): Promise<boolean> {
     const user = await this.usersService.findOne(id);
     if (user && user.verificationToken === token) {
-      user.password = await bcrypt.hash(newPassword, 10);
+      user.password = await bcrypt.hash(newPassword, 10); // Ensure both arguments are provided
       user.verificationToken = '';
+      await user.save();
+      return true;
+    }
+    return false;
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const user = await this.usersService.findOne(userId);
+    if (user && await bcrypt.compare(currentPassword, user.password)) {
+      user.password = await bcrypt.hash(newPassword, 10);
       await user.save();
       return true;
     }

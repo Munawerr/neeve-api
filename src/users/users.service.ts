@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
+import { Result } from './../results/schemas/result.schema'; // Import Result schema
 
 import { User } from './schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -17,6 +18,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Role.name) private roleModel: Model<Role>,
+    @InjectModel(Result.name) private resultModel: Model<Result>, // Inject Result model
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
@@ -33,6 +35,8 @@ export class UsersService {
             path: 'subjects',
           },
         })
+        .populate('role')
+        .populate('institute')
         .exec();
     }
     return this.userModel.findById(id).exec();
@@ -241,5 +245,67 @@ export class UsersService {
       throw new Error('Student role not found');
     }
     return studentRole._id;
+  }
+
+  async getUserAnalytics(user: User): Promise<any> {
+    const _user = user.toObject();
+    if (_user.role.slug === 'institute') {
+      const studentCount = await this.userModel.countDocuments({
+        institute: user._id,
+        role: await this.getStudentRoleId(),
+      });
+      const testResultsCount = await this.resultModel.countDocuments({
+        institute: user._id,
+      });
+      return { studentCount, testResultsCount };
+    } else if (_user.role.slug === 'student') {
+      const testResults = await this.resultModel
+        .find({ student: user._id })
+        .exec();
+      const testsTaken = testResults.length;
+      const totalScore = testResults.reduce(
+        (sum, result) => sum + result.marksPerQuestion * result.numOfQuestions,
+        0,
+      );
+      const acquiredScore = testResults.reduce(
+        (sum, result) =>
+          sum +
+          result
+            .toObject()
+            .questionResults.reduce(
+              (qSum, qResult: any) => qSum + qResult.score,
+              0,
+            ),
+        0,
+      );
+      const percentage = (acquiredScore / totalScore) * 100;
+      const avgTimePerQuestion =
+        testResults.reduce(
+          (sum, result) =>
+            sum +
+            (result.finishedAt.getTime() - result.startedAt.getTime()) /
+              result.numOfQuestions,
+          0,
+        ) /
+        testsTaken /
+        60000;
+      return {
+        testsTaken,
+        acquiredScore,
+        totalScore,
+        percentage,
+        avgTimePerQuestion,
+      };
+    } else if (_user.role.slug === 'admin') {
+      const instituteCount = await this.userModel.countDocuments({
+        role: await this.getInstituteRoleId(),
+      });
+      const studentCount = await this.userModel.countDocuments({
+        role: await this.getStudentRoleId(),
+      });
+      const testCount = await this.resultModel.countDocuments();
+      return { instituteCount, studentCount, testCount };
+    }
+    return {};
   }
 }

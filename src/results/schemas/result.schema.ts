@@ -15,6 +15,9 @@ export class Result extends Document {
   subject: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
+  institute: MongooseSchema.Types.ObjectId;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   student: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'QuestionResult' })

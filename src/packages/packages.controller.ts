@@ -50,7 +50,7 @@ export class PackagesController {
     status: HttpStatus.OK,
     description: 'Package created successfully',
   })
-  @SetMetadata('permissions', ['manage_packages'])
+  @SetMetadata('permissions', ['edit_packages'])
   async create(@Body() createPackageDto: CreatePackageDto) {
     const { course, class: classId, subjects, ...rest } = createPackageDto;
     const courseEntity = await this.coursesService.findOne(course);
@@ -89,7 +89,7 @@ export class PackagesController {
     status: HttpStatus.OK,
     description: 'Packages retrieved successfully',
   })
-  @SetMetadata('permissions', ['manage_packages', 'view_own_packages'])
+  @SetMetadata('permissions', ['view_packages'])
   async findAll(@Headers('authorization') authHeader: string) {
     const token = authHeader.split(' ')[1];
     let decodedToken;
@@ -160,7 +160,7 @@ export class PackagesController {
     status: HttpStatus.OK,
     description: 'Package updated successfully',
   })
-  @SetMetadata('permissions', ['manage_packages'])
+  @SetMetadata('permissions', ['edit_packages'])
   async update(
     @Param('id') id: string,
     @Body() updatePackageDto: UpdatePackageDto,
@@ -202,7 +202,7 @@ export class PackagesController {
     status: HttpStatus.OK,
     description: 'Package deleted successfully',
   })
-  @SetMetadata('permissions', ['manage_packages'])
+  @SetMetadata('permissions', ['delete_packages'])
   async remove(@Param('id') id: string) {
     await this.packagesService.remove(id);
     return {

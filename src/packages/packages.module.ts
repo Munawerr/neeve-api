@@ -15,6 +15,7 @@ import { ClassesService } from '../classes/classes.service';
 import { SubjectsService } from '../subjects/subjects.service';
 import { UsersService } from 'src/users/users.service';
 import { S3Service } from 'src/s3/s3.service';
+import { Result, ResultSchema } from 'src/results/schemas/result.schema';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { S3Service } from 'src/s3/s3.service';
       { name: Subject.name, schema: SubjectSchema },
       { name: User.name, schema: UserSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Result.name, schema: ResultSchema },
     ]),
   ],
   controllers: [PackagesController],
