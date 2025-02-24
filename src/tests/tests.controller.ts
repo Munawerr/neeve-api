@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  Res,
+  SetMetadata,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,6 +27,10 @@ import { TopicsService } from 'src/topics/topics.service';
 import { QuestionsService } from 'src/questions/questions.service';
 import { CreateQuestionDto } from 'src/questions/dto/create-question.dto';
 import { Schema as MongooseSchema } from 'mongoose';
+import { Response } from 'express';
+import * as ExcelJS from 'exceljs';
+import * as PDFDocument from 'pdfkit';
+import * as htmlToText from 'html-to-text';
 
 @ApiTags('tests')
 @Controller('tests')
@@ -197,5 +203,116 @@ export class TestsController {
       status: HttpStatus.OK,
       message: 'Question deleted successfully',
     };
+  }
+
+  @Get(':id/download/excel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download test as Excel' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Excel file generated successfully',
+  })
+  @SetMetadata('permissions', ['download_tests'])
+  async downloadExcel(@Param('id') id: string, @Res() res: Response) {
+    const test = await this.testsService.findOne(id);
+    if (!test) {
+      return res.status(HttpStatus.EXPECTATION_FAILED).json({
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Test not found',
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Test');
+
+    worksheet.columns = [
+      { header: 'Question', key: 'question', width: 50 },
+      { header: 'Options', key: 'options', width: 50 },
+    ];
+
+    for (const questionId of test.questions) {
+      const question = await this.questionsService.findOne(
+        questionId.toString(),
+      );
+
+      if (!question) continue;
+
+      const options = question.options
+        .map(
+          (option) =>
+            `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
+        )
+        .join(', ');
+      worksheet.addRow({
+        question: htmlToText.convert(question.text),
+        options,
+      });
+    }
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=test-${id}.xlsx`,
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
+  @Get(':id/download/pdf')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download test as PDF' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'PDF file generated successfully',
+  })
+  @SetMetadata('permissions', ['download_tests'])
+  async downloadPDF(@Param('id') id: string, @Res() res: Response) {
+    const test = await this.testsService.findOne(id);
+    if (!test) {
+      return res.status(HttpStatus.EXPECTATION_FAILED).json({
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Test not found',
+      });
+    }
+
+    const doc = new PDFDocument();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=test-${id}.pdf`);
+
+    doc.pipe(res);
+
+    doc.fontSize(20).text(htmlToText.convert(test.title), { align: 'center' });
+    doc.moveDown();
+
+    for (const questionId of test.questions) {
+      const question = await this.questionsService.findOne(
+        questionId.toString(),
+      );
+
+      if (!question) continue;
+
+      doc.fontSize(14).text(htmlToText.convert(question.text));
+      doc.moveDown();
+
+      question.options.forEach((option) => {
+        doc
+          .fontSize(12)
+          .text(
+            `- ${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
+          );
+      });
+
+      doc.moveDown();
+    }
+
+    doc.end();
   }
 }
