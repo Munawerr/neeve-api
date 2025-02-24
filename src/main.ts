@@ -12,6 +12,9 @@ import { TestsModule } from './tests/tests.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
 import { QuestionResultsModule } from './question-results/question-results.module';
+import { LiveClassesModule } from './liveClasses/liveClasses.module';
+import { ThreadsModule } from './threads/threads.module';
+import { DiscussionsModule } from './discussions/discussions.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -37,6 +40,9 @@ async function bootstrap() {
       QuestionsModule,
       ResultsModule,
       QuestionResultsModule,
+      LiveClassesModule,
+      ThreadsModule,
+      DiscussionsModule,
     ],
   });
   SwaggerModule.setup('docs', app, document);

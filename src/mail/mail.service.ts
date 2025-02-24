@@ -9,7 +9,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Your OTP Code',
-      template: './template', // The template file should be located in the templates folder
+      template: './verification', // The template file should be located in the templates folder
       context: {
         otp,
       },

@@ -98,11 +98,11 @@ export class UsersController {
   ) {
     try {
       const imageUrl = await this.s3Service.uploadFile(file);
-      const updatedImage = await this.usersService.updateImageUrl(id, imageUrl);
+      await this.usersService.updateImageUrl(id, imageUrl);
       return {
         status: HttpStatus.OK,
         message: 'Profile image updated successfully',
-        data: updatedImage,
+        data: imageUrl,
       };
     } catch (error) {
       return {
@@ -133,11 +133,11 @@ export class UsersController {
   ) {
     try {
       const coverUrl = await this.s3Service.uploadFile(file);
-      const updatedCover = await this.usersService.updateCoverUrl(id, coverUrl);
+      await this.usersService.updateCoverUrl(id, coverUrl);
       return {
         status: HttpStatus.OK,
         message: 'Profile cover updated successfully',
-        data: updatedCover,
+        data: coverUrl,
       };
     } catch (error) {
       return {
@@ -220,43 +220,6 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update institute user',
-        error: error.message,
-      };
-    }
-  }
-
-  @Get('institute/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get institute user by ID' })
-  @ApiParam({ name: 'id', required: true })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Institute user retrieved successfully',
-  })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Failed to retrieve institute user',
-  })
-  async getInstituteUser(@Param('id') id: string) {
-    try {
-      const user = await this.usersService.getInstituteUser(id);
-      if (user) {
-        const { password, ...userWithoutPassword } = user.toObject();
-        return {
-          status: HttpStatus.OK,
-          message: 'Institute user retrieved successfully',
-          data: userWithoutPassword,
-        };
-      }
-      return {
-        status: HttpStatus.NOT_FOUND,
-        message: 'Institute user not found',
-      };
-    } catch (error) {
-      return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Failed to retrieve institute user',
         error: error.message,
       };
     }
@@ -462,43 +425,6 @@ export class UsersController {
     }
   }
 
-  @Get('student/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get student user by ID' })
-  @ApiParam({ name: 'id', required: true })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Student user retrieved successfully',
-  })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Failed to retrieve student user',
-  })
-  async getStudentUser(@Param('id') id: string) {
-    try {
-      const user = await this.usersService.getStudentUser(id);
-      if (user) {
-        const { password, ...userWithoutPassword } = user.toObject();
-        return {
-          status: HttpStatus.OK,
-          message: 'Student user retrieved successfully',
-          data: userWithoutPassword,
-        };
-      }
-      return {
-        status: HttpStatus.NOT_FOUND,
-        message: 'Student user not found',
-      };
-    } catch (error) {
-      return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Failed to retrieve student user',
-        error: error.message,
-      };
-    }
-  }
-
   @Get('students')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -567,6 +493,44 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete student user',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve user',
+  })
+  async getUser(@Param('id') id: string) {
+    try {
+      const user = await this.usersService.findOne(id, true);
+      if (user) {
+        const { password, ...userWithoutPassword } = user.toObject();
+        const analytics = await this.usersService.getUserAnalytics(user);
+        return {
+          status: HttpStatus.OK,
+          message: 'User retrieved successfully',
+          data: { ...userWithoutPassword, analytics },
+        };
+      }
+      return {
+        status: HttpStatus.NOT_FOUND,
+        message: 'User not found',
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve user',
         error: error.message,
       };
     }

@@ -37,7 +37,10 @@ export class User extends Document {
   zip: string;
 
   @Prop()
-  instituteRegNo: string;
+  dob: string;
+
+  @Prop()
+  regNo: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   institute: MongooseSchema.Types.ObjectId;

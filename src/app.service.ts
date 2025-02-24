@@ -19,44 +19,71 @@ export class AppService implements OnModuleInit {
   }
 
   private async initRolesAndPermissions() {
-    const rolesCount = await this.roleModel.countDocuments();
-    if (rolesCount > 0) {
-      return;
-    }
-
     const roles = [
       {
         name: 'Admin',
         slug: 'admin',
         permissions: [
           'view_all_analytics',
-          'manage_institutes',
-          'manage_students',
-          'manage_courses',
-          'manage_classes',
-          'manage_subjects',
-          'manage_packages',
-          'manage_all_reports',
-          'manage_tests',
-          'manage_topics',
+          'view_all_reports',
+          'download_all_reports',
+          'view_institutes',
+          'edit_institutes',
+          'delete_institutes',
+          'view_students',
+          'edit_students',
+          'delete_students',
+          'view_courses',
+          'edit_courses',
+          'delete_courses',
+          'view_classes',
+          'edit_classes',
+          'delete_classes',
+          'view_subjects',
+          'edit_subjects',
+          'delete_subjects',
+          'view_packages',
+          'edit_packages',
+          'delete_packages',
+          'view_tests',
+          'edit_tests',
+          'delete_tests',
+          'download_tests',
+          'edit_topics',
+          'delete_topics',
+          'view_discussions',
+          'create_discussions',
+          'replay_discussions',
+          'delete_discussions',
+          'view_treads',
+          'create_threads',
+          'edit_treads',
+          'delete_treads',
         ],
       },
       {
         name: 'Institute',
         slug: 'institute',
         permissions: [
-          'view_own_analytics',
-          'view_own_packages',
-          'manage_own_students',
-          'manage_tests',
-          'manage_topics',
-          'manage_studykit',
-          'manage_course_reports',
-          'manage_subject_reports',
-          'manage_live_classes',
+          'view_course_reports',
+          'view_subject_reports',
+          'download_course_reports',
+          'download_subject_reports',
+          'view_analytics',
+          'view_packages',
+          'view_students',
+          'view_tests',
+          'download_tests',
+          'view_live_classes',
+          'edit_live_classes',
+          'delete_live_classes',
           'view_courses',
           'view_discussions',
           'replay_discussions',
+          'create_discussions',
+          'view_treads',
+          'create_threads',
+          'delete_treads',
         ],
       },
       {
@@ -65,15 +92,28 @@ export class AppService implements OnModuleInit {
         permissions: [
           'view_own_report',
           'view_live_classes',
-          'view_studykit',
           'view_tests',
           'view_discussions',
           'create_discussions',
+          'replay_discussions',
+          'view_treads',
+          'create_threads',
+          'delete_treads',
         ],
       },
     ];
 
-    await this.roleModel.insertMany(roles);
+    for (const roleData of roles) {
+      const existingRole = await this.roleModel.findOne({
+        slug: roleData.slug,
+      });
+      if (existingRole) {
+        existingRole.permissions = roleData.permissions;
+        await existingRole.save();
+      } else {
+        await this.roleModel.create(roleData);
+      }
+    }
   }
 
   private async createAdminUser() {

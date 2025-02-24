@@ -20,4 +20,6 @@ export enum Messages {
   otpResent = 'OTP has been resent to your email.',
   passwordReset = 'Your password has been reset successfully.',
   invalidToken = 'Invalid Token',
+  invalidPassword = 'Invalid current password',
+  passwordChanged = 'Password changed successfully',
 }

@@ -19,13 +19,13 @@ import {
 } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
-import { FileInterceptor } from '@nestjs/platform-express';
 
 import {
   ForgotPasswordDto,
   VerifyOtpDto,
   ResendOtpDto,
   ResetPasswordDto,
+  ChangePasswordDto,
 } from './dto/auth.dto';
 import { AppService } from './app.service';
 import { AuthService } from './auth/auth.service';
@@ -208,8 +208,8 @@ export class AppController {
     const { email } = forgotPasswordDto;
     const otp =
       process.env.NODE_ENV === 'development'
-        ? '0000'
-        : Math.floor(1000 + Math.random() * 9000).toString();
+        ? '000000'
+        : Math.floor(100000 + Math.random() * 999999).toString();
     const token = uuidv4();
     await this.authService.sendOtp(email, otp, token);
     return {
@@ -254,8 +254,8 @@ export class AppController {
     const { email } = resendOtpDto;
     const otp =
       process.env.NODE_ENV === 'development'
-        ? '0000'
-        : Math.floor(1000 + Math.random() * 9000).toString();
+        ? '000000'
+        : Math.floor(100000 + Math.random() * 999999).toString();
     const token = uuidv4();
     await this.authService.sendOtp(email, otp, token);
     return {
@@ -289,6 +289,46 @@ export class AppController {
     return {
       status: HttpStatus.OK,
       message: Messages.passwordReset,
+    };
+  }
+
+  @Post('auth/change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change password' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Password changed successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid password',
+  })
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { currentPassword, newPassword } = changePasswordDto;
+    const token = authHeader.split(' ')[1];
+    let decodedToken;
+    decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+    const userId: string = decodedToken.sub;
+
+    const isChanged = await this.authService.changePassword(
+      userId,
+      currentPassword,
+      newPassword,
+    );
+    if (!isChanged) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: Messages.invalidPassword,
+      };
+    }
+    return {
+      status: HttpStatus.OK,
+      message: Messages.passwordChanged,
     };
   }
 }
