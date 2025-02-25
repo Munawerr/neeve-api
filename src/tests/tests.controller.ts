@@ -31,6 +31,8 @@ import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
 import * as PDFDocument from 'pdfkit';
 import * as htmlToText from 'html-to-text';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 
 @ApiTags('tests')
 @Controller('tests')
@@ -233,21 +235,54 @@ export class TestsController {
     ];
 
     for (const questionId of test.questions) {
+      const _quest: any = questionId;
       const question = await this.questionsService.findOne(
-        questionId.toString(),
+        _quest._id.toString(),
       );
 
-      if (!question) continue;
+      if (!question) {
+        continue;
+      }
 
-      const options = question.options
-        .map(
-          (option) =>
-            `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
-        )
-        .join(', ');
-      worksheet.addRow({
-        question: htmlToText.convert(question.text),
-        options,
+      const $ = cheerio.load(question.text);
+      const images: { imgTag: string; imageId: number }[] = [];
+      const imgElements = $('img').toArray();
+      for (const img of imgElements) {
+        const imgUrl = $(img).attr('src');
+        if (imgUrl) {
+          const response = await axios.get(imgUrl, {
+            responseType: 'arraybuffer',
+          });
+          const imageId = workbook.addImage({
+            buffer: response.data,
+            extension: 'png',
+          });
+          images.push({ imgTag: $.html(img), imageId });
+          $(img).replaceWith(`{img-${imageId}}`);
+        }
+      }
+
+      const questionText = $.html();
+
+      const row = worksheet.addRow({
+        question: htmlToText.convert(questionText),
+        options: question.options
+          .map(
+            (option) =>
+              `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
+          )
+          .join(', '),
+      });
+
+      images.forEach(({ imgTag, imageId }) => {
+        const cell = worksheet.getCell(`A${row.number}`);
+        if (typeof cell.value === 'string') {
+          cell.value = cell.value.replace(`{img-${imageId}}`, '');
+        }
+        worksheet.addImage(imageId, {
+          tl: { col: 0, row: row.number - 1 },
+          ext: { width: 100, height: 100 },
+        });
       });
     }
 
@@ -293,13 +328,44 @@ export class TestsController {
     doc.moveDown();
 
     for (const questionId of test.questions) {
+      const _quest: any = questionId;
       const question = await this.questionsService.findOne(
-        questionId.toString(),
+        _quest._id.toString(),
       );
 
-      if (!question) continue;
+      if (!question) {
+        continue;
+      }
 
-      doc.fontSize(14).text(htmlToText.convert(question.text));
+      const $ = cheerio.load(question.text);
+
+      const imgElements = $('img').toArray();
+      const images: any[] = [];
+
+      for (const img of imgElements) {
+        const imgUrl = $(img).attr('src');
+        if (imgUrl) {
+          const response = await axios.get(imgUrl, {
+            responseType: 'arraybuffer',
+          });
+          const imgBuffer = Buffer.from(response.data, 'binary');
+          images.push({ imgTag: $.html(img), imgBuffer });
+          $(img).replaceWith(`{img-${imgBuffer.toString('base64')}}`);
+        }
+      }
+
+      const questionText = $.html();
+
+      const parts = questionText.split(/(\{img-[^}]+\})/g);
+      parts.forEach((part) => {
+        const imgMatch = part.match(/\{img-([^}]+)\}/);
+        if (imgMatch) {
+          const imgBuffer = Buffer.from(imgMatch[1], 'base64');
+          doc.image(imgBuffer);
+        } else {
+          doc.fontSize(14).text(htmlToText.convert(part));
+        }
+      });
       doc.moveDown();
 
       question.options.forEach((option) => {
@@ -314,5 +380,8 @@ export class TestsController {
     }
 
     doc.end();
+    doc.on('finish', () => {
+      res.end();
+    });
   }
 }
