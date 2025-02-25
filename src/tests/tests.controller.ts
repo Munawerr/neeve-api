@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpStatus,
   Res,
+  SetMetadata,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -207,7 +208,7 @@ export class TestsController {
   }
 
   @Get(':id/download/excel')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download test as Excel' })
   @ApiParam({ name: 'id', required: true })
@@ -215,6 +216,7 @@ export class TestsController {
     status: HttpStatus.OK,
     description: 'Excel file generated successfully',
   })
+  @SetMetadata('permissions', ['download_tests'])
   async downloadExcel(@Param('id') id: string, @Res() res: Response) {
     const test = await this.testsService.findOne(id);
     if (!test) {
@@ -298,7 +300,7 @@ export class TestsController {
   }
 
   @Get(':id/download/pdf')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download test as PDF' })
   @ApiParam({ name: 'id', required: true })
@@ -306,6 +308,7 @@ export class TestsController {
     status: HttpStatus.OK,
     description: 'PDF file generated successfully',
   })
+  @SetMetadata('permissions', ['download_tests'])
   async downloadPDF(@Param('id') id: string, @Res() res: Response) {
     const test = await this.testsService.findOne(id);
     if (!test) {
