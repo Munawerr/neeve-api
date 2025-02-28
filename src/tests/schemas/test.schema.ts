@@ -12,7 +12,7 @@ export class Test extends Document {
   @Prop({ required: true })
   title: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Topic', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Topic' })
   topic: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject', required: true })
