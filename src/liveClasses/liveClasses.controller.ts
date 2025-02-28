@@ -66,15 +66,12 @@ export class LiveClassesController {
     @Query('search') search: string = '',
   ) {
     try {
-      const { liveClasses, total } = await this.liveClassesService.findAllWithPaging(
-        page,
-        limit,
-        search,
-      );
+      const { liveClasses, total } =
+        await this.liveClassesService.findAllWithPaging(page, limit, search);
       return {
         status: HttpStatus.OK,
         message: 'Live classes retrieved successfully',
-        data: { liveClasses, total },
+        data: { items: liveClasses, total },
       };
     } catch (error) {
       return {
