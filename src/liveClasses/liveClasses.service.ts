@@ -26,6 +26,8 @@ export class LiveClassesService {
       .find(query)
       .skip((page - 1) * limit)
       .limit(limit)
+      .populate('package')
+      .populate('subject')
       .exec();
     const total = await this.liveClassModel.countDocuments(query).exec();
     return { liveClasses, total };

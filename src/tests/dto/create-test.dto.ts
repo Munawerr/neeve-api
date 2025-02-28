@@ -6,8 +6,11 @@ export class CreateTestDto {
   @ApiProperty({ example: 'Midterm Exam' })
   readonly title: string;
 
+  @ApiProperty({ example: '60d0fe4f5311236168a109ca', required: false })
+  readonly topic?: Types.ObjectId;
+
   @ApiProperty({ example: '60d0fe4f5311236168a109ca' })
-  readonly topic: Types.ObjectId;
+  readonly subject: Types.ObjectId;
 
   @ApiProperty({ example: 5 })
   readonly marksPerQuestion: number;

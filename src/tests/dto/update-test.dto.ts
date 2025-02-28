@@ -9,6 +9,9 @@ export class UpdateTestDto {
   @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
   readonly topic?: Types.ObjectId;
 
+  @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
+  readonly subject?: Types.ObjectId;
+
   @ApiPropertyOptional({ example: 5 })
   readonly marksPerQuestion?: number;
 
