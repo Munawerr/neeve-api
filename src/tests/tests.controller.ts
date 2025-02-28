@@ -55,10 +55,12 @@ export class TestsController {
   async create(@Body() createTestDto: CreateTestDto) {
     const test = await this.testsService.create(createTestDto);
 
-    const topic = await this.topicsService.findOne(test.topic.toString());
+    if (test.topic) {
+      const topic = await this.topicsService.findOne(test.topic.toString());
 
-    topic?.tests.push(test._id as MongooseSchema.Types.ObjectId);
-    topic?.save();
+      topic?.tests.push(test._id as MongooseSchema.Types.ObjectId);
+      topic?.save();
+    }
 
     return {
       status: HttpStatus.OK,
