@@ -67,16 +67,16 @@ export class TestsController {
     };
   }
 
-  @Get()
+  @Get('subject/:subject/mock')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all tests' })
+  @ApiOperation({ summary: 'Get all mock tests' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Tests retrieved successfully',
   })
-  async findAll() {
-    const tests = await this.testsService.findAll();
+  async findAll(@Param('subject') subject: string) {
+    const tests = await this.testsService.findAllMockTests(subject);
     return {
       status: HttpStatus.OK,
       message: 'Tests retrieved successfully',

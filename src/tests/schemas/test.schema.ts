@@ -15,6 +15,9 @@ export class Test extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Topic', required: true })
   topic: MongooseSchema.Types.ObjectId;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject', required: true })
+  subject: MongooseSchema.Types.ObjectId;
+
   @Prop({ required: true })
   marksPerQuestion: number;
 
