@@ -86,6 +86,61 @@ export class TestsController {
     };
   }
 
+  @Get('subject/:subjectId/mock-tests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all mock tests by subject ID' })
+  @ApiParam({ name: 'subjectId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Mock tests retrieved successfully',
+  })
+  async getMockTestsBySubject(@Param('subjectId') subjectId: string) {
+    const tests = await this.testsService.findAllMockTests(subjectId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Mock tests retrieved successfully',
+      data: tests,
+    };
+  }
+
+  @Get('topic/:topicId/tests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all tests by topic ID' })
+  @ApiParam({ name: 'topicId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tests retrieved successfully',
+  })
+  async getTestsByTopic(@Param('topicId') topicId: string) {
+    const tests = await this.testsService.findTestsByTopic(topicId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Tests retrieved successfully',
+      data: tests,
+    };
+  }
+
+  @Get('all-tests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all tests by subject ID and topic ID' })
+  @ApiParam({ name: 'subjectId', required: true })
+  @ApiParam({ name: 'topicId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tests retrieved successfully',
+  })
+  async getAllTests(@Param('subjectId') subjectId: string, @Param('topicId') topicId: string) {
+    const { mockTests, otherTests } = await this.testsService.findAllTests(subjectId, topicId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Tests retrieved successfully',
+      data: { mockTests, otherTests },
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
