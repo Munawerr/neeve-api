@@ -308,4 +308,13 @@ export class UsersService {
     }
     return {};
   }
+
+  async getAllInstituteUsersForDropdown(): Promise<User[]> {
+    const instituteRoleId = await this.getInstituteRoleId();
+    return this.userModel
+      .find({ role: instituteRoleId })
+      .select('full_name _id packages')
+      .populate('packages')
+      .exec();
+  }
 }

@@ -307,7 +307,36 @@ export class UsersController {
       return {
         status: HttpStatus.OK,
         message: 'Institute users retrieved successfully',
-        data: { users, total },
+        data: { items: users, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve institute users',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('dropdown/institutes')
+  // @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all institute users for dropdown' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Institute users retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve institute users',
+  })
+  async getAllInstituteUsersForDropdown() {
+    try {
+      const users = await this.usersService.getAllInstituteUsersForDropdown();
+      return {
+        status: HttpStatus.OK,
+        message: 'Institute users retrieved successfully',
+        data: users,
       };
     } catch (error) {
       return {
@@ -457,7 +486,7 @@ export class UsersController {
       return {
         status: HttpStatus.OK,
         message: 'Student users retrieved successfully',
-        data: { users, total },
+        data: { items: users, total },
       };
     } catch (error) {
       return {
