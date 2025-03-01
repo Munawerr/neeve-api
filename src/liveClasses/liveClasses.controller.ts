@@ -52,6 +52,7 @@ export class LiveClassesController {
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all live classes' })
+  @ApiQuery({ name: 'institute', required: true })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'search', required: false })
@@ -61,13 +62,19 @@ export class LiveClassesController {
   })
   @SetMetadata('permissions', ['view_live_classes'])
   async findAll(
+    @Query('institute') institute: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
   ) {
     try {
       const { liveClasses, total } =
-        await this.liveClassesService.findAllWithPaging(page, limit, search);
+        await this.liveClassesService.findAllWithPaging(
+          institute,
+          page,
+          limit,
+          search,
+        );
       return {
         status: HttpStatus.OK,
         message: 'Live classes retrieved successfully',
