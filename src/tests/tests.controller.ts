@@ -122,7 +122,7 @@ export class TestsController {
     };
   }
 
-  @Get('all-tests')
+  @Get('subject/:subjectId/topic/:topicId/all')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all tests by subject ID and topic ID' })
@@ -132,8 +132,14 @@ export class TestsController {
     status: HttpStatus.OK,
     description: 'Tests retrieved successfully',
   })
-  async getAllTests(@Param('subjectId') subjectId: string, @Param('topicId') topicId: string) {
-    const { mockTests, otherTests } = await this.testsService.findAllTests(subjectId, topicId);
+  async getAllTests(
+    @Param('subjectId') subjectId: string,
+    @Param('topicId') topicId: string,
+  ) {
+    const { mockTests, otherTests } = await this.testsService.findAllTests(
+      subjectId,
+      topicId,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Tests retrieved successfully',

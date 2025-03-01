@@ -20,18 +20,25 @@ export class LiveClassesService {
     return this.liveClassModel.find().exec();
   }
 
-  async findAllWithPaging(page: number, limit: number, search: string) {
-    const query = search ? { title: { $regex: search, $options: 'i' } } : {};
+  async findAllWithPaging(
+    institute: string,
+    page: number,
+    limit: number,
+    search: string,
+  ) {
+    const query = search
+      ? { institute, title: { $regex: search, $options: 'i' } }
+      : { institute };
     const liveClasses = await this.liveClassModel
       .find(query)
       .skip((page - 1) * limit)
       .limit(limit)
       .populate({
-        path: 'packages',
+        path: 'package',
         model: 'Package',
         populate: [
-          { path: 'courses', model: 'Course' },
-          { path: 'classes', model: 'Class' },
+          { path: 'course', model: 'Course' },
+          { path: 'class', model: 'Class' },
         ],
       })
       .populate('subject')
