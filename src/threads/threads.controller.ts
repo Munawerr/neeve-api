@@ -63,11 +63,16 @@ export class ThreadsController {
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
   ) {
-    const threads = await this.threadsService.findAllByTopicId(topicId, page, limit, search);
+    const { threads, total } = await this.threadsService.findAllByTopicId(
+      topicId,
+      page,
+      limit,
+      search,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Threads retrieved successfully',
-      data: threads,
+      data: { items: threads, total },
     };
   }
 
