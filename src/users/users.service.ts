@@ -145,7 +145,7 @@ export class UsersService {
       role: await this.getInstituteRoleId(),
       ...(search && {
         $or: [
-          { name: { $regex: search, $options: 'i' } },
+          { full_name: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
         ],
       }),
@@ -205,7 +205,7 @@ export class UsersService {
   }
 
   async getStudentUser(id: string): Promise<User | null> {
-    return this.userModel.findById(id).exec();
+    return this.userModel.findById(id).populate('packages').exec();
   }
 
   async getAllStudentUsers(
@@ -218,7 +218,7 @@ export class UsersService {
       role: await this.getStudentRoleId(),
       ...(search && {
         $or: [
-          { name: { $regex: search, $options: 'i' } },
+          { full_name: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
         ],
       }),
@@ -228,6 +228,7 @@ export class UsersService {
       .find(filter)
       .skip((page - 1) * limit)
       .limit(limit)
+      .populate('packages')
       .exec();
     const total = await this.userModel.countDocuments(filter);
     return { users, total };
