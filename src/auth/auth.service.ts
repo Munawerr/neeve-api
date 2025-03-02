@@ -47,7 +47,7 @@ export class AuthService {
       await user.save();
 
       if (hostname() !== 'Munawer-PC') {
-        await this.mailService.sendOtp(email, otp);
+        // await this.mailService.sendOtp(email, otp);
       }
     }
   }
