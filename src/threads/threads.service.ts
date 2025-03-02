@@ -14,35 +14,44 @@ export class ThreadsService {
     return createdThread.save();
   }
 
-  findAll(
+  async findAll(
     page: number = 1,
     limit: number = 10,
     search: string = '',
-  ): Promise<Thread[]> {
+  ): Promise<{ threads: Thread[]; total: number }> {
     const skip = (page - 1) * limit;
     const query = search ? { title: { $regex: search, $options: 'i' } } : {};
-    return this.threadModel
+    const threads = await this.threadModel
       .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate('user')
       .exec();
+    const total = await this.threadModel.countDocuments(query).exec();
+    return { threads, total };
   }
 
-  async findAllByTopicId(topicId: string, page: number, limit: number, search: string): Promise<Thread[]> {
+  async findAllByTopicId(
+    topicId: string,
+    page: number,
+    limit: number,
+    search: string,
+  ): Promise<{ threads: Thread[]; total: number }> {
     const skip = (page - 1) * limit;
     const query = {
       topic: topicId,
       ...(search && { title: { $regex: search, $options: 'i' } }),
     };
-    return this.threadModel
+    const threads = await this.threadModel
       .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate('user')
       .exec();
+    const total = await this.threadModel.countDocuments(query).exec();
+    return { threads, total };
   }
 
   findOne(id: string): Promise<Thread | null> {

@@ -16,14 +16,17 @@ export class DiscussionsService {
     return createdDiscussion.save();
   }
 
-  findAll(
+  async findAll(
+    threadId: string,
     page: number = 1,
     limit: number = 10,
     search: string = '',
-  ): Promise<Discussion[]> {
+  ): Promise<{ discussions: Discussion[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query = search ? { content: { $regex: search, $options: 'i' } } : {};
-    return this.discussionModel
+    const query = search
+      ? { thread: threadId, content: { $regex: search, $options: 'i' } }
+      : { thread: threadId };
+    const discussions = await this.discussionModel
       .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -31,6 +34,8 @@ export class DiscussionsService {
       .populate('thread')
       .populate('user')
       .exec();
+    const total = await this.discussionModel.countDocuments(query).exec();
+    return { discussions, total };
   }
 
   findOne(id: string): Promise<Discussion | null> {

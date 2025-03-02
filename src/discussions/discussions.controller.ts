@@ -47,8 +47,9 @@ export class DiscussionsController {
     };
   }
 
-  @Get()
-  @ApiOperation({ summary: 'Get all discussions' })
+  @Get('thread/:threadId')
+  @ApiOperation({ summary: 'Get all discussions by thread ID' })
+  @ApiParam({ name: 'threadId', required: true })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'search', required: false })
@@ -57,11 +58,13 @@ export class DiscussionsController {
     description: 'Discussions retrieved successfully',
   })
   async findAll(
+    @Param('threadId') threadId: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
   ) {
-    const discussions = await this.discussionsService.findAll(
+    const { discussions, total } = await this.discussionsService.findAll(
+      threadId,
       page,
       limit,
       search,
@@ -69,7 +72,7 @@ export class DiscussionsController {
     return {
       status: HttpStatus.OK,
       message: 'Discussions retrieved successfully',
-      data: discussions,
+      data: { items: discussions, total },
     };
   }
 
