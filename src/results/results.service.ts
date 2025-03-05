@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Result } from './schemas/result.schema';
-import { CreateResultDto } from './dto/create-result.dto';
+import { CreateResultServiceDto } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 
 @Injectable()
 export class ResultsService {
   constructor(@InjectModel(Result.name) private resultModel: Model<Result>) {}
 
-  async create(createResultDto: CreateResultDto): Promise<Result> {
+  async create(createResultDto: CreateResultServiceDto): Promise<Result> {
     const createdResult = new this.resultModel(createResultDto);
     return createdResult.save();
   }

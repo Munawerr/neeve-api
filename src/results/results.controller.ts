@@ -19,7 +19,10 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResultsService } from './results.service';
-import { CreateResultDto } from './dto/create-result.dto';
+import {
+  CreateResultDto,
+  CreateResultServiceDto,
+} from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 
 @ApiTags('results')
@@ -37,7 +40,11 @@ export class ResultsController {
     description: 'Result created successfully',
   })
   async create(@Body() createResultDto: CreateResultDto) {
-    const result = await this.resultsService.create(createResultDto);
+    const _result: CreateResultServiceDto = {
+      ...createResultDto,
+      startedAt: new Date(),
+    };
+    const result = await this.resultsService.create(_result);
     return {
       status: HttpStatus.OK,
       message: 'Result created successfully',

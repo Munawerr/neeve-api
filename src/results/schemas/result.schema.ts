@@ -26,10 +26,14 @@ export class Result extends Document {
   @Prop({ required: true })
   startedAt: Date;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   finishedAt: Date;
 
-  @Prop({ required: true, enum: ResultStatus })
+  @Prop({
+    required: true,
+    enum: ResultStatus,
+    default: ResultStatus.NOT_FINISHED,
+  })
   status: ResultStatus;
 
   @Prop({ required: true })
