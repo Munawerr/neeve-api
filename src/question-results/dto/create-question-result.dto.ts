@@ -7,7 +7,7 @@ class OptionDto {
   @ApiProperty({ example: true })
   readonly isCorrect: boolean;
 
-  @ApiProperty({ example: false })
+  @ApiProperty({ example: true })
   readonly isChecked: boolean;
 }
 
