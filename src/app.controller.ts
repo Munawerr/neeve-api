@@ -6,8 +6,6 @@ import {
   HttpStatus,
   UseGuards,
   Headers,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,

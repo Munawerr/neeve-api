@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class OptionDto {
   @ApiProperty({ example: 'Option 1' })
@@ -21,6 +21,6 @@ export class CreateQuestionResultDto {
   @ApiProperty({ type: [OptionDto] })
   readonly options: OptionDto[];
 
-  @ApiProperty({ example: 'The capital of France is Paris.' })
-  readonly corAnsExp: string;
+  @ApiPropertyOptional({ example: 'The capital of France is Paris.', required: false })
+  readonly corAnsExp?: string;
 }

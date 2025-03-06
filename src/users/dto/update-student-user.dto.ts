@@ -28,9 +28,10 @@ export class UpdateStudentUserDto {
   @IsOptional()
   zip?: string;
 
-  @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
+  @ApiPropertyOptional({ example: 'REG123456' })
+  @IsString()
   @IsOptional()
-  institute?: MongooseSchema.Types.ObjectId;
+  regNo?: string;
 
   @ApiProperty({ example: ['package1', 'package2'] })
   readonly packages: string[];
