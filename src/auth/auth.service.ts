@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
+import { SmsService } from '../sms/sms.service';
 import { User } from '../users/schemas/user.schema';
 import * as bcrypt from 'bcrypt';
 import { hostname } from 'os';
@@ -12,10 +13,19 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
+    private readonly smsService: SmsService,
   ) {}
 
   async validateUser(email: string, pass: string): Promise<User | null> {
     const user = await this.usersService.findByEmail(email);
+    if (user && (await bcrypt.compare(pass, user.password))) {
+      return user;
+    }
+    return null;
+  }
+
+  async validateUserById(userId: string, pass: string): Promise<User | null> {
+    const user = await this.usersService.findOne(userId);
     if (user && (await bcrypt.compare(pass, user.password))) {
       return user;
     }
@@ -39,15 +49,30 @@ export class AuthService {
     return { token, expiresIn, permissions };
   }
 
-  async sendOtp(email: string, otp: string, token: string): Promise<void> {
-    const user = await this.usersService.findByEmail(email);
+  async sendOtp(loginData: string, otp: string, token: string): Promise<void> {
+    let user;
+
+    if (loginData.includes('@')) {
+      user = await this.usersService.findByEmail(loginData);
+    } else if (/^\d+$/.test(loginData)) {
+      user = await this.usersService.findByPhone(loginData);
+    } else {
+      user = await this.usersService.findByRegNo(loginData);
+    }
+
     if (user) {
       user.verificationOtp = otp;
       user.verificationToken = token;
       await user.save();
 
-      if (hostname() !== 'Munawer-PC') {
-        // await this.mailService.sendOtp(email, otp);
+      if (user.email) {
+        if (hostname() !== 'Munawer-PC') {
+          // await this.mailService.sendOtp(user.email, otp);
+        }
+      }
+
+      if (user.phone) {
+        await this.smsService.sendOtp(user.phone, otp);
       }
     }
   }

@@ -22,4 +22,5 @@ export enum Messages {
   invalidToken = 'Invalid Token',
   invalidPassword = 'Invalid current password',
   passwordChanged = 'Password changed successfully',
+  userNotFound = 'User not found',
 }

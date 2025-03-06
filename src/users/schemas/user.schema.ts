@@ -40,6 +40,9 @@ export class User extends Document {
   dob: string;
 
   @Prop()
+  phone: string;
+
+  @Prop()
   regNo: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })

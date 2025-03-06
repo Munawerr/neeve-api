@@ -177,14 +177,20 @@ export class UsersService {
     createStudentUserDto: CreateStudentUserDto,
     file?: Express.Multer.File,
   ): Promise<User> {
-    const { password, ...userData } = createStudentUserDto;
+    const { password, regNo, ...userData } = createStudentUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+
+    const institute = await this.userModel.findOne({ regNo, role: await this.getInstituteRoleId() });
+    if (!institute) {
+      throw new Error('Institute not found');
+    }
+
     const newUser = new this.userModel({
       ...userData,
       password: hashedPassword,
-      role: await this.getStudentRoleId(), // Get student role ID
-      institute: userData.institute, // Reference to institute user
+      role: await this.getStudentRoleId(),
+      institute: institute._id,
       imageUrl,
     });
     return newUser.save();
@@ -317,5 +323,21 @@ export class UsersService {
       .select('full_name _id packages')
       .populate('packages')
       .exec();
+  }
+
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.userModel.findOne({ phone }).exec();
+  }
+
+  async findByEmailOrRegNo(loginData: string): Promise<User | null> {
+    return this.userModel
+      .findOne({
+        $or: [{ email: loginData }, { regNo: loginData }],
+      })
+      .exec();
+  }
+
+  async findByRegNo(regNo: string): Promise<User | null> {
+    return this.userModel.findOne({ regNo }).exec();
   }
 }

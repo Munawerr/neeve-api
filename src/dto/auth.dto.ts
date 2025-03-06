@@ -42,3 +42,23 @@ export class ChangePasswordDto {
   @IsNotEmpty()
   newPassword: string;
 }
+
+export class LoginStep1Dto {
+  @IsString()
+  @IsNotEmpty()
+  loginData: string;
+
+  @IsString()
+  @IsNotEmpty()
+  loginType: 'student' | 'institute' | 'admin';
+}
+
+export class LoginStep2Dto {
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}

@@ -1,5 +1,10 @@
-import { IsString, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
-import { Schema as MongooseSchema } from 'mongoose';
+import {
+  IsString,
+  IsPhoneNumber,
+  IsNotEmpty,
+  IsOptional,
+  IsEmail,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateStudentUserDto {
@@ -8,10 +13,15 @@ export class CreateStudentUserDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ example: 'john.doe@example.com' })
+  @ApiProperty({ example: 'john.doe@example.com', required: false })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email?: string;
+
+  @ApiProperty({ example: '+91312345789', required: false })
+  @IsPhoneNumber()
+  @IsNotEmpty()
+  phone?: string;
 
   @ApiProperty({ example: 'John Doe' })
   @IsString()
@@ -28,9 +38,10 @@ export class CreateStudentUserDto {
   @IsOptional()
   zip?: string;
 
-  @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
+  @ApiPropertyOptional({ example: 'REG123456' })
+  @IsString()
   @IsOptional()
-  institute?: MongooseSchema.Types.ObjectId;
+  regNo?: string;
 
   @ApiProperty({ example: ['package1', 'package2'] })
   readonly packages: string[];
