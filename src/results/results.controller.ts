@@ -24,6 +24,7 @@ import {
   CreateResultServiceDto,
 } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
+import { ResultStatus } from './schemas/result.schema';
 
 @ApiTags('results')
 @Controller('results')
@@ -100,17 +101,34 @@ export class ResultsController {
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a result' })
+  @ApiOperation({ summary: 'Finish a Test' })
   @ApiParam({ name: 'id', required: true })
   @ApiBody({ type: UpdateResultDto })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Result updated successfully',
+    description: 'Test Finished successfully',
   })
   async update(
     @Param('id') id: string,
     @Body() updateResultDto: UpdateResultDto,
   ) {
+    const result = await this.resultsService.findOne(id);
+    if (!result) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Result not found',
+      };
+    }
+    if (result.status === ResultStatus.FINISHED) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Test already finished',
+      };
+    }
+
+    updateResultDto.finishedAt = new Date();
+    updateResultDto.status = ResultStatus.FINISHED;
+
     const updatedResult = await this.resultsService.update(id, updateResultDto);
     return {
       status: HttpStatus.OK,

@@ -94,45 +94,45 @@ export class QuestionResultsController {
     };
   }
 
-  @Put(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a question result' })
-  @ApiParam({ name: 'id', required: true })
-  @ApiBody({ type: UpdateQuestionResultDto })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Question result updated successfully',
-  })
-  async update(
-    @Param('id') id: string,
-    @Body() updateQuestionResultDto: UpdateQuestionResultDto,
-  ) {
-    const updatedQuestionResult = await this.questionResultsService.update(
-      id,
-      updateQuestionResultDto,
-    );
-    return {
-      status: HttpStatus.OK,
-      message: 'Question result updated successfully',
-      data: updatedQuestionResult,
-    };
-  }
+  // @Put(':id')
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'Update a question result' })
+  // @ApiParam({ name: 'id', required: true })
+  // @ApiBody({ type: UpdateQuestionResultDto })
+  // @ApiResponse({
+  //   status: HttpStatus.OK,
+  //   description: 'Question result updated successfully',
+  // })
+  // async update(
+  //   @Param('id') id: string,
+  //   @Body() updateQuestionResultDto: UpdateQuestionResultDto,
+  // ) {
+  //   const updatedQuestionResult = await this.questionResultsService.update(
+  //     id,
+  //     updateQuestionResultDto,
+  //   );
+  //   return {
+  //     status: HttpStatus.OK,
+  //     message: 'Question result updated successfully',
+  //     data: updatedQuestionResult,
+  //   };
+  // }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a question result' })
-  @ApiParam({ name: 'id', required: true })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Question result deleted successfully',
-  })
-  async remove(@Param('id') id: string) {
-    await this.questionResultsService.remove(id);
-    return {
-      status: HttpStatus.OK,
-      message: 'Question result deleted successfully',
-    };
-  }
+  // @Delete(':id')
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'Delete a question result' })
+  // @ApiParam({ name: 'id', required: true })
+  // @ApiResponse({
+  //   status: HttpStatus.OK,
+  //   description: 'Question result deleted successfully',
+  // })
+  // async remove(@Param('id') id: string) {
+  //   await this.questionResultsService.remove(id);
+  //   return {
+  //     status: HttpStatus.OK,
+  //     message: 'Question result deleted successfully',
+  //   };
+  // }
 }
