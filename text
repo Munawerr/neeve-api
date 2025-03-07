@@ -1,1 +1,0 @@
-questionText, timerCount (how much time is spend while answering the test until this result is saved), options (array with the following properties: text, isCorrect, isChecked), corAnsExp,
