@@ -11,6 +11,7 @@ import {
   Get,
   Query,
   Delete,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -31,6 +32,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { PackagesService } from 'src/packages/packages.service';
+import { Workbook } from 'exceljs';
+import { Response, Express } from 'express';
 
 @ApiTags('users')
 @Controller('users')
@@ -525,6 +528,192 @@ export class UsersController {
         error: error.message,
       };
     }
+  }
+
+  @Post('students/bulk')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk create student users from Excel file' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Students created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to create students',
+  })
+  async bulkCreateStudents(@UploadedFile() file: Express.Multer.File) {
+    try {
+      const workbook = new Workbook();
+      await workbook.xlsx.load(file.buffer);
+      const worksheet = workbook.getWorksheet(1);
+
+      const students: any = [];
+      if (worksheet) {
+        const roleId = await this.usersService.getStudentRoleId();
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            // Skip header row
+            const student = {
+              full_name: row.getCell(1).value,
+              email: row.getCell(2).value,
+              phone: row.getCell(3).value,
+              city: row.getCell(4).value,
+              zip: row.getCell(5).value,
+              regNo: row.getCell(6).value,
+              role: roleId,
+              packages:
+                row && row.getCell(7).value
+                  ? row.getCell(7).value?.toString().split(',')
+                  : [],
+            };
+            students.push(student);
+          }
+        });
+      }
+
+      const createdStudents =
+        await this.usersService.bulkCreateStudents(students);
+      return {
+        status: HttpStatus.OK,
+        message: 'Students created successfully',
+        data: createdStudents,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to create students',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('students/template')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download template for bulk student creation' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Template downloaded successfully',
+  })
+  async downloadTemplate(@Res() res: Response) {
+    const workbook = new Workbook();
+    const worksheet = workbook.addWorksheet('Students');
+
+    worksheet.columns = [
+      { header: 'Full Name', key: 'full_name', width: 30 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'City', key: 'city', width: 20 },
+      { header: 'Zip', key: 'zip', width: 10 },
+      { header: 'Institute RegNo', key: 'regNo', width: 20 },
+      { header: 'Packages (comma separated)', key: 'packages', width: 30 },
+    ];
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + 'students_template.xlsx',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
+  @Post('institutes/bulk')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk create institute users from Excel file' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Institute users created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to create institute users',
+  })
+  async bulkCreateInstituteUsers(@UploadedFile() file: Express.Multer.File) {
+    try {
+      const workbook = new Workbook();
+      await workbook.xlsx.load(file.buffer);
+      const worksheet = workbook.getWorksheet(1);
+
+      const institutes: any[] = [];
+      if (worksheet) {
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            // Skip header row
+            const institute = {
+              full_name: row.getCell(1).value,
+              email: row.getCell(2).value,
+              phone: row.getCell(3).value,
+              city: row.getCell(4).value,
+              zip: row.getCell(5).value,
+              regNo: row.getCell(6).value,
+              packages: row.getCell(7).value
+                ? row.getCell(7).value?.toString().split(',')
+                : [],
+            };
+            institutes.push(institute);
+          }
+        });
+      }
+
+      await this.usersService.bulkCreateInstituteUsers(institutes);
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Institute users created successfully',
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to create institute users',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('institutes/template')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Download template for bulk institute user creation',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Template downloaded successfully',
+  })
+  async downloadInstituteTemplate(@Res() res: Response) {
+    const workbook = new Workbook();
+    const worksheet = workbook.addWorksheet('Institutes');
+
+    worksheet.columns = [
+      { header: 'Full Name', key: 'full_name', width: 30 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'City', key: 'city', width: 20 },
+      { header: 'Zip', key: 'zip', width: 10 },
+      { header: 'Institute RegNo', key: 'regNo', width: 20 },
+      { header: 'Packages (comma separated)', key: 'packages', width: 30 },
+    ];
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + 'institutes_template.xlsx',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
   }
 
   @Get(':id')
