@@ -1,11 +1,11 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
+  // Post,
+  // Body,
   Param,
-  Put,
-  Delete,
+  // Put,
+  // Delete,
   UseGuards,
   HttpStatus,
 } from '@nestjs/common';
@@ -14,13 +14,13 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiBody,
+  // ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { QuestionResultsService } from './question-results.service';
-import { CreateQuestionResultDto } from './dto/create-question-result.dto';
-import { UpdateQuestionResultDto } from './dto/update-question-result.dto';
+// import { CreateQuestionResultDto } from './dto/create-question-result.dto';
+// import { UpdateQuestionResultDto } from './dto/update-question-result.dto';
 
 @ApiTags('question-results')
 @Controller('question-results')
@@ -29,42 +29,42 @@ export class QuestionResultsController {
     private readonly questionResultsService: QuestionResultsService,
   ) {}
 
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new question result' })
-  @ApiBody({ type: CreateQuestionResultDto })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Question result created successfully',
-  })
-  async create(@Body() createQuestionResultDto: CreateQuestionResultDto) {
-    const questionResult = await this.questionResultsService.create(
-      createQuestionResultDto,
-    );
-    return {
-      status: HttpStatus.OK,
-      message: 'Question result created successfully',
-      data: questionResult,
-    };
-  }
+  // @Post()
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'Create a new question result' })
+  // @ApiBody({ type: CreateQuestionResultDto })
+  // @ApiResponse({
+  //   status: HttpStatus.OK,
+  //   description: 'Question result created successfully',
+  // })
+  // async create(@Body() createQuestionResultDto: CreateQuestionResultDto) {
+  //   const questionResult = await this.questionResultsService.create(
+  //     createQuestionResultDto,
+  //   );
+  //   return {
+  //     status: HttpStatus.OK,
+  //     message: 'Question result created successfully',
+  //     data: questionResult,
+  //   };
+  // }
 
-  @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all question results' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Question results retrieved successfully',
-  })
-  async findAll() {
-    const questionResults = await this.questionResultsService.findAll();
-    return {
-      status: HttpStatus.OK,
-      message: 'Question results retrieved successfully',
-      data: questionResults,
-    };
-  }
+  // @Get()
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'Get all question results' })
+  // @ApiResponse({
+  //   status: HttpStatus.OK,
+  //   description: 'Question results retrieved successfully',
+  // })
+  // async findAll() {
+  //   const questionResults = await this.questionResultsService.findAll();
+  //   return {
+  //     status: HttpStatus.OK,
+  //     message: 'Question results retrieved successfully',
+  //     data: questionResults,
+  //   };
+  // }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)

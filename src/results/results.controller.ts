@@ -25,11 +25,17 @@ import {
 } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 import { ResultStatus } from './schemas/result.schema';
+import { QuestionResultsService } from '../question-results/question-results.service';
+import { CreateQuestionResultDto } from '../question-results/dto/create-question-result.dto';
+import { Schema as MongooseSchema } from 'mongoose';
 
 @ApiTags('results')
 @Controller('results')
 export class ResultsController {
-  constructor(private readonly resultsService: ResultsService) {}
+  constructor(
+    private readonly resultsService: ResultsService,
+    private readonly questionResultsService: QuestionResultsService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -50,6 +56,45 @@ export class ResultsController {
       status: HttpStatus.OK,
       message: 'Result created successfully',
       data: result,
+    };
+  }
+
+  @Post(':id/question-results')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new question result' })
+  @ApiBody({ type: CreateQuestionResultDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Question result created successfully',
+  })
+  async createQuestionResult(
+    @Param('id') resultId: string,
+    @Body() createQuestionResultDto: CreateQuestionResultDto,
+  ) {
+    const questionResult = await this.questionResultsService.create(
+      createQuestionResultDto,
+    );
+
+    const result = await this.resultsService.findOne(resultId);
+    if (!result) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Result not found',
+      };
+    }
+
+    result.questionResults.push(
+      questionResult._id as MongooseSchema.Types.ObjectId,
+    );
+    await this.resultsService.update(resultId, result);
+
+    const UpdatedResult = await this.resultsService.findOne(resultId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Question result created successfully',
+      data: UpdatedResult,
     };
   }
 
