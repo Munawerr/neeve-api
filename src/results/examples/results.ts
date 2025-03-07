@@ -47,6 +47,11 @@ export const findAllByStudentIdExample = {
           corAnsExp: 'Paris is the capital of France.',
         },
       ],
+      marksSummary: {
+        totalMarks: 10,
+        obtainedMarks: 1,
+        averageMarks: 10,
+      },
       status: 'NOT_FINISHED',
       startedAt: '2021-06-23T14:28:54.000Z',
       finishedAt: null,
@@ -104,6 +109,11 @@ export const findOneExample = {
         corAnsExp: 'Paris is the capital of France.',
       },
     ],
+    marksSummary: {
+      totalMarks: 10,
+      obtainedMarks: 1,
+      averageMarks: 10,
+    },
     status: 'NOT_FINISHED',
     startedAt: '2021-06-23T14:28:54.000Z',
     finishedAt: null,

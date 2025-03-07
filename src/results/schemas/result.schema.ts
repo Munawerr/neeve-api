@@ -1,9 +1,21 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types, Schema as MongooseSchema } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 
 export enum ResultStatus {
   FINISHED = 'finished',
   NOT_FINISHED = 'not_finished',
+}
+
+@Schema()
+export class MarksSummary {
+  @Prop({ required: true })
+  totalMarks: number;
+
+  @Prop({ required: true })
+  obtainedMarks: number;
+
+  @Prop({ required: true })
+  averageMarks: number;
 }
 
 @Schema()
@@ -41,6 +53,12 @@ export class Result extends Document {
 
   @Prop({ required: true })
   marksPerQuestion: number;
+
+  @Prop({
+    type: [{ totalMarks: Number, obtainedMarks: Number, averageMarks: Number }],
+    required: false,
+  })
+  marksSummary: MarksSummary;
 }
 
 export const ResultSchema = SchemaFactory.createForClass(Result);
