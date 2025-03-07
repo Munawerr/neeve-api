@@ -8,6 +8,9 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,11 +25,18 @@ import { TopicsService } from './topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { Schema as MongooseSchema } from 'mongoose';
+import { FilesService } from '../files/files.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Workbook } from 'exceljs';
+import { Response } from 'express';
 
 @ApiTags('topics')
 @Controller('topics')
 export class TopicsController {
-  constructor(private readonly topicsService: TopicsService) {}
+  constructor(
+    private readonly topicsService: TopicsService,
+    private readonly filesService: FilesService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -210,5 +220,128 @@ export class TopicsController {
       message: 'SubTopic added successfully',
       data: subTopic,
     };
+  }
+
+  @Post('bulk')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk create topics from Excel file' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Topics created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to create topics',
+  })
+  async bulkCreateTopics(@UploadedFile() file: Express.Multer.File) {
+    try {
+      const workbook = new Workbook();
+      await workbook.xlsx.load(file.buffer);
+      const worksheet = workbook.getWorksheet(1);
+
+      const parentTopics: any = {};
+
+      if (worksheet) {
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            // Skip header row
+            const topic = {
+              code: row.getCell(1).value,
+              title: row.getCell(2).value,
+              subjectCode: row.getCell(3).value,
+              packageCode: row.getCell(4).value,
+              introVideoUrls: row.getCell(5).value
+                ? row.getCell(5).value?.toString().split(',')
+                : [],
+              studyNotes: row.getCell(6).value
+                ? row.getCell(6).value?.toString().split(',')
+                : [],
+              studyPlans: row.getCell(7).value
+                ? row.getCell(7).value?.toString().split(',')
+                : [],
+              practiceProblems: row.getCell(8).value
+                ? row.getCell(8).value?.toString().split(',')
+                : [],
+            };
+
+            const topicCode = topic.code?.toString();
+
+            if (topicCode) {
+              if (!parentTopics[topicCode]) {
+                parentTopics[topicCode] = [];
+              }
+              parentTopics[topicCode].push(topic);
+            }
+          }
+        });
+      }
+
+      await this.topicsService.bulkCreateTopics(parentTopics);
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Topics created successfully',
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to create topics',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('template')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download template for bulk topic creation' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Template downloaded successfully',
+  })
+  async downloadTemplate(@Res() res: Response) {
+    const workbook = new Workbook();
+    const worksheet = workbook.addWorksheet('Topics');
+
+    worksheet.columns = [
+      { header: 'Code', key: 'code', width: 20 },
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Subject Code', key: 'subjectCode', width: 20 },
+      { header: 'Package Code', key: 'packageCode', width: 20 },
+      {
+        header: 'Intro Video URLs (comma separated)',
+        key: 'introVideoUrls',
+        width: 30,
+      },
+      {
+        header: 'Study Notes URLs (comma separated)',
+        key: 'studyNotes',
+        width: 30,
+      },
+      {
+        header: 'Study Plans URLs (comma separated)',
+        key: 'studyPlans',
+        width: 30,
+      },
+      {
+        header: 'Practice Problems URLs (comma separated)',
+        key: 'practiceProblems',
+        width: 30,
+      },
+    ];
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + 'topics_template.xlsx',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
   }
 }

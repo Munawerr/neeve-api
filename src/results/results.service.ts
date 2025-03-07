@@ -19,7 +19,13 @@ export class ResultsService {
   }
 
   async findOne(id: string): Promise<Result | null> {
-    return this.resultModel.findById(id).exec();
+    return this.resultModel
+      .findById(id)
+      .populate({
+        path: 'questionResults',
+        model: 'QuestionResult',
+      })
+      .exec();
   }
 
   async update(

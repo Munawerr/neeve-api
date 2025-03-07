@@ -1,5 +1,5 @@
 export class CreateFileDto {
-  user: string;
+  user?: string;
   fileName: string;
   fileType: string;
   fileUrl: string;

@@ -10,6 +10,10 @@ import {
   QuestionSchema,
 } from 'src/questions/schemas/question.schema';
 import { QuestionsService } from 'src/questions/questions.service';
+import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
+import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
+import { FilesService } from 'src/files/files.service';
+import { File, FileSchema } from 'src/files/schemas/file.schema';
 
 @Module({
   imports: [
@@ -17,9 +21,12 @@ import { QuestionsService } from 'src/questions/questions.service';
       { name: Test.name, schema: TestSchema },
       { name: Topic.name, schema: TopicSchema },
       { name: Question.name, schema: QuestionSchema },
+      { name: Subject.name, schema: SubjectSchema },
+      { name: Package.name, schema: PackageSchema },
+      { name: File.name, schema: FileSchema },
     ]),
   ],
   controllers: [TestsController],
-  providers: [TestsService, TopicsService, QuestionsService],
+  providers: [TestsService, TopicsService, QuestionsService, FilesService],
 })
 export class TestsModule {}
