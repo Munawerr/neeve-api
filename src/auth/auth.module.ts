@@ -6,6 +6,7 @@ import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './jwt.strategy';
 import { MailService } from 'src/mail/mail.service';
 import { MailModule } from 'src/mail/mail.module';
+import { SmsService } from 'src/sms/sms.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { MailModule } from 'src/mail/mail.module';
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN },
     }),
   ],
-  providers: [AuthService, JwtStrategy, MailService],
-  exports: [AuthService, MailService],
+  providers: [AuthService, JwtStrategy, MailService, SmsService],
+  exports: [AuthService, MailService, SmsService],
 })
 export class AuthModule {}
