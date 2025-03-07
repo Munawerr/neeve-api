@@ -27,7 +27,7 @@ export class QuestionResult extends Document {
   })
   options: Option[];
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   corAnsExp: string;
 }
 

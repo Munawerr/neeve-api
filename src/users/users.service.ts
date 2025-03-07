@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
 import { Result } from './../results/schemas/result.schema'; // Import Result schema
+import { Package } from 'src/packages/schemas/package.schema';
 
 import { User } from './schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -19,6 +20,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Role.name) private roleModel: Model<Role>,
     @InjectModel(Result.name) private resultModel: Model<Result>, // Inject Result model
+    @InjectModel(Package.name) private readonly packageModel: Model<Package>,
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
@@ -163,9 +165,7 @@ export class UsersService {
     return this.userModel.findByIdAndDelete(id).exec();
   }
 
-  private async getInstituteRoleId(): Promise<
-    MongooseSchema.Types.ObjectId | unknown
-  > {
+  async getInstituteRoleId(): Promise<MongooseSchema.Types.ObjectId | unknown> {
     const instituteRole = await this.roleModel.findOne({ slug: 'institute' });
     if (!instituteRole) {
       throw new Error('Institute role not found');
@@ -181,7 +181,10 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
 
-    const institute = await this.userModel.findOne({ regNo, role: await this.getInstituteRoleId() });
+    const institute = await this.userModel.findOne({
+      regNo,
+      role: await this.getInstituteRoleId(),
+    });
     if (!institute) {
       throw new Error('Institute not found');
     }
@@ -244,9 +247,7 @@ export class UsersService {
     return this.userModel.findByIdAndDelete(id).exec();
   }
 
-  private async getStudentRoleId(): Promise<
-    MongooseSchema.Types.ObjectId | unknown
-  > {
+  async getStudentRoleId(): Promise<MongooseSchema.Types.ObjectId | unknown> {
     const studentRole = await this.roleModel.findOne({ slug: 'student' });
     if (!studentRole) {
       throw new Error('Student role not found');
@@ -339,5 +340,62 @@ export class UsersService {
 
   async findByRegNo(regNo: string): Promise<User | null> {
     return this.userModel.findOne({ regNo }).exec();
+  }
+
+  async bulkCreateStudents(students: any[]): Promise<any[]> {
+    const createdStudents: any[] = [];
+
+    for (const student of students) {
+      const institute = await this.userModel.findOne({
+        regNo: student.regNo,
+      });
+      if (!institute) {
+        throw new Error(`Institute with regNo ${student.regNo} not found`);
+      }
+
+      const packageIds: any[] = [];
+      for (const code of student.packages) {
+        const _package = await this.packageModel.findOne({ code });
+        if (!_package) {
+          throw new Error(`Package with code ${code} not found`);
+        }
+        packageIds.push(_package._id);
+      }
+
+      const newStudent = new this.userModel({
+        ...student,
+        institute: institute._id,
+        packages: packageIds,
+      });
+
+      createdStudents.push(await newStudent.save());
+    }
+
+    return createdStudents;
+  }
+
+  async bulkCreateInstituteUsers(institutes: any[]): Promise<any[]> {
+    const createdInstitutes: any[] = [];
+
+    for (const institute of institutes) {
+      const packageIds: any[] = [];
+      for (const code of institute.packages) {
+        const _package = await this.packageModel.findOne({ code });
+        if (!_package) {
+          throw new Error(`Package with code ${code} not found`);
+        }
+        packageIds.push(_package._id);
+      }
+
+      const newInstitute = new this.userModel({
+        ...institute,
+        role: await this.getInstituteRoleId(),
+        packages: packageIds,
+      });
+
+      createdInstitutes.push(await newInstitute.save());
+    }
+
+    return createdInstitutes;
   }
 }
