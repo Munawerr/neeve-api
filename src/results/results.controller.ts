@@ -23,7 +23,7 @@ import {
   CreateResultDto,
   CreateResultServiceDto,
 } from './dto/create-result.dto';
-import { UpdateResultDto } from './dto/update-result.dto';
+import { MarksSummaryDto, UpdateResultDto } from './dto/update-result.dto';
 import { ResultStatus } from './schemas/result.schema';
 import { QuestionResultsService } from '../question-results/question-results.service';
 import { CreateQuestionResultDto } from '../question-results/dto/create-question-result.dto';
@@ -173,7 +173,7 @@ export class ResultsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Finish a Test' })
   @ApiParam({ name: 'id', required: true })
-  @ApiBody({ type: UpdateResultDto })
+  @ApiBody({ type: CreateQuestionResultDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Test Finished successfully',
@@ -183,7 +183,7 @@ export class ResultsController {
   })
   async update(
     @Param('id') id: string,
-    @Body() updateResultDto: UpdateResultDto,
+    @Body() createQuestionResultDto: CreateQuestionResultDto,
   ) {
     const result = await this.resultsService.findOne(id);
     if (!result) {
@@ -199,18 +199,63 @@ export class ResultsController {
       };
     }
 
-    updateResultDto.finishedAt = new Date();
-    updateResultDto.status = ResultStatus.FINISHED;
+    const questionResult = await this.questionResultsService.create(
+      createQuestionResultDto,
+    );
 
-    await this.resultsService.update(id, updateResultDto);
+    result.questionResults.push(
+      questionResult._id as MongooseSchema.Types.ObjectId,
+    );
+    await this.resultsService.update(id, result);
 
-    const updatedResult = await this.resultsService.findOne(id);
+    const updatedResult1 = await this.resultsService.findOne(id);
 
-    return {
-      status: HttpStatus.OK,
-      message: 'Result updated successfully',
-      data: updatedResult,
-    };
+    if (updatedResult1) {
+      const totalMarks =
+        updatedResult1.numOfQuestions * updatedResult1.marksPerQuestion;
+      const obtainedMarks = updatedResult1.questionResults.reduce(
+        (sum, questionResult) => {
+          const correctOptions = questionResult.options.filter(
+            (option) => option.isCorrect,
+          );
+          const checkedOptions = questionResult.options.filter(
+            (option) => option.isChecked,
+          );
+
+          if (
+            correctOptions.length === checkedOptions.length &&
+            correctOptions.every((option) => option.isChecked) &&
+            checkedOptions.every((option) => option.isCorrect)
+          ) {
+            return sum + updatedResult1.marksPerQuestion;
+          }
+          return sum;
+        },
+        0,
+      );
+      const averageMarks = (obtainedMarks / totalMarks) * 100;
+
+      const marksSummary: MarksSummaryDto = {
+        totalMarks,
+        obtainedMarks,
+        averageMarks,
+      };
+
+      const updateResultDto: UpdateResultDto = {};
+      updateResultDto.finishedAt = new Date();
+      updateResultDto.status = ResultStatus.FINISHED;
+      updateResultDto.marksSummary = marksSummary;
+
+      await this.resultsService.update(id, updateResultDto);
+
+      const updatedResult2 = await this.resultsService.findOne(id);
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Result updated successfully',
+        data: updatedResult2,
+      };
+    }
   }
 
   @Delete(':id')
