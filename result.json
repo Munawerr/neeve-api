@@ -1,0 +1,191 @@
+{
+    "status": 200,
+    "message": "Result retrieved successfully",
+    "data": {
+        "_id": "67cb0c118ab5b7986f0e96c3",
+        "test": {
+            "_id": "67c1ed037607766aceb7f055",
+            "title": "Practice Test 1",
+            "topic": "67b8a53489037cf1509ae742",
+            "subject": "67a4aff9e6a6457f829798a6",
+            "marksPerQuestion": 5,
+            "testDuration": 20,
+            "testType": "practice",
+            "questions": [
+                "67c1ed2d7607766aceb7f06c",
+                "67c3dd6da4c5559ac2242ccd",
+                "67c3dd84a4c5559ac2242cec",
+                "67c3dda5a4c5559ac2242d0f",
+                "67c3ddcaa4c5559ac2242d36"
+            ],
+            "__v": 5
+        },
+        "subject": {
+            "_id": "67a4aff9e6a6457f829798a6",
+            "code": "P",
+            "title": "Physics",
+            "__v": 0,
+            "color": {
+                "solid": "#e74c3c",
+                "accent": "#f5b7b1"
+            }
+        },
+        "institute": {
+            "_id": "67a51aff6f0d043bad867bd3",
+            "password": "$2b$10$FGLMr5BRfkWgoJ8AYxpz2uhqblxgNi4IKWEO3mC.l.7mOK/MMjcqC",
+            "email": "institute@neeve.io",
+            "status": "active",
+            "role": "67a7a92bc26411824c5dff16",
+            "full_name": "Test Institute",
+            "city": "Multan",
+            "zip": "123123",
+            "instituteRegNo": "123123123",
+            "packages": [
+                "67a4e6426f98f70f0d016f4e",
+                "67a4e6ba6f98f70f0d016f56",
+                "67a4ea606f98f70f0d016f5e",
+                "67c3e6ff2a7232648e049955",
+                "67c3e6e62a7232648e049950",
+                "67c3e7d32a7232648e049987",
+                "67c3e8282a7232648e049994",
+                "67c3f76ce744c89c2130c7c0",
+                "67c3f7bee744c89c2130c7d1",
+                "67c3f7e1e744c89c2130c7d6"
+            ],
+            "imageUrl": "https://neeve-s3-dev.s3.amazonaws.com/1740169618856-Photoroom-20250210_105840-min.png",
+            "bio": "A test bio for the admin user",
+            "__v": 0,
+            "coverUrl": "https://neeve-s3-dev.s3.amazonaws.com/1740240610841-%C3%A2%C2%80%C2%94Pngtree%C3%A2%C2%80%C2%94educational%20institution%20autumn%20admission%20poster_1036270.jpg",
+            "verificationOtp": "000000",
+            "verificationToken": "9962e719-5c5f-4ea1-8a28-8541eff88ef9"
+        },
+        "student": {
+            "_id": "67bc9b90027396fbe97c0ce8",
+            "password": "$2b$10$4xNG/eq5P2xYJPlcazXn1OrpYHc5DMQCaai0fvWgo15ZECieyX0LC",
+            "email": "john.doe@example.com",
+            "status": "active",
+            "role": "67a7a92bc26411824c5dff17",
+            "full_name": "John Doe",
+            "city": "New York",
+            "zip": "1000111",
+            "institute": "67a51aff6f0d043bad867bd3",
+            "packages": [
+                "67a4e6426f98f70f0d016f4e"
+            ],
+            "imageUrl": null,
+            "__v": 0,
+            "verificationOtp": "000000",
+            "verificationToken": "92b92324-a937-47cd-a45a-2c4f77a83f78"
+        },
+        "questionResults": [
+            {
+                "_id": "67cb0c158ab5b7986f0e96c5",
+                "questionText": "<p>3+3=?</p>",
+                "createdAt": "2025-03-07T15:09:09.803Z",
+                "options": [
+                    {
+                        "text": "<p>9</p>",
+                        "isCorrect": true,
+                        "isChecked": true,
+                        "_id": "67cb0c158ab5b7986f0e96c6"
+                    },
+                    {
+                        "text": "<p>10</p>",
+                        "isCorrect": true,
+                        "isChecked": false,
+                        "_id": "67cb0c158ab5b7986f0e96c7"
+                    },
+                    {
+                        "text": "<p>11</p>",
+                        "isCorrect": false,
+                        "isChecked": false,
+                        "_id": "67cb0c158ab5b7986f0e96c8"
+                    },
+                    {
+                        "text": "<p>12</p>",
+                        "isCorrect": false,
+                        "isChecked": false,
+                        "_id": "67cb0c158ab5b7986f0e96c9"
+                    }
+                ],
+                "corAnsExp": "",
+                "__v": 0
+            },
+            {
+                "_id": "67cb0c1b8ab5b7986f0e96d3",
+                "questionText": "<p>Color of sky?</p>",
+                "createdAt": "2025-03-07T15:09:15.122Z",
+                "options": [
+                    {
+                        "text": "<p>Blue</p>",
+                        "isCorrect": true,
+                        "isChecked": true,
+                        "_id": "67cb0c1b8ab5b7986f0e96d4"
+                    },
+                    {
+                        "text": "<p>Green</p>",
+                        "isCorrect": false,
+                        "isChecked": false,
+                        "_id": "67cb0c1b8ab5b7986f0e96d5"
+                    }
+                ],
+                "corAnsExp": "",
+                "__v": 0
+            },
+            {
+                "_id": "67cb0c288ab5b7986f0e96e6",
+                "questionText": "<p>Days in a week?</p>",
+                "createdAt": "2025-03-07T15:09:28.172Z",
+                "options": [
+                    {
+                        "text": "<p>3</p>",
+                        "isCorrect": false,
+                        "isChecked": true,
+                        "_id": "67cb0c288ab5b7986f0e96e7"
+                    },
+                    {
+                        "text": "<p>7</p>",
+                        "isCorrect": true,
+                        "isChecked": true,
+                        "_id": "67cb0c288ab5b7986f0e96e8"
+                    },
+                    {
+                        "text": "<p>1</p>",
+                        "isCorrect": false,
+                        "isChecked": false,
+                        "_id": "67cb0c288ab5b7986f0e96e9"
+                    }
+                ],
+                "corAnsExp": "",
+                "__v": 0
+            },
+            {
+                "_id": "67cb0c2c8ab5b7986f0e96ff",
+                "questionText": "<p>First month of a year is?</p>",
+                "createdAt": "2025-03-07T15:09:32.992Z",
+                "options": [
+                    {
+                        "text": "<p>Jan</p>",
+                        "isCorrect": true,
+                        "isChecked": false,
+                        "_id": "67cb0c2c8ab5b7986f0e9700"
+                    },
+                    {
+                        "text": "<p>Nov</p>",
+                        "isCorrect": false,
+                        "isChecked": true,
+                        "_id": "67cb0c2c8ab5b7986f0e9701"
+                    }
+                ],
+                "corAnsExp": "",
+                "__v": 0
+            }
+        ],
+        "startedAt": "2025-03-07T15:09:05.001Z",
+        "status": "finished",
+        "numOfQuestions": 5,
+        "marksPerQuestion": 5,
+        "__v": 0,
+        "finishedAt": "2025-03-07T15:09:37.985Z"
+    }
+}

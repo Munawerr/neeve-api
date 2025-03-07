@@ -202,7 +202,10 @@ export class ResultsController {
     updateResultDto.finishedAt = new Date();
     updateResultDto.status = ResultStatus.FINISHED;
 
-    const updatedResult = await this.resultsService.update(id, updateResultDto);
+    await this.resultsService.update(id, updateResultDto);
+
+    const updatedResult = await this.resultsService.findOne(id);
+
     return {
       status: HttpStatus.OK,
       message: 'Result updated successfully',
