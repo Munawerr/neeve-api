@@ -28,6 +28,7 @@ import { ResultStatus } from './schemas/result.schema';
 import { QuestionResultsService } from '../question-results/question-results.service';
 import { CreateQuestionResultDto } from '../question-results/dto/create-question-result.dto';
 import { Schema as MongooseSchema } from 'mongoose';
+import { findAllByStudentIdExample, findOneExample } from './examples/results';
 
 @ApiTags('results')
 @Controller('results')
@@ -115,6 +116,27 @@ export class ResultsController {
     };
   }
 
+  @Get('student/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all results for a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Results retrieved successfully',
+    schema: {
+      example: findAllByStudentIdExample,
+    },
+  })
+  async findAllByStudentId(@Param('studentId') studentId: string) {
+    const results = await this.resultsService.findAllByStudentId(studentId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Results retrieved successfully',
+      data: results,
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -123,6 +145,9 @@ export class ResultsController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Result retrieved successfully',
+    schema: {
+      example: findOneExample,
+    },
   })
   @ApiResponse({
     status: HttpStatus.EXPECTATION_FAILED,
@@ -152,6 +177,9 @@ export class ResultsController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Test Finished successfully',
+    schema: {
+      example: { ...findOneExample, message: 'Result updated successfully' },
+    },
   })
   async update(
     @Param('id') id: string,

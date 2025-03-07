@@ -21,6 +21,24 @@ export class ResultsService {
   async findOne(id: string): Promise<Result | null> {
     return this.resultModel
       .findById(id)
+      .populate('test')
+      .populate('subject')
+      .populate('institute')
+      .populate('student')
+      .populate({
+        path: 'questionResults',
+        model: 'QuestionResult',
+      })
+      .exec();
+  }
+
+  async findAllByStudentId(student: string): Promise<Result[]> {
+    return this.resultModel
+      .find({ student })
+      .populate('test')
+      .populate('subject')
+      .populate('institute')
+      .populate('student')
       .populate({
         path: 'questionResults',
         model: 'QuestionResult',
