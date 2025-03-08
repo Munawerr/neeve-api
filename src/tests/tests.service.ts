@@ -18,7 +18,10 @@ export class TestsService {
     return this.testModel.find().exec();
   }
 
-  async findAllTests(subjectId: string, topicId: string): Promise<{ mockTests: Test[], otherTests: Test[] }> {
+  async findAllTests(
+    subjectId: string,
+    topicId: string,
+  ): Promise<{ mockTests: Test[]; otherTests: Test[] }> {
     const mockTests = await this.testModel
       .find({ subject: subjectId, testType: TestType.MOCK })
       .populate('subject')
@@ -69,6 +72,15 @@ export class TestsService {
       .populate({
         path: 'questions',
         model: 'Question',
+      })
+      .exec();
+  }
+
+  // Find tests by subject
+  async findTestsBySubject(subject: string): Promise<Test[]> {
+    return this.testModel
+      .find({
+        subject,
       })
       .exec();
   }
