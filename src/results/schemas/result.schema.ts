@@ -18,6 +18,15 @@ export class MarksSummary {
 
   @Prop({ required: true })
   averageMarks: number;
+
+  @Prop({ required: true })
+  correctAnswers: number;
+
+  @Prop({ required: true })
+  incorrectAnswers: number;
+
+  @Prop({ required: true })
+  averageTimePerQuestion: number;
 }
 
 @Schema()
@@ -58,7 +67,14 @@ export class Result extends Document {
   marksPerQuestion: number;
 
   @Prop({
-    type: [{ totalMarks: Number, obtainedMarks: Number, averageMarks: Number }],
+    type: [{ 
+      totalMarks: Number, 
+      obtainedMarks: Number, 
+      averageMarks: Number,
+      correctAnswers: Number,
+      incorrectAnswers: Number,
+      averageTimePerQuestion: Number 
+    }],
     required: false,
   })
   marksSummary: MarksSummary;

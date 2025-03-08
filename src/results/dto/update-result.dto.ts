@@ -10,6 +10,15 @@ export class MarksSummaryDto {
 
   @ApiPropertyOptional({ example: '90' })
   readonly averageMarks?: number;
+
+  @ApiPropertyOptional({ example: 15 })
+  readonly correctAnswers: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  readonly incorrectAnswers: number;
+
+  @ApiPropertyOptional({ example: 3 })
+  readonly averageTimePerQuestion: number;
 }
 export class UpdateResultDto {
   // @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
