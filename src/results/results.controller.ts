@@ -24,11 +24,15 @@ import {
   CreateResultServiceDto,
 } from './dto/create-result.dto';
 import { MarksSummaryDto, UpdateResultDto } from './dto/update-result.dto';
-import { ResultStatus } from './schemas/result.schema';
+import { Result, ResultStatus } from './schemas/result.schema';
 import { QuestionResultsService } from '../question-results/question-results.service';
 import { CreateQuestionResultDto } from '../question-results/dto/create-question-result.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { findAllByStudentIdExample, findOneExample } from './examples/results';
+import { ReportCardDto } from './dto/report-card.dto';
+import { QuestionResult } from 'src/question-results/schemas/question-result.schema';
+import { UsersService } from '../users/users.service';
+import { TestsService } from 'src/tests/tests.service';
 
 @ApiTags('results')
 @Controller('results')
@@ -36,8 +40,11 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly questionResultsService: QuestionResultsService,
+    private readonly usersService: UsersService,
+    private readonly testsService: TestsService,
   ) {}
 
+  // Create a new result
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -60,6 +67,7 @@ export class ResultsController {
     };
   }
 
+  // Create a new question result
   @Post(':id/question-results')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -99,6 +107,7 @@ export class ResultsController {
     };
   }
 
+  // Get all results
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -116,6 +125,7 @@ export class ResultsController {
     };
   }
 
+  // Get all results for a student
   @Get('student/:studentId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -137,6 +147,7 @@ export class ResultsController {
     };
   }
 
+  // Get a result by ID
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -168,6 +179,7 @@ export class ResultsController {
     };
   }
 
+  // Finish a test
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -258,6 +270,255 @@ export class ResultsController {
     }
   }
 
+  // Get report card for a student
+  @Post('report-card/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get report card for a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiBody({ type: ReportCardDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Report card retrieved successfully',
+  })
+  async getReportCard(
+    @Param('studentId') studentId: string,
+    @Body() reportCardDto: ReportCardDto,
+  ) {
+    const { testType, subject } = reportCardDto;
+    const results = await this.resultsService.findFinishedResults(
+      studentId,
+      subject,
+      testType,
+    );
+
+    const groupedResults = results.reduce((acc, result) => {
+      const topic = result.toObject().test.topic;
+      const topicId = topic._id;
+      if (!acc[topicId]) {
+        acc[topicId] = { topic, results: {} };
+      }
+      const testId = result.toObject().test._id;
+      if (
+        !acc[topicId].results[testId] ||
+        acc[topicId].results[testId].marksSummary.obtainedMarks <
+          result.marksSummary.obtainedMarks
+      ) {
+        acc[topicId].results[testId] = result;
+      }
+      return acc;
+    }, {});
+
+    const reportCard = Object.keys(groupedResults).map((topicId) => {
+      const { topic, results } = groupedResults[topicId];
+      const topicResults = Object.values(results) as Result[];
+      const totalMarks = topicResults.reduce(
+        (sum, result) => sum + result.marksSummary.totalMarks,
+        0,
+      );
+      const obtainedMarks = topicResults.reduce(
+        (sum, result) => sum + result.marksSummary.obtainedMarks,
+        0,
+      );
+      const averageMarks = (obtainedMarks / totalMarks) * 100;
+
+      return {
+        topicId,
+        topicCode: topic.code,
+        topicTitle: topic.title,
+        totalMarks,
+        obtainedMarks,
+        averageMarks,
+      };
+    });
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Report card retrieved successfully',
+      data: reportCard,
+    };
+  }
+
+  // Get subject report card for a student
+  @Post('subject-report-card/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get subject report card for a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiBody({ type: ReportCardDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Subject report card retrieved successfully',
+  })
+  async getSubjectReportCard(
+    @Param('studentId') studentId: string,
+    @Body() reportCardDto: ReportCardDto,
+  ) {
+    const { testType, subject } = reportCardDto;
+    const results = await this.resultsService.findFinishedResults(
+      studentId,
+      subject,
+      testType,
+    );
+
+    const uniqueResults = results.reduce((acc, result) => {
+      const testId = result.toObject().test._id;
+      if (
+        !acc[testId] ||
+        acc[testId].marksSummary.obtainedMarks < result.marksSummary.obtainedMarks
+      ) {
+        acc[testId] = result;
+      }
+      return acc;
+    }, {});
+
+    const uniqueResultsArray = Object.values(uniqueResults) as Result[];
+
+    const totalMarks = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.totalMarks,
+      0,
+    );
+    const obtainedMarks = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.obtainedMarks,
+      0,
+    );
+    const averageMarks = (obtainedMarks / totalMarks) * 100;
+
+    const subjectReportCard = {
+      subjectId: subject,
+      totalMarks,
+      obtainedMarks,
+      averageMarks,
+    };
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Subject report card retrieved successfully',
+      data: subjectReportCard,
+    };
+  }
+
+  // Get combined report card for a student
+  @Post('combined-report-card/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get combined report card for a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiBody({ type: ReportCardDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Combined report card retrieved successfully',
+  })
+  async getCombinedReportCard(
+    @Param('studentId') studentId: string,
+    @Body() reportCardDto: ReportCardDto,
+  ) {
+    const { testType } = reportCardDto;
+    const results =
+      await this.resultsService.findFinishedResultsByStudentAndTestType(
+        studentId,
+        testType,
+      );
+
+    const uniqueResults = results.reduce((acc, result) => {
+      const testId = result.toObject().test._id;
+      if (
+        !acc[testId] ||
+        acc[testId].marksSummary.obtainedMarks < result.marksSummary.obtainedMarks
+      ) {
+        acc[testId] = result;
+      }
+      return acc;
+    }, {});
+
+    const uniqueResultsArray = Object.values(uniqueResults) as Result[];
+
+    const totalMarks = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.totalMarks,
+      0,
+    );
+    const obtainedMarks = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.obtainedMarks,
+      0,
+    );
+    const averageMarks = (obtainedMarks / totalMarks) * 100;
+
+    const totalQuestions = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.numOfQuestions,
+      0,
+    );
+
+    const totalTimeInMinutes = uniqueResultsArray.reduce((sum, result) => {
+      const questionTimes = result
+        .toObject()
+        .questionResults.map(
+          (
+            questionResult: QuestionResult,
+            index: number,
+            array: QuestionResult[],
+          ) => {
+            if (index === 0) return 0;
+            const previousQuestion = array[index - 1];
+            return (
+              (new Date(questionResult.createdAt).getTime() -
+                new Date(previousQuestion.createdAt).getTime()) /
+              60000
+            );
+          },
+        );
+      return sum + questionTimes.reduce((acc, time) => acc + time, 0);
+    }, 0);
+
+    const averageTimePerQuestion = totalTimeInMinutes / totalQuestions;
+
+    // Get student object
+    const student = await this.usersService.getStudentUser(studentId);
+    if (!student) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Student not found',
+      };
+    }
+
+    // Calculate test summary
+    const packages = student.packages;
+    let totalTestsInCourse = 0;
+    let testsTakenByStudent = uniqueResultsArray.length;
+    let remainingTests = 0;
+
+    for (const pkg of packages) {
+      for (const subjectId of pkg.subjects) {
+        const tests = await this.testsService.findTestsBySubject(
+          subjectId.toString(),
+        );
+        totalTestsInCourse += tests.length;
+      }
+    }
+
+    remainingTests = totalTestsInCourse - testsTakenByStudent;
+
+    const testSummary = {
+      totalTestsInCourse,
+      testsTakenByStudent,
+      remainingTests,
+    };
+
+    const combinedReportCard = {
+      totalMarks,
+      obtainedMarks,
+      averageMarks,
+      averageTimePerQuestion,
+      testSummary,
+    };
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Combined report card retrieved successfully',
+      data: combinedReportCard,
+    };
+  }
+
+  // Delete a result
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
