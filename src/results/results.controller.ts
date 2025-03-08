@@ -347,24 +347,24 @@ export class ResultsController {
     );
 
     const groupedResults = results.reduce((acc, result) => {
-      const topic = result.toObject().test.topic;
-      const topicId = topic._id;
-      if (!acc[topicId]) {
-        acc[topicId] = { topic, results: {} };
+      const test = result.toObject().test;
+      const key = testType === 'mock' ? test.subject._id : test.topic._id;
+      if (!acc[key]) {
+        acc[key] = { test, results: {} };
       }
-      const testId = result.toObject().test._id;
+      const testId = test._id;
       if (
-        !acc[topicId].results[testId] ||
-        acc[topicId].results[testId].marksSummary.obtainedMarks <
+        !acc[key].results[testId] ||
+        acc[key].results[testId].marksSummary.obtainedMarks <
           result.marksSummary.obtainedMarks
       ) {
-        acc[topicId].results[testId] = result;
+        acc[key].results[testId] = result;
       }
       return acc;
     }, {});
 
-    const reportCard = Object.keys(groupedResults).map((topicId) => {
-      const { topic, results } = groupedResults[topicId];
+    const reportCard = Object.keys(groupedResults).map((key) => {
+      const { test, results } = groupedResults[key];
       const topicResults = Object.values(results) as Result[];
       const totalMarks = topicResults.reduce(
         (sum, result) => sum + result.marksSummary.totalMarks,
@@ -384,21 +384,29 @@ export class ResultsController {
         (sum, result) => sum + result.marksSummary.incorrectAnswers,
         0,
       );
-      const averageTimePerQuestion = topicResults.reduce(
-        (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
-        0,
-      ) / topicResults.length;
+      const averageTimePerQuestion =
+        topicResults.reduce(
+          (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
+          0,
+        ) / topicResults.length;
+
+      // Get the most recent finishedAt date
+      const mostRecentFinishedAt = topicResults.reduce((latest, result) => {
+        return result.finishedAt > latest ? result.finishedAt : latest;
+      }, new Date(0));
 
       return {
-        topicId,
-        topicCode: topic.code,
-        topicTitle: topic.title,
+        topicId: key,
+        code: testType === 'mock' ? test.subject.code : test.topic.code,
+        title: testType === 'mock' ? test.subject.title : test.topic.title,
+        totalTests: topicResults.length,
         totalMarks,
         obtainedMarks,
         averageMarks,
         correctAnswers,
         incorrectAnswers,
         averageTimePerQuestion,
+        mostRecentFinishedAt, // Add the most recent finishedAt date to the report card
       };
     });
 
@@ -466,10 +474,11 @@ export class ResultsController {
       (sum, result) => sum + result.marksSummary.incorrectAnswers,
       0,
     );
-    const averageTimePerQuestion = uniqueResultsArray.reduce(
-      (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
-      0,
-    ) / uniqueResultsArray.length;
+    const averageTimePerQuestion =
+      uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
+        0,
+      ) / uniqueResultsArray.length;
 
     const subjectReportCard = {
       subjectId: subject,
