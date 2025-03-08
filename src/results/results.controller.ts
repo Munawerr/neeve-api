@@ -28,8 +28,14 @@ import { Result, ResultStatus } from './schemas/result.schema';
 import { QuestionResultsService } from '../question-results/question-results.service';
 import { CreateQuestionResultDto } from '../question-results/dto/create-question-result.dto';
 import { Schema as MongooseSchema } from 'mongoose';
-import { findAllByStudentIdExample, findOneExample } from './examples/results';
-import { ReportCardDto } from './dto/report-card.dto';
+import {
+  findAllByStudentIdExample,
+  findOneExample,
+  reportCardExample,
+  subjectReportCardExample,
+  combinedReportCardExample,
+} from './examples/results';
+import { CombinedReportCardDto, ReportCardDto } from './dto/report-card.dto';
 import { QuestionResult } from 'src/question-results/schemas/question-result.schema';
 import { UsersService } from '../users/users.service';
 import { TestsService } from 'src/tests/tests.service';
@@ -247,10 +253,55 @@ export class ResultsController {
       );
       const averageMarks = (obtainedMarks / totalMarks) * 100;
 
+      const correctAnswers = updatedResult1.questionResults.filter(
+        (questionResult) => {
+          const correctOptions = questionResult.options.filter(
+            (option) => option.isCorrect,
+          );
+          const checkedOptions = questionResult.options.filter(
+            (option) => option.isChecked,
+          );
+          return (
+            correctOptions.length === checkedOptions.length &&
+            correctOptions.every((option) => option.isChecked) &&
+            checkedOptions.every((option) => option.isCorrect)
+          );
+        },
+      ).length;
+
+      const incorrectAnswers = updatedResult1.numOfQuestions - correctAnswers;
+
+      const totalTimeInMinutes = updatedResult1
+        .toObject()
+        .questionResults.reduce(
+          (
+            sum: number,
+            questionResult: QuestionResult,
+            index: number,
+            array: QuestionResult[],
+          ) => {
+            if (index === 0) return sum;
+            const previousQuestion = array[index - 1];
+            return (
+              sum +
+              (new Date(questionResult.createdAt).getTime() -
+                new Date(previousQuestion.createdAt).getTime()) /
+                60000
+            );
+          },
+          0,
+        );
+
+      const averageTimePerQuestion =
+        totalTimeInMinutes / updatedResult1.numOfQuestions;
+
       const marksSummary: MarksSummaryDto = {
         totalMarks,
         obtainedMarks,
         averageMarks,
+        correctAnswers,
+        incorrectAnswers,
+        averageTimePerQuestion,
       };
 
       const updateResultDto: UpdateResultDto = {};
@@ -280,6 +331,9 @@ export class ResultsController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Report card retrieved successfully',
+    schema: {
+      example: reportCardExample,
+    },
   })
   async getReportCard(
     @Param('studentId') studentId: string,
@@ -322,6 +376,19 @@ export class ResultsController {
       );
       const averageMarks = (obtainedMarks / totalMarks) * 100;
 
+      const correctAnswers = topicResults.reduce(
+        (sum, result) => sum + result.marksSummary.correctAnswers,
+        0,
+      );
+      const incorrectAnswers = topicResults.reduce(
+        (sum, result) => sum + result.marksSummary.incorrectAnswers,
+        0,
+      );
+      const averageTimePerQuestion = topicResults.reduce(
+        (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
+        0,
+      ) / topicResults.length;
+
       return {
         topicId,
         topicCode: topic.code,
@@ -329,6 +396,9 @@ export class ResultsController {
         totalMarks,
         obtainedMarks,
         averageMarks,
+        correctAnswers,
+        incorrectAnswers,
+        averageTimePerQuestion,
       };
     });
 
@@ -349,6 +419,9 @@ export class ResultsController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Subject report card retrieved successfully',
+    schema: {
+      example: subjectReportCardExample,
+    },
   })
   async getSubjectReportCard(
     @Param('studentId') studentId: string,
@@ -365,7 +438,8 @@ export class ResultsController {
       const testId = result.toObject().test._id;
       if (
         !acc[testId] ||
-        acc[testId].marksSummary.obtainedMarks < result.marksSummary.obtainedMarks
+        acc[testId].marksSummary.obtainedMarks <
+          result.marksSummary.obtainedMarks
       ) {
         acc[testId] = result;
       }
@@ -384,11 +458,27 @@ export class ResultsController {
     );
     const averageMarks = (obtainedMarks / totalMarks) * 100;
 
+    const correctAnswers = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.correctAnswers,
+      0,
+    );
+    const incorrectAnswers = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.incorrectAnswers,
+      0,
+    );
+    const averageTimePerQuestion = uniqueResultsArray.reduce(
+      (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
+      0,
+    ) / uniqueResultsArray.length;
+
     const subjectReportCard = {
       subjectId: subject,
       totalMarks,
       obtainedMarks,
       averageMarks,
+      correctAnswers,
+      incorrectAnswers,
+      averageTimePerQuestion,
     };
 
     return {
@@ -404,14 +494,17 @@ export class ResultsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get combined report card for a student' })
   @ApiParam({ name: 'studentId', required: true })
-  @ApiBody({ type: ReportCardDto })
+  @ApiBody({ type: CombinedReportCardDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Combined report card retrieved successfully',
+    schema: {
+      example: combinedReportCardExample,
+    },
   })
   async getCombinedReportCard(
     @Param('studentId') studentId: string,
-    @Body() reportCardDto: ReportCardDto,
+    @Body() reportCardDto: CombinedReportCardDto,
   ) {
     const { testType } = reportCardDto;
     const results =
@@ -424,7 +517,8 @@ export class ResultsController {
       const testId = result.toObject().test._id;
       if (
         !acc[testId] ||
-        acc[testId].marksSummary.obtainedMarks < result.marksSummary.obtainedMarks
+        acc[testId].marksSummary.obtainedMarks <
+          result.marksSummary.obtainedMarks
       ) {
         acc[testId] = result;
       }
@@ -507,6 +601,14 @@ export class ResultsController {
       totalMarks,
       obtainedMarks,
       averageMarks,
+      correctAnswers: uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.correctAnswers,
+        0,
+      ),
+      incorrectAnswers: uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.incorrectAnswers,
+        0,
+      ),
       averageTimePerQuestion,
       testSummary,
     };
