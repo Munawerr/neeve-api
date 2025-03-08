@@ -35,7 +35,7 @@ import {
   subjectReportCardExample,
   combinedReportCardExample,
 } from './examples/results';
-import { CombinedReportCardDto, ReportCardDto } from './dto/report-card.dto';
+import { ReportCardDto } from './dto/report-card.dto';
 import { QuestionResult } from 'src/question-results/schemas/question-result.schema';
 import { UsersService } from '../users/users.service';
 import { TestsService } from 'src/tests/tests.service';
@@ -498,12 +498,11 @@ export class ResultsController {
   }
 
   // Get combined report card for a student
-  @Post('combined-report-card/:studentId')
+  @Get('combined-report-card/:studentId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get combined report card for a student' })
   @ApiParam({ name: 'studentId', required: true })
-  @ApiBody({ type: CombinedReportCardDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Combined report card retrieved successfully',
@@ -511,16 +510,9 @@ export class ResultsController {
       example: combinedReportCardExample,
     },
   })
-  async getCombinedReportCard(
-    @Param('studentId') studentId: string,
-    @Body() reportCardDto: CombinedReportCardDto,
-  ) {
-    const { testType } = reportCardDto;
+  async getCombinedReportCard(@Param('studentId') studentId: string) {
     const results =
-      await this.resultsService.findFinishedResultsByStudentAndTestType(
-        studentId,
-        testType,
-      );
+      await this.resultsService.findFinishedResultsByStudent(studentId);
 
     const uniqueResults = results.reduce((acc, result) => {
       const testId = result.toObject().test._id;
