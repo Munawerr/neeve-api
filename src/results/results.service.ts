@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Result, ResultStatus } from './schemas/result.schema';
 import { CreateResultServiceDto } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
+import { TestType } from 'src/tests/schemas/test.schema';
 
 @Injectable()
 export class ResultsService {
@@ -79,14 +80,14 @@ export class ResultsService {
   }
 
   // Find finished results for a student and test type
-  async findFinishedResultsByStudentAndTestType(
+  async findFinishedResultsByStudent(
     student: string,
-    testType: string,
   ): Promise<Result[]> {
     return this.resultModel
       .find({
         student,
         status: ResultStatus.FINISHED,
+        testType: { $ne: TestType.MOCK },
       })
       .populate({
         path: 'questionResults',
