@@ -67,14 +67,14 @@ export class Result extends Document {
   marksPerQuestion: number;
 
   @Prop({
-    type: [{ 
-      totalMarks: Number, 
-      obtainedMarks: Number, 
+    type: {
+      totalMarks: Number,
+      obtainedMarks: Number,
       averageMarks: Number,
       correctAnswers: Number,
       incorrectAnswers: Number,
-      averageTimePerQuestion: Number 
-    }],
+      averageTimePerQuestion: Number,
+    },
     required: false,
   })
   marksSummary: MarksSummary;
