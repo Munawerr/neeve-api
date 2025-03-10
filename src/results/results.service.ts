@@ -66,7 +66,7 @@ export class ResultsService {
       .populate({
         path: 'test',
         model: 'Test',
-        match: { testType },
+        // match: { testType },
         populate: [
           { path: 'topic', model: 'Topic' },
           { path: 'subject', model: 'Subject' },
