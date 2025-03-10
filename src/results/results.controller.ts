@@ -348,17 +348,27 @@ export class ResultsController {
 
     const groupedResults = results.reduce((acc, result) => {
       const test = result.toObject().test;
-      const key = testType === 'mock' ? test.subject._id : test.topic._id;
-      if (!acc[key]) {
-        acc[key] = { test, results: {} };
-      }
-      const testId = test._id;
-      if (
-        !acc[key].results[testId] ||
-        acc[key].results[testId].marksSummary.obtainedMarks <
-          result.marksSummary.obtainedMarks
-      ) {
-        acc[key].results[testId] = result;
+      if (test) {
+        let key = '';
+        if (testType === 'mock' && test.subject) {
+          key = test.subject._id;
+        } else if (test.topic) {
+          key = test.topic._id;
+        }
+
+        if (key) {
+          if (!acc[key]) {
+            acc[key] = { test, results: {} };
+          }
+          const testId = test._id;
+          if (
+            !acc[key].results[testId] ||
+            acc[key].results[testId].marksSummary.obtainedMarks <
+              result.marksSummary.obtainedMarks
+          ) {
+            acc[key].results[testId] = result;
+          }
+        }
       }
       return acc;
     }, {});
