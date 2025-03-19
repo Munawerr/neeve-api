@@ -16,8 +16,27 @@ export class SubjectsService {
     return createdSubject.save();
   }
 
-  findAll(): Promise<Subject[]> {
-    return this.subjectModel.find().exec();
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search: string = '',
+  ): Promise<{ subjects: Subject[]; total: number }> {
+    const filter = search
+      ? {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const subjects = await this.subjectModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+    const total = await this.subjectModel.countDocuments(filter);
+    return { subjects, total };
   }
 
   findOne(id: string): Promise<Subject | null> {

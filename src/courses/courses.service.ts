@@ -14,8 +14,27 @@ export class CoursesService {
     return createdCourse.save();
   }
 
-  findAll(): Promise<Course[]> {
-    return this.courseModel.find().exec();
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search: string = '',
+  ): Promise<{ courses: Course[]; total: number }> {
+    const filter = search
+      ? {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const courses = await this.courseModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+    const total = await this.courseModel.countDocuments(filter);
+    return { courses, total };
   }
 
   findOne(id: string): Promise<Course | null> {

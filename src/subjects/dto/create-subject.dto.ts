@@ -6,4 +6,13 @@ export class CreateSubjectDto {
 
   @ApiProperty({ example: 'Introduction to Computer Science' })
   readonly title: string;
+
+  @ApiProperty({ example: { solid: '#FFFFFF', accent: '#000000' } })
+  readonly color: {
+    solid: string;
+    accent: string;
+  };
+
+  @ApiProperty({ example: 'https://pngs.flaticons.com/asdf.png' })
+  readonly iconUrl: string;
 }

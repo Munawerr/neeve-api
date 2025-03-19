@@ -62,6 +62,7 @@ export class ResultsService {
         student,
         subject,
         status: ResultStatus.FINISHED,
+        testType,
       })
       .populate({
         path: 'test',
@@ -80,9 +81,7 @@ export class ResultsService {
   }
 
   // Find finished results for a student and test type
-  async findFinishedResultsByStudent(
-    student: string,
-  ): Promise<Result[]> {
+  async findFinishedResultsByStudent(student: string): Promise<Result[]> {
     return this.resultModel
       .find({
         student,
@@ -93,6 +92,15 @@ export class ResultsService {
         path: 'questionResults',
         model: 'QuestionResult',
       })
+      .exec();
+  }
+
+  async findOneByStudentAndTest(
+    studentId: string,
+    testId: string,
+  ): Promise<Result | null> {
+    return this.resultModel
+      .findOne({ student: studentId, test: testId })
       .exec();
   }
 
