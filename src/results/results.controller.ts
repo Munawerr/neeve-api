@@ -61,6 +61,17 @@ export class ResultsController {
     description: 'Result created successfully',
   })
   async create(@Body() createResultDto: CreateResultDto) {
+    // Check if the student already has a result for the particular test
+    const existingResult = await this.resultsService.findOneByStudentAndTest(
+      createResultDto.student,
+      createResultDto.test,
+    );
+
+    if (existingResult) {
+      // Delete the previous result
+      await this.resultsService.remove(existingResult.toObject()._id);
+    }
+
     const _result: CreateResultServiceDto = {
       ...createResultDto,
       startedAt: new Date(),

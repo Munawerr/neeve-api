@@ -7,6 +7,12 @@ export enum ResultStatus {
   NOT_FINISHED = 'not_finished',
 }
 
+enum TestType {
+  MOCK = 'mock',
+  PRACTICE = 'practice',
+  TEST = 'test',
+}
+
 @Schema()
 // Schema for MarksSummary
 export class MarksSummary {
@@ -43,6 +49,9 @@ export class Result extends Document {
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   student: MongooseSchema.Types.ObjectId;
+
+  @Prop({ required: true, enum: TestType })
+  testType: TestType;
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'QuestionResult' })
   questionResults: MongooseSchema.Types.ObjectId[];

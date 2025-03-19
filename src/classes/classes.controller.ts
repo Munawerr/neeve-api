@@ -8,8 +8,9 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -39,14 +40,40 @@ export class ClassesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all classes' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Classes retrieved successfully' })
-  async findAll() {
-    const classes = await this.classesService.findAll();
-    return {
-      status: HttpStatus.OK,
-      message: 'Classes retrieved successfully',
-      data: classes,
-    };
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Classes retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve classes',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    try {
+      const { classes, total } = await this.classesService.findAll(
+        page,
+        limit,
+        search,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Classes retrieved successfully',
+        data: { items: classes, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve classes',
+        error: error.message,
+      };
+    }
   }
 
   @Get(':id')

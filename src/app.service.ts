@@ -93,6 +93,7 @@ export class AppService implements OnModuleInit {
           'view_own_report',
           'view_live_classes',
           'view_tests',
+          'take_tests',
           'view_discussions',
           'create_discussions',
           'replay_discussions',

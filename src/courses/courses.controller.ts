@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,7 +18,7 @@ import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { S3Service } from '../s3/s3.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('courses')
 @Controller('courses')
@@ -54,14 +55,40 @@ export class CoursesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all courses' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Courses retrieved successfully' })
-  async findAll() {
-    const courses = await this.coursesService.findAll();
-    return {
-      status: HttpStatus.OK,
-      message: 'Courses retrieved successfully',
-      data: courses,
-    };
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Courses retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve courses',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    try {
+      const { courses, total } = await this.coursesService.findAll(
+        page,
+        limit,
+        search,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Courses retrieved successfully',
+        data: { items: courses, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve courses',
+        error: error.message,
+      };
+    }
   }
 
   @Get(':id')
