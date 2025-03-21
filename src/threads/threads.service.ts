@@ -4,10 +4,17 @@ import { Model } from 'mongoose';
 import { Thread } from './schemas/thread.schema';
 import { CreateThreadDto } from './dto/create-thread.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
+import { CreateGlobalThreadDto } from './dto/create-global-thread.dto';
+import { UsersService } from '../users/users.service';
+import { ClassesService } from '../classes/classes.service';
 
 @Injectable()
 export class ThreadsService {
-  constructor(@InjectModel(Thread.name) private threadModel: Model<Thread>) {}
+  constructor(
+    @InjectModel(Thread.name) private threadModel: Model<Thread>,
+    private readonly usersService: UsersService,
+    private readonly classesService: ClassesService,
+  ) {}
 
   create(createThreadDto: CreateThreadDto): Promise<Thread> {
     const createdThread = new this.threadModel(createThreadDto);
@@ -70,5 +77,37 @@ export class ThreadsService {
 
   remove(id: string): Promise<Thread | null> {
     return this.threadModel.findByIdAndDelete(id).exec();
+  }
+
+  async findOrCreateGlobalThread(
+    instituteId: string,
+    classId: string,
+  ): Promise<Thread> {
+    let thread = await this.threadModel
+      .findOne({ institute: instituteId, class: classId })
+      .exec();
+    if (!thread) {
+      const instituteUser = await this.usersService.findOne(instituteId);
+      const classData = await this.classesService.findOne(classId);
+
+      if (!instituteUser || !classData) {
+        throw new Error('Institute or Class not found');
+      }
+
+      const title = `Discussion Thread for ${instituteUser.full_name} - ${classData.title}`;
+      const content = `<p>This is the Discussion thread for the institute <strong>${instituteUser.full_name}</strong> and the class <strong>${classData.title}</strong>.</p>`;
+
+      const instituteThreadData: CreateGlobalThreadDto = {
+        user: instituteId,
+        institute: instituteId,
+        class: classId,
+        title,
+        content,
+      };
+
+      thread = new this.threadModel(instituteThreadData);
+      await thread.save();
+    }
+    return thread;
   }
 }

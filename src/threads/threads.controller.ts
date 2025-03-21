@@ -47,6 +47,32 @@ export class ThreadsController {
     };
   }
 
+  @Post('global')
+  @ApiOperation({
+    summary: 'Get or create a global thread for an institute and class',
+  })
+  @ApiQuery({ name: 'instituteId', required: true })
+  @ApiQuery({ name: 'classId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Global thread retrieved or created successfully',
+  })
+  @SetMetadata('permissions', ['create_threads'])
+  async findOrCreateGlobalThread(
+    @Query('instituteId') instituteId: string,
+    @Query('classId') classId: string,
+  ) {
+    const thread = await this.threadsService.findOrCreateGlobalThread(
+      instituteId,
+      classId,
+    );
+    return {
+      status: HttpStatus.OK,
+      message: 'Global thread retrieved or created successfully',
+      data: thread,
+    };
+  }
+
   @Get('topic/:topicId')
   @ApiOperation({ summary: 'Get all threads by topic ID' })
   @ApiQuery({ name: 'page', required: false })

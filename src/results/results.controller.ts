@@ -359,7 +359,8 @@ export class ResultsController {
 
     const reportCard = results.map((result) => {
       const test = result.toObject().test;
-      const title = `${testType == 'mock' ? test.subject.title : test.topic.title} + ${test.title}`;
+      // const title = `${testType == 'mock' ? test.subject.title : test.topic.title} + ${test.title}`;
+      const title = test.title;
       const totalMarks = result.marksSummary.totalMarks;
       const obtainedMarks = result.marksSummary.obtainedMarks;
       const averageMarks = (obtainedMarks / totalMarks) * 100;
@@ -368,7 +369,7 @@ export class ResultsController {
       const averageTimePerQuestion = result.marksSummary.averageTimePerQuestion;
       const mostRecentFinishedAt = result.finishedAt;
 
-      return {
+      let _reportCard = {
         title,
         totalMarks,
         obtainedMarks,
@@ -378,6 +379,12 @@ export class ResultsController {
         averageTimePerQuestion,
         mostRecentFinishedAt,
       };
+
+      if (testType !== 'mock') {
+        _reportCard['topic_title'] = test.topic.title;
+      }
+
+      return _reportCard;
     });
 
     return {
