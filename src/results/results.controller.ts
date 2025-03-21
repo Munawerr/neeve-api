@@ -357,77 +357,26 @@ export class ResultsController {
       testType,
     );
 
-    const groupedResults = results.reduce((acc, result) => {
+    const reportCard = results.map((result) => {
       const test = result.toObject().test;
-      if (test) {
-        let key = '';
-        if (testType === 'mock' && test.subject) {
-          key = test.subject._id;
-        } else if (test.topic) {
-          key = test.topic._id;
-        }
-
-        if (key) {
-          if (!acc[key]) {
-            acc[key] = { test, results: {} };
-          }
-          const testId = test._id;
-          if (
-            !acc[key].results[testId] ||
-            acc[key].results[testId].marksSummary.obtainedMarks <
-              result.marksSummary.obtainedMarks
-          ) {
-            acc[key].results[testId] = result;
-          }
-        }
-      }
-      return acc;
-    }, {});
-
-    const reportCard = Object.keys(groupedResults).map((key) => {
-      const { test, results } = groupedResults[key];
-      const topicResults = Object.values(results) as Result[];
-      const totalMarks = topicResults.reduce(
-        (sum, result) => sum + result.marksSummary.totalMarks,
-        0,
-      );
-      const obtainedMarks = topicResults.reduce(
-        (sum, result) => sum + result.marksSummary.obtainedMarks,
-        0,
-      );
+      const title = `${testType == 'mock' ? test.subject.title : test.topic.title} + ${test.title}`;
+      const totalMarks = result.marksSummary.totalMarks;
+      const obtainedMarks = result.marksSummary.obtainedMarks;
       const averageMarks = (obtainedMarks / totalMarks) * 100;
-
-      const correctAnswers = topicResults.reduce(
-        (sum, result) => sum + result.marksSummary.correctAnswers,
-        0,
-      );
-      const incorrectAnswers = topicResults.reduce(
-        (sum, result) => sum + result.marksSummary.incorrectAnswers,
-        0,
-      );
-      const averageTimePerQuestion =
-        topicResults.reduce(
-          (sum, result) => sum + result.marksSummary.averageTimePerQuestion,
-          0,
-        ) / topicResults.length;
-
-      // Get the most recent finishedAt date
-      const mostRecentFinishedAt = topicResults.reduce((latest, result) => {
-        return result.finishedAt > latest ? result.finishedAt : latest;
-      }, new Date(0));
+      const correctAnswers = result.marksSummary.correctAnswers;
+      const incorrectAnswers = result.marksSummary.incorrectAnswers;
+      const averageTimePerQuestion = result.marksSummary.averageTimePerQuestion;
+      const mostRecentFinishedAt = result.finishedAt;
 
       return {
-        topicId: key,
-        code: testType === 'mock' ? test.subject.code : test.topic.code,
-        title: testType === 'mock' ? test.subject.title : test.topic.title,
-        totalTests: topicResults.length,
+        title,
         totalMarks,
         obtainedMarks,
         averageMarks,
         correctAnswers,
         incorrectAnswers,
         averageTimePerQuestion,
-        mostRecentFinishedAt, // Add the most recent finishedAt date to the report card
+        mostRecentFinishedAt,
       };
     });
 
