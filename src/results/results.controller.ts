@@ -496,7 +496,7 @@ export class ResultsController {
       return acc;
     }, {});
 
-    const uniqueResultsArray = Object.values(uniqueResults) as Result[];
+    const uniqueResultsArray: Result[] = Object.values(uniqueResults);
 
     const totalMarks = uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.totalMarks,

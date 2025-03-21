@@ -86,7 +86,7 @@ export class ResultsService {
       .find({
         student,
         status: ResultStatus.FINISHED,
-        testType: { $ne: TestType.MOCK },
+        testType: { $ne: TestType.PRACTICE },
       })
       .populate({
         path: 'questionResults',
