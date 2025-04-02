@@ -91,6 +91,23 @@ export class CoursesController {
     }
   }
 
+  @Get('dropdown')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all courses for dropdown' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Courses retrieved successfully for dropdown',
+  })
+  async findAllForDropdown() {
+    const courses = await this.coursesService.findAllForDropdown();
+    return {
+      status: HttpStatus.OK,
+      message: 'Courses retrieved successfully for dropdown',
+      data: courses,
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

@@ -87,6 +87,23 @@ export class SubjectsController {
     }
   }
 
+  @Get('dropdown')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all subjects for dropdown' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Subjects retrieved successfully for dropdown',
+  })
+  async findAllForDropdown() {
+    const subjects = await this.subjectsService.findAllForDropdown();
+    return {
+      status: HttpStatus.OK,
+      message: 'Subjects retrieved successfully for dropdown',
+      data: subjects,
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

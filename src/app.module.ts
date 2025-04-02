@@ -48,6 +48,8 @@ import {
 } from './discussions/schemas/discussion.schema';
 import { ThreadsModule } from './threads/threads.module';
 import { DiscussionsModule } from './discussions/discussions.module';
+import { ChatModule } from './chat/chat.module'; // Import ChatModule
+import { ConfigModule } from '@nestjs/config'; // Import ConfigModule
 
 env.config();
 
@@ -57,6 +59,7 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
 
 @Module({
   imports: [
+    ConfigModule.forRoot(), // Add ConfigModule
     MongooseModule.forRoot(DB_URL),
     JwtModule.register({
       secret: JWT_SECRET,
@@ -94,6 +97,7 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
     LiveClassesModule,
     ThreadsModule,
     DiscussionsModule,
+    ChatModule, // Add ChatModule
   ],
   controllers: [AppController],
   providers: [AppService, AuthService],

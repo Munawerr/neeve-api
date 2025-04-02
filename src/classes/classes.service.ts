@@ -37,6 +37,10 @@ export class ClassesService {
     return { classes, total };
   }
 
+  async findAllForDropdown(): Promise<Class[]> {
+    return this.classModel.find({}, 'title').exec();
+  }
+
   findOne(id: string): Promise<Class | null> {
     return this.classModel.findById(id).exec();
   }

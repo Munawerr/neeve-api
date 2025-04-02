@@ -16,8 +16,36 @@ export class PackagesService {
     return createdPackage.save();
   }
 
-  findAll(): Promise<Package[]> {
-    return this.packageModel.find().exec();
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search: string = '',
+  ): Promise<{ packages: Package[]; total: number }> {
+    const filter = search
+      ? {
+          $or: [
+            { code: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const packages = await this.packageModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('subjects')
+      .exec();
+    const total = await this.packageModel.countDocuments(filter);
+    return { packages, total };
+  }
+
+  async findAllForDropdown(): Promise<Package[]> {
+    return this.packageModel
+      .find({}, 'code description')
+      .populate('subjects')
+      .populate('course')
+      .exec();
   }
 
   findOne(id: string): Promise<Package | null> {

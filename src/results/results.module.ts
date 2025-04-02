@@ -15,6 +15,11 @@ import { TestsService } from 'src/tests/tests.service';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { S3Service } from 'src/s3/s3.service';
+import {
+  Question,
+  QuestionSchema,
+} from 'src/questions/schemas/question.schema';
+import { QuestionsService } from 'src/questions/questions.service';
 
 @Module({
   imports: [
@@ -25,11 +30,13 @@ import { S3Service } from 'src/s3/s3.service';
       { name: Test.name, schema: TestSchema },
       { name: Package.name, schema: PackageSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Question.name, schema: QuestionSchema },
     ]),
   ],
   controllers: [ResultsController],
   providers: [
     ResultsService,
+    QuestionsService,
     QuestionResultsService,
     UsersService,
     TestsService,

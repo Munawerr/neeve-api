@@ -11,6 +11,7 @@ import {
   SetMetadata,
   Request,
   Headers,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PackagesService } from './packages.service';
@@ -90,7 +91,12 @@ export class PackagesController {
     description: 'Packages retrieved successfully',
   })
   @SetMetadata('permissions', ['view_packages'])
-  async findAll(@Headers('authorization') authHeader: string) {
+  async findAll(
+    @Headers('authorization') authHeader: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
     const token = authHeader.split(' ')[1];
     let decodedToken;
     try {
@@ -110,11 +116,15 @@ export class PackagesController {
         data: user ? user.packages : [],
       };
     } else if (decodedToken.role === 'admin') {
-      const packages = await this.packagesService.findAll();
+      const { packages, total } = await this.packagesService.findAll(
+        page,
+        limit,
+        search,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Packages retrieved successfully',
-        data: packages,
+        data: { items: packages, total },
       };
     } else {
       return {
@@ -122,6 +132,23 @@ export class PackagesController {
         message: 'Access denied',
       };
     }
+  }
+
+  @Get('dropdown')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all packages for dropdown' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Packages retrieved successfully for dropdown',
+  })
+  @SetMetadata('permissions', ['view_packages'])
+  async findAllForDropdown() {
+    const packages = await this.packagesService.findAllForDropdown();
+    return {
+      status: HttpStatus.OK,
+      message: 'Packages retrieved successfully for dropdown',
+      data: packages,
+    };
   }
 
   @Get(':id')

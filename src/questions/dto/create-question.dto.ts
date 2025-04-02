@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Types } from 'mongoose';
 
-class OptionDto {
+export class OptionDto {
   @ApiProperty({ example: 'Option 1' })
   readonly text: string;
 

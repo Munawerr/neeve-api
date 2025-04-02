@@ -51,6 +51,10 @@ export class SubjectsService {
     return result;
   }
 
+  async findAllForDropdown(): Promise<Subject[]> {
+    return this.subjectModel.find({}, 'title').exec();
+  }
+
   update(
     id: string,
     updateSubjectDto: UpdateSubjectDto,
