@@ -9,6 +9,7 @@ import * as mammoth from 'mammoth'; // Replace docx4js with mammoth
 import { OpenAI } from 'openai'; // Corrected import
 import { QuestionsService } from 'src/questions/questions.service'; // Import QuestionsService
 import { OptionDto } from 'src/questions/dto/create-question.dto';
+import { MathMLToLaTeX } from 'mathml-to-latex'; // Library to convert MathML to LaTeX
 
 @Injectable()
 export class TestsService {
@@ -129,22 +130,27 @@ export class TestsService {
     fileBuffer: Buffer,
     mimeType: string,
   ): Promise<any> {
-    let extractedText = '';
+    let rawText = '';
 
     try {
       if (mimeType === 'application/pdf') {
         const pdfData = await pdfParse(fileBuffer);
-        extractedText = pdfData.text;
+        rawText = pdfData.text;
       } else if (
         mimeType ===
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       ) {
         try {
           const result = await mammoth.extractRawText({ buffer: fileBuffer });
-          extractedText = result.value; // Extracted text is in the 'value' property
+          rawText = result.value; // Extracted text is in the 'value' property
         } catch (mammothError) {
-          console.error('Error extracting text from .docx file using mammoth:', mammothError);
-          throw new BadRequestException('Failed to extract text from .docx file');
+          console.error(
+            'Error extracting text from .docx file using mammoth:',
+            mammothError,
+          );
+          throw new BadRequestException(
+            'Failed to extract text from .docx file',
+          );
         }
       } else {
         throw new BadRequestException('Unsupported file type');
@@ -153,54 +159,136 @@ export class TestsService {
       throw new BadRequestException('Failed to extract text from file');
     }
 
+    // Step 2: Send cleaned data to GPT-4 for better structuring
+    const formattedMcqs = await this.getStructuredMCQsFromGPT(rawText);
+
+    if (!formattedMcqs || !Array.isArray(formattedMcqs.mcqs)) {
+      throw new BadRequestException('Invalid response from OpenAI API');
+    }
+
+    const test = await this.findOne(testId);
+    if (!test) {
+      throw new BadRequestException('Test not found');
+    }
+
+    for (const mcq of formattedMcqs.mcqs) {
+      // Wrap LaTeX in dollar signs for mcq.question
+      mcq.question = this.wrapLatexInDollarSigns(mcq.question);
+
+      const options: OptionDto[] = mcq.options
+        // .filter((opt) => opt.text && opt.isCorrect !== undefined) // Ensure options have text and isCorrect
+        .map((option) => ({
+          text: this.wrapLatexInDollarSigns(option.text),
+          isCorrect: false,
+          // isCorrect: option.isCorrect,
+        }));
+
+      const question = await this.questionsService.create({
+        text: mcq.question,
+        // corAnsExp: mcq.reasoning,
+        corAnsExp: '',
+        options: options,
+      });
+
+      test.questions.push(question._id as MongooseSchema.Types.ObjectId);
+    }
+
+    await test.save();
+
+    return { questionsAdded: formattedMcqs.mcqs.length };
+  }
+
+  // Utility method to wrap LaTeX in dollar signs
+  private wrapLatexInDollarSigns(text: string): string {
+    const latexRegex =
+      /\\[a-zA-Z]+|{[^{}]*}|\\frac|\\sqrt|\\begin|\\end|\\[()[\]]/; // Detect LaTeX patterns
+    if (
+      latexRegex.test(text) &&
+      !text.startsWith('$$') &&
+      !text.endsWith('$$')
+    ) {
+      return `$$${text}$$`;
+    }
+    return text;
+  }
+
+  private async getStructuredMCQsFromGPT(text: string): Promise<any> {
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
     const jsonSchema = {
       type: 'object',
+      additionalProperties: false, // Disallow extra properties
       properties: {
         mcqs: {
           type: 'array',
           items: {
             type: 'object',
+            additionalProperties: false, // Disallow extra properties in MCQ objects
             properties: {
               question: { type: 'string' },
               options: {
                 type: 'array',
                 items: {
                   type: 'object',
+                  additionalProperties: false, // Disallow extra properties in options
                   properties: {
                     text: { type: 'string' },
-                    isCorrect: { type: 'boolean' },
+                    // isCorrect: { type: 'boolean' },
                   },
-                  required: ['text', 'isCorrect'],
+                  required: ['text'],
+                  // required: ['text', 'isCorrect'],
                 },
               },
-              answer: { type: 'string' },
-              reasoning: { type: 'string' },
+              // solution: { type: 'string' },
+              // reasoning: { type: 'string' },
             },
-            required: ['question', 'options', 'answer', 'reasoning'],
+            required: ['question', 'options'],
+            // required: ['question', 'options', 'solution', 'reasoning'],
           },
         },
       },
       required: ['mcqs'],
     };
 
-    let structuredData: any;
+    // Calculate the token count of the input text
+    const tokenCount = this.calculateTokenCount(text);
+
+    // Dynamically select the model based on the token count
+    let selectedModel = 'gpt-3.5-turbo'; // Default to a cheaper model
+    let maxModelTokens = 4096; // Default max tokens for gpt-3.5-turbo
+    if (tokenCount > 3000 && tokenCount <= 8000) {
+      selectedModel = 'gpt-4o-mini'; // Use GPT-4o-mini for medium-length text
+      maxModelTokens = 8192; // Max tokens for gpt-4o-mini
+    } else if (tokenCount > 8000) {
+      selectedModel = 'gpt-4o'; // Use GPT-4o for very large text
+      maxModelTokens = 16384; // Max tokens for gpt-4o
+    }
+
+    // Calculate max_tokens for the response
+    const maxTokensForResponse = Math.max(
+      maxModelTokens - tokenCount - 500,
+      1000,
+    ); // Reserve 500 tokens for system/user messages
+
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4', // Attempt to use gpt-4
+        model: selectedModel,
+        max_tokens: maxTokensForResponse,
+        temperature: 0.2,
         messages: [
           {
             role: 'system',
-            content: `Extract all multiple-choice questions (MCQs) from the provided text and always return them in JSON format. Ensure that:
-                      - Math equations are in LaTeX format (surrounded by dollar signs $ for inline equations).
-                      - Each MCQ contains a "question", "options", "answer", and "reasoning".`,
+            content: `You will extract MCQs from the provided text. Follow this structured format:
+                      - **Question:** Extract the MCQ question. The question can be plain text, a mix of text and math equations, or consist solely of math equations.
+                      - **Options:** Extract all options (A, B, C, D).
+                      - **Math Equations:** If there is LaTeX math content, ensure it is surrounded by double dollar signs ($$).
+                      - Ensure that questions consisting only of math equations are also extracted.`,
           },
           {
             role: 'user',
-            content: extractedText,
+            content: text,
           },
         ],
         tools: [
@@ -222,112 +310,19 @@ export class TestsService {
         },
       });
 
-      structuredData = JSON.parse(
-        response.choices[0]?.message?.content || '{}',
+      return JSON.parse(
+        response.choices[0]?.message?.tool_calls?.[0]?.function?.arguments ??
+          '{}',
       );
-
-      console.log('Structured Data:', structuredData);
-
-      structuredData = this.validateJsonArguments(structuredData, jsonSchema);
     } catch (error) {
       console.error('Error processing text with OpenAI API:', error); // Log error details
-
-      if (error.message.includes('404') && error.message.includes('gpt-4')) {
-        console.warn('Falling back to gpt-3.5-turbo model...');
-        try {
-          const fallbackResponse = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo', // Fallback to gpt-3.5-turbo
-            messages: [
-              {
-                role: 'system',
-                content: `Extract all multiple-choice questions (MCQs) from the provided text and always return them in JSON format. Ensure that:
-                          - Math equations are in LaTeX format (surrounded by dollar signs $ for inline equations).
-                          - Each MCQ contains a "question", "options", "answer", and "reasoning".`,
-              },
-              {
-                role: 'user',
-                content: extractedText,
-              },
-            ],
-            tools: [
-              {
-                type: 'function',
-                function: {
-                  name: 'validate_json',
-                  description: 'Validate JSON format',
-                  parameters: jsonSchema,
-                  strict: true,
-                },
-              },
-            ],
-            tool_choice: {
-              type: 'function',
-              function: {
-                name: 'validate_json',
-              },
-            },
-          });
-
-          structuredData = JSON.parse(
-            fallbackResponse.choices[0]?.message?.content || '{}',
-          );
-
-          console.log('Structured Data (Fallback):', structuredData);
-
-          structuredData = this.validateJsonArguments(structuredData, jsonSchema);
-        } catch (fallbackError) {
-          console.error('Error processing text with fallback model:', fallbackError);
-          throw new BadRequestException('Failed to process text with OpenAI API (fallback model)');
-        }
-      } else {
-        throw new BadRequestException('Failed to process text with OpenAI API');
-      }
+      throw new BadRequestException('Failed to process text with OpenAI API');
     }
-
-    if (!structuredData || !Array.isArray(structuredData.mcqs)) {
-      throw new BadRequestException('Invalid response from OpenAI API');
-    }
-
-    const test = await this.findOne(testId);
-    if (!test) {
-      throw new BadRequestException('Test not found');
-    }
-
-    for (const mcq of structuredData.mcqs) {
-      const options: OptionDto[] = mcq.options.map((option) => ({
-        text: option.text,
-        isCorrect: option.isCorrect,
-      }));
-
-      const question = await this.questionsService.create({
-        text: mcq.question,
-        corAnsExp: mcq.reasoning,
-        options: options,
-      });
-
-      test.questions.push(question._id as MongooseSchema.Types.ObjectId);
-    }
-
-    await test.save();
-
-    return { questionsAdded: structuredData.mcqs.length };
   }
 
-  private validateJsonArguments(rawArguments: string, schema: any): any {
-    try {
-      const parsedArguments = JSON.parse(rawArguments);
-
-      const Ajv = require('ajv');
-      const ajv = new Ajv();
-      const validate = ajv.compile(schema);
-
-      if (!validate(parsedArguments)) {
-        throw new Error('Validation failed');
-      }
-
-      return parsedArguments;
-    } catch (error) {
-      throw new BadRequestException('Invalid arguments generated by OpenAI');
-    }
+  // Utility method to calculate token count
+  private calculateTokenCount(text: string): number {
+    // Approximate token count: 1 token ≈ 4 characters in English text
+    return Math.ceil(text.length / 4);
   }
 }

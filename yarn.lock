@@ -2027,7 +2027,7 @@
   dependencies:
     arch "^3.0.0"
 
-"@xmldom/xmldom@^0.8.6":
+"@xmldom/xmldom@^0.8.10", "@xmldom/xmldom@^0.8.6":
   version "0.8.10"
   resolved "https://registry.yarnpkg.com/@xmldom/xmldom/-/xmldom-0.8.10.tgz#a1337ca426aa61cef9fe15b5b28e340a72f6fa99"
   integrity sha512-2WALfTl4xo2SkGCYRt6rDTFfk9R1czmBvUQy12gK2KuRKIpWEhcbbzy8EZXtz/jkRqHX8bFEc6FC1HjX4TUWYw==
@@ -5966,6 +5966,13 @@ math-intrinsics@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz#a0dd74be81e2aa5c2f27e65ce283605ee4e2b7f9"
   integrity sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==
+
+mathml-to-latex@^1.4.3:
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/mathml-to-latex/-/mathml-to-latex-1.4.3.tgz#1e42b05f6ed648712481ace8299c8928ce0c328a"
+  integrity sha512-RfMRrpIBEk/BweXKZx0Mb3u5nA6/vKASYeVnclAed6pEhnfaCi1jfDqXYBEbzRsS+ORd1jB88Easa1Ov7majKQ==
+  dependencies:
+    "@xmldom/xmldom" "^0.8.10"
 
 media-typer@0.3.0:
   version "0.3.0"
