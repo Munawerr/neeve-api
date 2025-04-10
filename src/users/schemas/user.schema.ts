@@ -18,6 +18,9 @@ export class User extends Document {
   @Prop({ required: true, enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;
 
+  @Prop({ required: true })
+  lastLogin: Date;
+
   @Prop()
   verificationOtp: string;
 

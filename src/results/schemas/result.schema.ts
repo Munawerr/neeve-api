@@ -1,6 +1,26 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 
+// TestResult interface for correctly typing result data
+export interface TestResult {
+  student: {
+    id: any;
+    name: any;
+    email: any;
+  };
+  testName: string;
+  subject: string;
+  status: ResultStatus;
+  startedAt: Date;
+  finishedAt: Date;
+  score: number;
+  totalMarks: number;
+  percentage: string;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  averageTimePerQuestion: string;
+}
+
 // Enum to represent the status of the result
 export enum ResultStatus {
   FINISHED = 'finished',

@@ -14,6 +14,11 @@ import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { FilesService } from 'src/files/files.service';
 import { File, FileSchema } from 'src/files/schemas/file.schema';
+import {
+  LoginHistory,
+  LoginHistorySchema,
+} from 'src/auth/schemas/login-history.schema';
+import { LoginHistoryService } from 'src/auth/login-history.service';
 
 @Module({
   imports: [
@@ -24,9 +29,16 @@ import { File, FileSchema } from 'src/files/schemas/file.schema';
       { name: Subject.name, schema: SubjectSchema },
       { name: Package.name, schema: PackageSchema },
       { name: File.name, schema: FileSchema },
+      { name: LoginHistory.name, schema: LoginHistorySchema },
     ]),
   ],
   controllers: [TestsController],
-  providers: [TestsService, TopicsService, QuestionsService, FilesService],
+  providers: [
+    TestsService,
+    TopicsService,
+    QuestionsService,
+    FilesService,
+    LoginHistoryService,
+  ],
 })
 export class TestsModule {}

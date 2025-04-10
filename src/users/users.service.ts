@@ -4,6 +4,7 @@ import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose S
 import { Role } from './../roles/schemas/role.schema';
 import { Result } from './../results/schemas/result.schema'; // Import Result schema
 import { Package } from 'src/packages/schemas/package.schema';
+import { LoginHistory } from '../auth/schemas/login-history.schema'; // Import LoginHistory model
 
 import { User } from './schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -21,6 +22,8 @@ export class UsersService {
     @InjectModel(Role.name) private roleModel: Model<Role>,
     @InjectModel(Result.name) private resultModel: Model<Result>, // Inject Result model
     @InjectModel(Package.name) private readonly packageModel: Model<Package>,
+    @InjectModel(LoginHistory.name)
+    private readonly loginHistoryModel: Model<LoginHistory>, // Inject LoginHistory model
     private readonly s3Service: S3Service, // Inject S3 service
   ) {}
 
@@ -257,16 +260,17 @@ export class UsersService {
 
   async getUserAnalytics(user: User): Promise<any> {
     const _user = user.toObject();
-    if (_user.role.slug === 'institute') {
+    if (_user.role && _user.role.slug === 'institute') {
+      const studentRole = await this.roleModel.findOne({ slug: 'student' });
       const studentCount = await this.userModel.countDocuments({
         institute: user._id,
-        role: await this.getStudentRoleId(),
+        role: studentRole?._id,
       });
       const testResultsCount = await this.resultModel.countDocuments({
         institute: user._id,
       });
       return { studentCount, testResultsCount };
-    } else if (_user.role.slug === 'student') {
+    } else if (_user.role && _user.role.slug === 'student') {
       const testResults = await this.resultModel
         .find({ student: user._id })
         .exec();
@@ -290,9 +294,11 @@ export class UsersService {
       const avgTimePerQuestion =
         testResults.reduce(
           (sum, result) =>
-            sum +
-            (result.finishedAt.getTime() - result.startedAt.getTime()) /
-              result.numOfQuestions,
+            result.finishedAt && result.startedAt
+              ? sum +
+                (result.finishedAt.getTime() - result.startedAt.getTime()) /
+                  result.numOfQuestions
+              : sum,
           0,
         ) /
         testsTaken /
@@ -304,7 +310,7 @@ export class UsersService {
         percentage,
         avgTimePerQuestion,
       };
-    } else if (_user.role.slug === 'admin') {
+    } else if (_user.role && _user.role.slug === 'admin') {
       const instituteCount = await this.userModel.countDocuments({
         role: await this.getInstituteRoleId(),
       });
@@ -324,6 +330,32 @@ export class UsersService {
       .select('full_name _id packages')
       .populate('packages')
       .exec();
+  }
+
+  async getAllStudentUsersForDropdown(instituteId?: string): Promise<any[]> {
+    const query: any = { role: await this.getStudentRoleId() };
+
+    // Filter by institute if provided
+    if (instituteId) {
+      query.institute = instituteId;
+    }
+
+    const students = await this.userModel
+      .find(query)
+      .select('_id full_name email imageUrl regNo')
+      .sort({ full_name: 1 })
+      .lean()
+      .exec();
+
+    return students.map((student) => ({
+      _id: student._id,
+      full_name: student.full_name,
+      email: student.email,
+      imageUrl: student.imageUrl,
+      regNo: student.regNo || '',
+      value: student._id,
+      label: student.full_name,
+    }));
   }
 
   async findByPhone(phone: string): Promise<User | null> {
@@ -397,5 +429,260 @@ export class UsersService {
     }
 
     return createdInstitutes;
+  }
+
+  // Analytics methods for dashboard
+
+  async countAllUsers(): Promise<number> {
+    return await this.userModel.countDocuments({ status: 'active' });
+  }
+
+  async countActiveUsers(days: number): Promise<number> {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+
+    return await this.userModel.countDocuments({
+      status: 'active',
+      lastLogin: { $gte: date },
+    });
+  }
+
+  async countInstitutes(): Promise<number> {
+    // Find the institute role first
+    const instituteRole = await this.roleModel.findOne({ slug: 'institute' });
+    if (!instituteRole) return 0;
+
+    // Then query users with that role id
+    return this.userModel.countDocuments({
+      role: instituteRole._id,
+      status: 'active',
+    });
+  }
+
+  async getNewUsersByMonth(
+    months: number,
+  ): Promise<Array<{ month: string; count: number }>> {
+    const results: any[] = [];
+    const date = new Date();
+
+    // Go back 'months' number of months and get counts for each month
+    for (let i = 0; i < months; i++) {
+      const currentMonth = date.getMonth() - i;
+      const year = date.getFullYear() - Math.floor(Math.abs(currentMonth) / 12);
+      const month = (currentMonth + 12) % 12;
+
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0);
+
+      const count = await this.userModel.countDocuments({
+        createdAt: { $gte: startDate, $lte: endDate },
+        status: 'active',
+      });
+
+      results.unshift({
+        month:
+          startDate.toLocaleString('default', { month: 'short' }) + ' ' + year,
+        count,
+      });
+    }
+
+    return results;
+  }
+
+  async getUserEngagementByDay(
+    days: number,
+  ): Promise<Array<{ date: string; count: number }>> {
+    const results: any[] = [];
+    const date = new Date();
+
+    // Get login activity for each day
+    for (let i = 0; i < days; i++) {
+      const currentDate = new Date();
+      currentDate.setDate(date.getDate() - i);
+
+      // Start and end of the day
+      const startOfDay = new Date(currentDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(currentDate.setHours(23, 59, 59, 999));
+
+      const count = await this.loginHistoryModel.countDocuments({
+        loginTime: { $gte: startOfDay, $lte: endOfDay },
+      });
+
+      results.unshift({
+        date: startOfDay.toISOString().split('T')[0],
+        count,
+      });
+    }
+
+    return results;
+  }
+
+  async getInstituteDistribution(): Promise<any[]> {
+    // Find the institute role first
+    const instituteRole = await this.roleModel.findOne({ slug: 'institute' });
+    if (!instituteRole) return [];
+
+    // Get all active institutes
+    const institutes = await this.userModel.find({
+      role: instituteRole._id,
+      status: 'active',
+    });
+
+    // For each institute, count their students
+    const result: any[] = [];
+    for (const institute of institutes) {
+      const studentCount = await this.countInstituteUsers(
+        institute._id as string,
+      );
+      result.push({
+        institute: institute.full_name,
+        studentCount,
+      });
+    }
+
+    return result;
+  }
+
+  // Institute-specific analytics methods
+
+  async countInstituteUsers(instituteId: string): Promise<number> {
+    return await this.userModel.countDocuments({
+      institute: instituteId,
+      status: 'active',
+    });
+  }
+
+  async countActiveInstituteUsers(
+    instituteId: string,
+    days: number,
+  ): Promise<number> {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+
+    return await this.userModel.countDocuments({
+      institute: instituteId,
+      status: 'active',
+      lastLogin: { $gte: date },
+    });
+  }
+
+  async getNewInstituteUsersByMonth(
+    instituteId: string,
+    months: number,
+  ): Promise<Array<{ month: string; count: number }>> {
+    const results: any[] = [];
+    const date = new Date();
+
+    // Go back 'months' number of months and get counts for each month
+    for (let i = 0; i < months; i++) {
+      const currentMonth = date.getMonth() - i;
+      const year = date.getFullYear() - Math.floor(Math.abs(currentMonth) / 12);
+      const month = (currentMonth + 12) % 12;
+
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0);
+
+      const count = await this.userModel.countDocuments({
+        institute: instituteId,
+        createdAt: { $gte: startDate, $lte: endDate },
+        status: 'active',
+      });
+
+      results.unshift({
+        month:
+          startDate.toLocaleString('default', { month: 'short' }) + ' ' + year,
+        count,
+      });
+    }
+
+    return results;
+  }
+
+  async getInstituteUserEngagementByDay(
+    instituteId: string,
+    days: number,
+  ): Promise<Array<{ date: string; count: number }>> {
+    const results: any[] = [];
+    const date = new Date();
+
+    // First get all users in this institute
+    const instituteUsers = await this.userModel
+      .find({
+        institute: instituteId,
+        status: 'active',
+      })
+      .select('_id');
+
+    const userIds = instituteUsers.map((user) => user._id);
+
+    // Get login activity for each day
+    for (let i = 0; i < days; i++) {
+      const currentDate = new Date();
+      currentDate.setDate(date.getDate() - i);
+
+      // Start and end of the day
+      const startOfDay = new Date(currentDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(currentDate.setHours(23, 59, 59, 999));
+
+      const count = await this.loginHistoryModel.countDocuments({
+        userId: { $in: userIds },
+        loginTime: { $gte: startOfDay, $lte: endOfDay },
+      });
+
+      results.unshift({
+        date: startOfDay.toISOString().split('T')[0],
+        count,
+      });
+    }
+
+    return results;
+  }
+
+  async getTopPerformingInstituteStudents(
+    instituteId: string,
+    limit: number,
+  ): Promise<Array<any>> {
+    // Get all students in this institute
+    const students = await this.userModel
+      .find({
+        institute: instituteId,
+        role: { $ne: 'admin' }, // Exclude admins
+        status: 'active',
+      })
+      .select('_id name email')
+      .lean();
+
+    const result: any[] = [];
+
+    // For each student, get their test performance
+    for (const student of students) {
+      const testScores = await this.resultModel.find({
+        student: student._id,
+      });
+
+      if (testScores.length > 0) {
+        // Calculate average score
+        const totalScore = testScores.reduce(
+          (acc, curr) => acc + curr.marksSummary.totalMarks,
+          0,
+        );
+        const averageScore = totalScore / testScores.length;
+
+        result.push({
+          student: {
+            id: student._id,
+            name: student.full_name,
+            email: student.email,
+          },
+          averageScore,
+          testsAttempted: testScores.length,
+        });
+      }
+    }
+
+    // Sort by average score in descending order and return top performers
+    return result
+      .sort((a, b) => b.averageScore - a.averageScore)
+      .slice(0, limit);
   }
 }

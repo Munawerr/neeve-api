@@ -500,6 +500,42 @@ export class UsersController {
     }
   }
 
+  @Get('dropdown/students')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all student users for dropdown' })
+  @ApiQuery({
+    name: 'instituteId',
+    required: false,
+    description: 'Filter students by institute',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Student users retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve student users',
+  })
+  async getAllStudentUsersForDropdown(
+    @Query('instituteId') instituteId?: string,
+  ) {
+    try {
+      const students =
+        await this.usersService.getAllStudentUsersForDropdown(instituteId);
+      return {
+        status: HttpStatus.OK,
+        message: 'Student users retrieved successfully',
+        data: students,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve student users',
+        error: error.message,
+      };
+    }
+  }
+
   @Delete('student/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -746,6 +782,7 @@ export class UsersController {
         message: 'User not found',
       };
     } catch (error) {
+      console.log('error', error);
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve user',

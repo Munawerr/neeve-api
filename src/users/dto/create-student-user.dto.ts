@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsEmail,
+  IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -27,6 +28,11 @@ export class CreateStudentUserDto {
   @IsString()
   @IsNotEmpty()
   full_name: string;
+
+  @ApiProperty({ example: '2000-01-01', description: 'Date of birth in ISO format (YYYY-MM-DD)' })
+  @IsDateString()
+  @IsNotEmpty()
+  dob: string;
 
   @ApiPropertyOptional({ example: 'New York' })
   @IsString()

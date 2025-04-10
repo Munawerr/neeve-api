@@ -12,6 +12,11 @@ import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { Result, ResultSchema } from 'src/results/schemas/result.schema';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { S3Service } from 'src/s3/s3.service';
+import {
+  LoginHistory,
+  LoginHistorySchema,
+} from 'src/auth/schemas/login-history.schema';
+import { LoginHistoryService } from 'src/auth/login-history.service';
 
 @Module({
   imports: [
@@ -23,9 +28,16 @@ import { S3Service } from 'src/s3/s3.service';
       { name: Role.name, schema: RoleSchema },
       { name: Result.name, schema: ResultSchema },
       { name: Package.name, schema: PackageSchema },
+      { name: LoginHistory.name, schema: LoginHistorySchema },
     ]),
   ],
   controllers: [ThreadsController],
-  providers: [ThreadsService, UsersService, ClassesService, S3Service],
+  providers: [
+    ThreadsService,
+    UsersService,
+    ClassesService,
+    S3Service,
+    LoginHistoryService,
+  ],
 })
 export class ThreadsModule {}

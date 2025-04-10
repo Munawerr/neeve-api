@@ -33,7 +33,7 @@ import { CreateQuestionDto } from 'src/questions/dto/create-question.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import * as htmlToText from 'html-to-text';
 import axios from 'axios';
 import * as cheerio from 'cheerio';

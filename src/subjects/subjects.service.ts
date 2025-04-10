@@ -8,7 +8,7 @@ import { UpdateSubjectDto } from './dto/update-subject.dto';
 @Injectable()
 export class SubjectsService {
   constructor(
-    @InjectModel(Subject.name) private subjectModel: Model<Subject>,
+    @InjectModel(Subject.name) private readonly subjectModel: Model<Subject>,
   ) {}
 
   create(createSubjectDto: CreateSubjectDto): Promise<Subject> {
@@ -53,6 +53,37 @@ export class SubjectsService {
 
   async findAllForDropdown(): Promise<Subject[]> {
     return this.subjectModel.find({}, 'title').exec();
+  }
+
+  async getAllSubjectsForDropdown(
+    courseId?: string,
+    instituteId?: string,
+  ): Promise<any[]> {
+    const query: any = {};
+
+    // Filter by course if provided
+    if (courseId) {
+      query.course = courseId;
+    }
+
+    // Filter by institute if provided
+    if (instituteId) {
+      query.institute = instituteId;
+    }
+
+    const subjects = await this.subjectModel
+      .find(query)
+      .select('_id name description course')
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+
+    return subjects.map((subject) => ({
+      _id: subject._id,
+      name: subject.title,
+      value: subject._id,
+      label: subject.title,
+    }));
   }
 
   update(

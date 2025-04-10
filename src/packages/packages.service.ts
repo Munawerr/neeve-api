@@ -8,7 +8,7 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 @Injectable()
 export class PackagesService {
   constructor(
-    @InjectModel(Package.name) private packageModel: Model<Package>,
+    @InjectModel(Package.name) private readonly packageModel: Model<Package>,
   ) {}
 
   create(createPackageDto: CreatePackageDto): Promise<Package> {
@@ -46,6 +46,35 @@ export class PackagesService {
       .populate('subjects')
       .populate('course')
       .exec();
+  }
+
+  async getAllPackagesForDropdown(instituteId?: string): Promise<any[]> {
+    const query: any = {};
+
+    // Filter by institute if provided
+    if (instituteId) {
+      query.institute = instituteId;
+    }
+
+    const packages = await this.packageModel
+      .find(query)
+      .select('_id name code description')
+      .sort({ name: 1 })
+      .populate('course', 'name')
+      .populate('class', 'name')
+      .lean()
+      .exec();
+
+    return packages.map((pkg) => ({
+      _id: pkg._id,
+      name: pkg.description,
+      code: pkg.code,
+      description: pkg.description,
+      course: pkg.course,
+      class: pkg.class,
+      value: pkg._id,
+      label: pkg.description,
+    }));
   }
 
   findOne(id: string): Promise<Package | null> {

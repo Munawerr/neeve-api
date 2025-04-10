@@ -91,17 +91,34 @@ export class SubjectsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all subjects for dropdown' })
+  @ApiQuery({ name: 'courseId', required: false, description: 'Filter subjects by course' })
+  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter subjects by institute' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Subjects retrieved successfully for dropdown',
   })
-  async findAllForDropdown() {
-    const subjects = await this.subjectsService.findAllForDropdown();
-    return {
-      status: HttpStatus.OK,
-      message: 'Subjects retrieved successfully for dropdown',
-      data: subjects,
-    };
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve subjects for dropdown',
+  })
+  async getAllSubjectsForDropdown(
+    @Query('courseId') courseId?: string,
+    @Query('instituteId') instituteId?: string
+  ) {
+    try {
+      const subjects = await this.subjectsService.getAllSubjectsForDropdown(courseId, instituteId);
+      return {
+        status: HttpStatus.OK,
+        message: 'Subjects retrieved successfully for dropdown',
+        data: subjects,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve subjects for dropdown',
+        error: error.message,
+      };
+    }
   }
 
   @Get(':id')

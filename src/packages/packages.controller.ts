@@ -28,6 +28,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
 
@@ -137,18 +138,33 @@ export class PackagesController {
   @Get('dropdown')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all packages for dropdown' })
+  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter packages by institute' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Packages retrieved successfully for dropdown',
   })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve packages for dropdown',
+  })
   @SetMetadata('permissions', ['view_packages'])
-  async findAllForDropdown() {
-    const packages = await this.packagesService.findAllForDropdown();
-    return {
-      status: HttpStatus.OK,
-      message: 'Packages retrieved successfully for dropdown',
-      data: packages,
-    };
+  async getAllPackagesForDropdown(
+    @Query('instituteId') instituteId?: string
+  ) {
+    try {
+      const packages = await this.packagesService.getAllPackagesForDropdown(instituteId);
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully for dropdown',
+        data: packages,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve packages for dropdown',
+        error: error.message,
+      };
+    }
   }
 
   @Get(':id')
