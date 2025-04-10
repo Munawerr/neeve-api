@@ -15,6 +15,17 @@ import { TestsService } from 'src/tests/tests.service';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { S3Service } from 'src/s3/s3.service';
+import { PdfReportService } from './../reports/services/pdf-report.service';
+import {
+  Question,
+  QuestionSchema,
+} from 'src/questions/schemas/question.schema';
+import { QuestionsService } from 'src/questions/questions.service';
+import {
+  LoginHistory,
+  LoginHistorySchema,
+} from 'src/auth/schemas/login-history.schema';
+import { LoginHistoryService } from 'src/auth/login-history.service';
 
 @Module({
   imports: [
@@ -25,15 +36,20 @@ import { S3Service } from 'src/s3/s3.service';
       { name: Test.name, schema: TestSchema },
       { name: Package.name, schema: PackageSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Question.name, schema: QuestionSchema },
+      { name: LoginHistory.name, schema: LoginHistorySchema },
     ]),
   ],
   controllers: [ResultsController],
   providers: [
     ResultsService,
+    QuestionsService,
     QuestionResultsService,
     UsersService,
     TestsService,
     S3Service,
+    PdfReportService,
+    LoginHistoryService,
   ],
 })
 export class ResultsModule {}

@@ -25,6 +25,9 @@ export class Thread extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: false })
   class: mongoose.Schema.Types.ObjectId;
 
+  @Prop({ default: false })
+  isGlobal: boolean;
+
   @Prop({ default: Date.now })
   createdAt: Date;
 

@@ -7,7 +7,9 @@ import { UpdateClassDto } from './dto/update-class.dto';
 
 @Injectable()
 export class ClassesService {
-  constructor(@InjectModel(Class.name) private classModel: Model<Class>) {}
+  constructor(
+    @InjectModel(Class.name) private readonly classModel: Model<Class>,
+  ) {}
 
   create(createClassDto: CreateClassDto): Promise<Class> {
     const createdClass = new this.classModel(createClassDto);
@@ -35,6 +37,41 @@ export class ClassesService {
       .exec();
     const total = await this.classModel.countDocuments(filter);
     return { classes, total };
+  }
+
+  async findAllForDropdown(): Promise<Class[]> {
+    return this.classModel.find({}, 'title').exec();
+  }
+
+  async getAllClassesForDropdown(
+    courseId?: string,
+    instituteId?: string,
+  ): Promise<any[]> {
+    const query: any = {};
+
+    // Filter by course if provided
+    if (courseId) {
+      query.course = courseId;
+    }
+
+    // Filter by institute if provided
+    if (instituteId) {
+      query.institute = instituteId;
+    }
+
+    const classes = await this.classModel
+      .find(query)
+      .select('_id name description course')
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+
+    return classes.map((classItem) => ({
+      _id: classItem._id,
+      name: classItem.title,
+      value: classItem._id,
+      label: classItem.title,
+    }));
   }
 
   findOne(id: string): Promise<Class | null> {

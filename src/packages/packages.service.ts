@@ -8,7 +8,7 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 @Injectable()
 export class PackagesService {
   constructor(
-    @InjectModel(Package.name) private packageModel: Model<Package>,
+    @InjectModel(Package.name) private readonly packageModel: Model<Package>,
   ) {}
 
   create(createPackageDto: CreatePackageDto): Promise<Package> {
@@ -16,8 +16,65 @@ export class PackagesService {
     return createdPackage.save();
   }
 
-  findAll(): Promise<Package[]> {
-    return this.packageModel.find().exec();
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search: string = '',
+  ): Promise<{ packages: Package[]; total: number }> {
+    const filter = search
+      ? {
+          $or: [
+            { code: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const packages = await this.packageModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('subjects')
+      .exec();
+    const total = await this.packageModel.countDocuments(filter);
+    return { packages, total };
+  }
+
+  async findAllForDropdown(): Promise<Package[]> {
+    return this.packageModel
+      .find({}, 'code description')
+      .populate('subjects')
+      .populate('course')
+      .exec();
+  }
+
+  async getAllPackagesForDropdown(instituteId?: string): Promise<any[]> {
+    const query: any = {};
+
+    // Filter by institute if provided
+    if (instituteId) {
+      query.institute = instituteId;
+    }
+
+    const packages = await this.packageModel
+      .find(query)
+      .select('_id name code description')
+      .sort({ name: 1 })
+      .populate('course', 'name')
+      .populate('class', 'name')
+      .lean()
+      .exec();
+
+    return packages.map((pkg) => ({
+      _id: pkg._id,
+      name: pkg.description,
+      code: pkg.code,
+      description: pkg.description,
+      course: pkg.course,
+      class: pkg.class,
+      value: pkg._id,
+      label: pkg.description,
+    }));
   }
 
   findOne(id: string): Promise<Package | null> {

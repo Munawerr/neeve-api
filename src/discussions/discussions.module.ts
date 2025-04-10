@@ -5,6 +5,7 @@ import { DiscussionsService } from './discussions.service';
 import { Discussion, DiscussionSchema } from './schemas/discussion.schema';
 import { Thread, ThreadSchema } from 'src/threads/schemas/thread.schema';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,8 +14,10 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
       { name: Thread.name, schema: ThreadSchema },
       { name: User.name, schema: UserSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [DiscussionsController],
   providers: [DiscussionsService],
+  exports: [DiscussionsService],
 })
 export class DiscussionsModule {}

@@ -10,6 +10,9 @@ import {
   HttpStatus,
   Res,
   SetMetadata,
+  Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +21,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TestsService } from './tests.service';
@@ -29,10 +33,11 @@ import { CreateQuestionDto } from 'src/questions/dto/create-question.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import * as htmlToText from 'html-to-text';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('tests')
 @Controller('tests')
@@ -69,6 +74,46 @@ export class TestsController {
     };
   }
 
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all tests' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tests retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve tests',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    try {
+      const { tests, total } = await this.testsService.findAll(
+        page,
+        limit,
+        search,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Tests retrieved successfully',
+        data: { items: tests, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve tests',
+        error: error.message,
+      };
+    }
+  }
+
   @Get('subject/:subject/mock')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -77,7 +122,7 @@ export class TestsController {
     status: HttpStatus.OK,
     description: 'Tests retrieved successfully',
   })
-  async findAll(@Param('subject') subject: string) {
+  async findAllMockTests(@Param('subject') subject: string) {
     const tests = await this.testsService.findAllMockTests(subject);
     return {
       status: HttpStatus.OK,
@@ -446,5 +491,62 @@ export class TestsController {
     doc.on('finish', () => {
       res.end();
     });
+  }
+
+  @Post(':testId/upload-questions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Upload a file to extract MCQs and save to database',
+  })
+  @ApiParam({ name: 'testId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Questions extracted and saved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid file type or extraction failed',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new Error('Invalid file type. Only PDF and DOCX are allowed.'),
+            false,
+          );
+        }
+      },
+    }),
+  )
+  async uploadQuestions(
+    @Param('testId') testId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    try {
+      const result = await this.testsService.extractAndSaveQuestions(
+        testId,
+        file.buffer,
+        file.mimetype,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Questions extracted and saved successfully',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Failed to extract and save questions',
+        error: error.message,
+      };
+    }
   }
 }

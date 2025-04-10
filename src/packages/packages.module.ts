@@ -16,6 +16,12 @@ import { SubjectsService } from '../subjects/subjects.service';
 import { UsersService } from 'src/users/users.service';
 import { S3Service } from 'src/s3/s3.service';
 import { Result, ResultSchema } from 'src/results/schemas/result.schema';
+import { Test, TestSchema } from 'src/tests/schemas/test.schema';
+import {
+  LoginHistory,
+  LoginHistorySchema,
+} from 'src/auth/schemas/login-history.schema';
+import { LoginHistoryService } from 'src/auth/login-history.service';
 
 @Module({
   imports: [
@@ -27,6 +33,8 @@ import { Result, ResultSchema } from 'src/results/schemas/result.schema';
       { name: User.name, schema: UserSchema },
       { name: Role.name, schema: RoleSchema },
       { name: Result.name, schema: ResultSchema },
+      { name: Test.name, schema: TestSchema },
+      { name: LoginHistory.name, schema: LoginHistorySchema },
     ]),
   ],
   controllers: [PackagesController],
@@ -37,6 +45,7 @@ import { Result, ResultSchema } from 'src/results/schemas/result.schema';
     SubjectsService,
     UsersService,
     S3Service,
+    LoginHistoryService,
   ],
 })
 export class PackagesModule {}

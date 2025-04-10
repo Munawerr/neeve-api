@@ -16,9 +16,17 @@ export class Question extends Document {
   text: string;
 
   @Prop()
-  corAnsExp: string;
+  corAnsExp: string; // Correct Answer Explanation
 
-  @Prop({ type: [{ text: String, isCorrect: Boolean }], required: true })
+  @Prop({
+    type: [
+      {
+        text: { type: String, required: true },
+        isCorrect: { type: Boolean, required: true },
+      },
+    ],
+    required: true,
+  })
   options: Option[];
 }
 

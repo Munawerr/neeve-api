@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsDate } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -16,6 +16,11 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   full_name?: string;
+
+  @ApiPropertyOptional({ example: 'John Doe' })
+  @IsOptional()
+  @IsDate()
+  lastLogin?: Date;
 
   @ApiPropertyOptional({ example: 'Software Developer' })
   readonly bio?: string;

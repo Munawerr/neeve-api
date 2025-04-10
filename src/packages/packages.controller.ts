@@ -11,6 +11,7 @@ import {
   SetMetadata,
   Request,
   Headers,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PackagesService } from './packages.service';
@@ -27,6 +28,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
 
@@ -90,7 +92,12 @@ export class PackagesController {
     description: 'Packages retrieved successfully',
   })
   @SetMetadata('permissions', ['view_packages'])
-  async findAll(@Headers('authorization') authHeader: string) {
+  async findAll(
+    @Headers('authorization') authHeader: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
     const token = authHeader.split(' ')[1];
     let decodedToken;
     try {
@@ -110,16 +117,52 @@ export class PackagesController {
         data: user ? user.packages : [],
       };
     } else if (decodedToken.role === 'admin') {
-      const packages = await this.packagesService.findAll();
+      const { packages, total } = await this.packagesService.findAll(
+        page,
+        limit,
+        search,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Packages retrieved successfully',
-        data: packages,
+        data: { items: packages, total },
       };
     } else {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
         message: 'Access denied',
+      };
+    }
+  }
+
+  @Get('dropdown')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all packages for dropdown' })
+  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter packages by institute' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Packages retrieved successfully for dropdown',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve packages for dropdown',
+  })
+  @SetMetadata('permissions', ['view_packages'])
+  async getAllPackagesForDropdown(
+    @Query('instituteId') instituteId?: string
+  ) {
+    try {
+      const packages = await this.packagesService.getAllPackagesForDropdown(instituteId);
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully for dropdown',
+        data: packages,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve packages for dropdown',
+        error: error.message,
       };
     }
   }

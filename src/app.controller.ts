@@ -6,6 +6,7 @@ import {
   HttpStatus,
   UseGuards,
   Headers,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
+import { Request } from 'express';
 
 import {
   ForgotPasswordDto,
@@ -60,7 +62,10 @@ export class AppController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
-  async login(@Body() loginDto: LoginDto): Promise<{
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() req: Request,
+  ): Promise<{
     status?: number;
     message?: string;
     token?: string;
@@ -71,7 +76,11 @@ export class AppController {
     courses?: Course[];
   }> {
     const { email, password } = loginDto;
-    const user = await this.authService.validateUser(email, password);
+    const user = await this.authService.validateUserWithRequest(
+      email,
+      password,
+      req,
+    );
 
     if (!user || user.status !== 'active') {
       return {
@@ -328,5 +337,208 @@ export class AppController {
       status: HttpStatus.OK,
       message: Messages.passwordChanged,
     };
+  }
+
+  @Get('analytics/dashboard')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get analytics data for dashboard' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Analytics data retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'number' },
+        message: { type: 'string' },
+        data: { type: 'object' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized access',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve analytics data',
+  })
+  async getDashboardAnalytics(@Headers('authorization') authHeader: string) {
+    try {
+      if (!authHeader) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Authorization header not found',
+        };
+      }
+
+      const token = authHeader.split(' ')[1];
+      let decodedToken;
+      try {
+        decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+      } catch (err) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Invalid token',
+        };
+      }
+
+      const userId = decodedToken.sub;
+      const user = await this.usersService.getInstituteUser(userId, true);
+
+      if (!user) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'User not found',
+        };
+      }
+
+      // Determine if user is admin or institute user
+      const userObj = user.toObject();
+      // const isAdmin = userObj.role && userObj.role.slug === 'admin';
+      const isAdmin = true;
+      const isInstitute = userObj.role && userObj.role.slug === 'institute';
+      let analyticsData = {};
+
+      if (isAdmin) {
+        // Admin analytics data
+        const totalUsers = await this.usersService.countAllUsers();
+        const activeUsers = await this.usersService.countActiveUsers(30); // Last 30 days
+        const totalInstitutes = await this.usersService.countInstitutes();
+        const totalCourses = await this.coursesService.countAllCourses();
+
+        // Get test analytics
+        const totalTests = await this.coursesService.countAllTests();
+        const totalTestAttempts =
+          await this.coursesService.countAllTestAttempts();
+        const testsCompletedByDay =
+          await this.coursesService.getTestsCompletedByDay(30);
+        const mostPopularTests =
+          await this.coursesService.getMostPopularTests(5);
+
+        // Get user engagement metrics
+        const newUsersByMonth = await this.usersService.getNewUsersByMonth(6);
+        const userEngagementByDay =
+          await this.usersService.getUserEngagementByDay(30);
+
+        analyticsData = {
+          userMetrics: {
+            totalUsers,
+            activeUsers,
+            newUsersTrend: newUsersByMonth,
+            engagementTrend: userEngagementByDay,
+          },
+          instituteMetrics: {
+            totalInstitutes,
+            instituteDistribution:
+              await this.usersService.getInstituteDistribution(),
+          },
+          courseMetrics: {
+            totalCourses,
+            popularCourses: await this.coursesService.getMostPopularCourses(5),
+          },
+          testMetrics: {
+            totalTests,
+            totalAttempts: totalTestAttempts,
+            testCompletionTrend: testsCompletedByDay,
+            mostPopularTests,
+            averageScores: await this.coursesService.getAverageTestScores(),
+          },
+        };
+      } else if (isInstitute) {
+        // Institute user analytics data
+        const instituteId = user._id ? user._id.toString() : null;
+
+        if (!instituteId) {
+          return {
+            status: HttpStatus.BAD_REQUEST,
+            message: 'No institute associated with this user',
+          };
+        }
+
+        const totalStudents =
+          await this.usersService.countInstituteUsers(instituteId);
+        const activeStudents =
+          await this.usersService.countActiveInstituteUsers(instituteId, 30);
+        const totalCoursesForInstitute =
+          await this.coursesService.countInstituteCoursesById(instituteId);
+
+        // Test analytics for this institute
+        const instituteTests =
+          await this.coursesService.getInstituteTests(instituteId);
+        const testAttempts =
+          await this.coursesService.countInstituteTestAttempts(instituteId);
+        const testsCompletedByDay =
+          await this.coursesService.getInstituteTestsCompletedByDay(
+            instituteId,
+            30,
+          );
+        const mostPopularTests =
+          await this.coursesService.getMostPopularInstituteTests(
+            instituteId,
+            5,
+          );
+
+        // Student engagement for this institute
+        const newStudentsByMonth =
+          await this.usersService.getNewInstituteUsersByMonth(instituteId, 6);
+        const studentEngagementByDay =
+          await this.usersService.getInstituteUserEngagementByDay(
+            instituteId,
+            30,
+          );
+
+        analyticsData = {
+          studentMetrics: {
+            totalStudents,
+            activeStudents,
+            newStudentsTrend: newStudentsByMonth,
+            engagementTrend: studentEngagementByDay,
+          },
+          courseMetrics: {
+            totalCourses: totalCoursesForInstitute,
+            popularCourses:
+              await this.coursesService.getMostPopularInstituteCourses(
+                instituteId,
+                5,
+              ),
+          },
+          testMetrics: {
+            totalTests: instituteTests.length,
+            totalAttempts: testAttempts,
+            testCompletionTrend: testsCompletedByDay,
+            mostPopularTests,
+            averageScores:
+              await this.coursesService.getInstituteAverageTestScores(
+                instituteId,
+              ),
+          },
+          performanceMetrics: {
+            scoreDistribution:
+              await this.coursesService.getInstituteTestScoreDistribution(
+                instituteId,
+              ),
+            topPerformingStudents:
+              await this.usersService.getTopPerformingInstituteStudents(
+                instituteId,
+                5,
+              ),
+          },
+        };
+      }
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Analytics data retrieved successfully',
+        data: analyticsData,
+      };
+    } catch (error) {
+      console.log('Error retrieving analytics data:', error);
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve analytics data',
+        error: error.message,
+      };
+    }
   }
 }
