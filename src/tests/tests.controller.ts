@@ -352,44 +352,77 @@ export class TestsController {
         continue;
       }
 
-      const $ = cheerio.load(question.text);
-      const images: { imgTag: string; imageId: number }[] = [];
-      const imgElements = $('img').toArray();
-      for (const img of imgElements) {
-        const imgUrl = $(img).attr('src');
-        if (imgUrl) {
-          const response = await axios.get(imgUrl, {
-            responseType: 'arraybuffer',
-          });
-          const imageId = workbook.addImage({
-            buffer: response.data,
-            extension: 'png',
-          });
-          images.push({ imgTag: $.html(img), imageId });
-          $(img).replaceWith(`{img-${imageId}}`);
+      // Process the question text to find LaTeX equations
+      let questionText = question.text;
+      
+      // Extract LaTeX expressions enclosed in dollar signs
+      const latexExpressions = questionText.match(/\$(.*?)\$/g);
+      const latexImages: { latexMarker: string; imageId: number }[] = [];
+      
+      // If LaTeX expressions are found, convert them to images
+      if (latexExpressions) {
+        for (let i = 0; i < latexExpressions.length; i++) {
+          const latexExpression = latexExpressions[i];
+          const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
+          
+          try {
+            // Use a LaTeX to PNG conversion API (CodeCogs)
+            const response = await axios.get(
+              `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
+              { responseType: 'arraybuffer' }
+            );
+            
+            const imageId = workbook.addImage({
+              buffer: response.data,
+              extension: 'png',
+            });
+            
+            latexImages.push({ latexMarker: latexExpression, imageId });
+            
+            // Replace the LaTeX expression with a marker
+            questionText = questionText.replace(
+              latexExpression,
+              `{latex-${imageId}}`
+            );
+          } catch (error) {
+            console.error(`Failed to convert LaTeX: ${latex}`, error);
+          }
         }
       }
 
-      const questionText = $.html();
+      // Process options for LaTeX expressions
+      const processedOptions = await Promise.all(question.options.map(async (option) => {
+        let optionText = option.text;
+        const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
+        
+        if (optionLatexExpressions) {
+          let processedOptionText = optionText;
+          for (const latexExpr of optionLatexExpressions) {
+            processedOptionText = processedOptionText.replace(
+              latexExpr,
+              latexExpr.slice(1, -1) // Simply remove $ symbols for display in Excel
+            );
+          }
+          return `${htmlToText.convert(processedOptionText)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
+        }
+        
+        return `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
+      }));
 
       const row = worksheet.addRow({
         question: htmlToText.convert(questionText),
-        options: question.options
-          .map(
-            (option) =>
-              `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
-          )
-          .join(', '),
+        options: processedOptions.join(', '),
       });
 
-      images.forEach(({ imgTag, imageId }) => {
+      // Add the LaTeX images to the cell
+      latexImages.forEach(({ latexMarker, imageId }) => {
         const cell = worksheet.getCell(`A${row.number}`);
         if (typeof cell.value === 'string') {
-          cell.value = cell.value.replace(`{img-${imageId}}`, '');
+          cell.value = cell.value.replace(`{latex-${imageId}}`, '');
         }
         worksheet.addImage(imageId, {
           tl: { col: 0, row: row.number - 1 },
-          ext: { width: 100, height: 100 },
+          ext: { width: 100, height: 50 }, // Adjust size as needed for equations
         });
       });
     }
@@ -445,44 +478,125 @@ export class TestsController {
         continue;
       }
 
-      const $ = cheerio.load(question.text);
-
-      const imgElements = $('img').toArray();
-      const images: any[] = [];
-
-      for (const img of imgElements) {
-        const imgUrl = $(img).attr('src');
-        if (imgUrl) {
-          const response = await axios.get(imgUrl, {
-            responseType: 'arraybuffer',
-          });
-          const imgBuffer = Buffer.from(response.data, 'binary');
-          images.push({ imgTag: $.html(img), imgBuffer });
-          $(img).replaceWith(`{img-${imgBuffer.toString('base64')}}`);
+      // Process the question text to find LaTeX equations
+      let questionText = question.text;
+      
+      // Extract LaTeX expressions enclosed in dollar signs
+      const latexExpressions = questionText.match(/\$(.*?)\$/g);
+      const latexImages: { latexMarker: string; imgBuffer: Buffer }[] = [];
+      
+      // If LaTeX expressions are found, convert them to images
+      if (latexExpressions) {
+        for (let i = 0; i < latexExpressions.length; i++) {
+          const latexExpression = latexExpressions[i];
+          const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
+          
+          try {
+            // Use a LaTeX to PNG conversion API (CodeCogs)
+            const response = await axios.get(
+              `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
+              { responseType: 'arraybuffer' }
+            );
+            
+            const imgBuffer = Buffer.from(response.data);
+            const marker = `{latex-${i}}`;
+            
+            latexImages.push({ latexMarker: marker, imgBuffer });
+            
+            // Replace the LaTeX expression with a marker
+            questionText = questionText.replace(latexExpression, marker);
+          } catch (error) {
+            console.error(`Failed to convert LaTeX: ${latex}`, error);
+          }
         }
       }
 
-      const questionText = $.html();
-
-      const parts = questionText.split(/(\{img-[^}]+\})/g);
-      parts.forEach((part) => {
-        const imgMatch = part.match(/\{img-([^}]+)\}/);
-        if (imgMatch) {
-          const imgBuffer = Buffer.from(imgMatch[1], 'base64');
-          doc.image(imgBuffer);
-        } else {
+      // Split the text by the latex markers
+      const textParts = questionText.split(/(\{latex-\d+\})/g);
+      
+      // Write each part, inserting images where needed
+      for (const part of textParts) {
+        const latexMatch = part.match(/\{latex-(\d+)\}/);
+        if (latexMatch) {
+          const index = parseInt(latexMatch[1]);
+          const latexImage = latexImages.find(img => img.latexMarker === part);
+          
+          if (latexImage) {
+            doc.image(latexImage.imgBuffer, { 
+              fit: [200, 100], // Adjust size as needed for equations
+              align: 'left'
+            });
+            doc.moveDown(0.5);
+          }
+        } else if (part.trim()) {
           doc.fontSize(14).text(htmlToText.convert(part));
         }
-      });
+      }
+      
       doc.moveDown();
 
-      question.options.forEach((option) => {
-        doc
-          .fontSize(12)
-          .text(
+      // Process options with LaTeX
+      for (const option of question.options) {
+        let optionText = option.text;
+        const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
+        
+        if (optionLatexExpressions) {
+          doc.fontSize(12).text(`- ${option.isCorrect ? 'Correct' : 'Incorrect'} option:`);
+          
+          // Process each LaTeX expression in the option
+          const optionLatexImages: { latexMarker: string; imgBuffer: Buffer }[] = [];
+          
+          for (let i = 0; i < optionLatexExpressions.length; i++) {
+            const latexExpression = optionLatexExpressions[i];
+            const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
+            
+            try {
+              const response = await axios.get(
+                `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
+                { responseType: 'arraybuffer' }
+              );
+              
+              const imgBuffer = Buffer.from(response.data);
+              const marker = `{option-latex-${i}}`;
+              
+              optionLatexImages.push({ latexMarker: marker, imgBuffer });
+              
+              // Replace the LaTeX expression with a marker
+              optionText = optionText.replace(latexExpression, marker);
+            } catch (error) {
+              console.error(`Failed to convert LaTeX in option: ${latex}`, error);
+            }
+          }
+          
+          // Split the option text by the latex markers and render
+          const optionParts = optionText.split(/(\{option-latex-\d+\})/g);
+          
+          for (const optPart of optionParts) {
+            const optLatexMatch = optPart.match(/\{option-latex-(\d+)\}/);
+            if (optLatexMatch) {
+              const index = parseInt(optLatexMatch[1]);
+              const optLatexImage = optionLatexImages.find(img => img.latexMarker === optPart);
+              
+              if (optLatexImage) {
+                doc.image(optLatexImage.imgBuffer, { 
+                  fit: [150, 75],
+                  align: 'left'
+                });
+                doc.moveDown(0.5);
+              }
+            } else if (optPart.trim()) {
+              doc.fontSize(12).text(htmlToText.convert(optPart));
+            }
+          }
+        } else {
+          // No LaTeX in option, render normally
+          doc.fontSize(12).text(
             `- ${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
           );
-      });
+        }
+        
+        doc.moveDown(0.5);
+      }
 
       doc.moveDown();
     }

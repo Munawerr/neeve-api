@@ -24,8 +24,8 @@ export class SubjectsService {
     const filter = search
       ? {
           $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
+            { title: { $regex: search, $options: 'i' } },
+            { code: { $regex: search, $options: 'i' } },
           ],
         }
       : {};
@@ -73,14 +73,14 @@ export class SubjectsService {
 
     const subjects = await this.subjectModel
       .find(query)
-      .select('_id name description course')
+      .select('_id title description course')
       .sort({ name: 1 })
       .lean()
       .exec();
 
     return subjects.map((subject) => ({
       _id: subject._id,
-      name: subject.title,
+      title: subject.title,
       value: subject._id,
       label: subject.title,
     }));
