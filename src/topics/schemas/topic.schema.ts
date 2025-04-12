@@ -9,6 +9,9 @@ export class Topic extends Document {
   @Prop({ required: true })
   title: string;
 
+  @Prop({ required: false })
+  description: string;
+
   @Prop({ required: true, default: true })
   isParent: boolean;
 

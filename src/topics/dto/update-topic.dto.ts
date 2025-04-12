@@ -8,6 +8,12 @@ export class UpdateTopicDto {
   @ApiPropertyOptional({ example: 'Introduction to Chemistry' })
   readonly title?: string;
 
+  @ApiPropertyOptional({
+    example:
+      'Chemistry is a science subject and is a mandatory subject all over the world',
+  })
+  readonly description?: string;
+
   @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })
   readonly subject?: Types.ObjectId;
 

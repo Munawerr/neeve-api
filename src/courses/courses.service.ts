@@ -31,8 +31,8 @@ export class CoursesService {
     const filter = search
       ? {
           $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
+            { title: { $regex: search, $options: 'i' } },
+            { code: { $regex: search, $options: 'i' } },
           ],
         }
       : {};
@@ -60,15 +60,14 @@ export class CoursesService {
 
     const courses = await this.courseModel
       .find(query)
-      .select('_id name description iconUrl')
-      .sort({ name: 1 })
+      .select('_id title')
+      .sort({ title: 1 })
       .lean()
       .exec();
 
     return courses.map((course) => ({
       _id: course._id,
-      name: course.title,
-      iconUrl: course.iconUrl,
+      title: course.title,
       value: course._id,
       label: course.title,
     }));

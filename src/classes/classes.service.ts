@@ -61,14 +61,14 @@ export class ClassesService {
 
     const classes = await this.classModel
       .find(query)
-      .select('_id name description course')
+      .select('_id title')
       .sort({ name: 1 })
       .lean()
       .exec();
 
     return classes.map((classItem) => ({
       _id: classItem._id,
-      name: classItem.title,
+      title: classItem.title,
       value: classItem._id,
       label: classItem.title,
     }));
