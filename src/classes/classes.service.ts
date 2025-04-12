@@ -23,10 +23,7 @@ export class ClassesService {
   ): Promise<{ classes: Class[]; total: number }> {
     const filter = search
       ? {
-          $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-          ],
+          $or: [{ title: { $regex: search, $options: 'i' } }],
         }
       : {};
 
@@ -62,7 +59,7 @@ export class ClassesService {
     const classes = await this.classModel
       .find(query)
       .select('_id title')
-      .sort({ name: 1 })
+      .sort({ title: 1 })
       .lean()
       .exec();
 

@@ -74,7 +74,7 @@ export class SubjectsService {
     const subjects = await this.subjectModel
       .find(query)
       .select('_id title description course')
-      .sort({ name: 1 })
+      .sort({ title: 1 })
       .lean()
       .exec();
 
