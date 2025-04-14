@@ -3,42 +3,42 @@ import { Types } from 'mongoose';
 
 export class CreateTopicDto {
   @ApiProperty({ example: 'CH101' })
-  readonly code: string;
+   code: string;
 
   @ApiProperty({ example: 'Introduction to Chemistry' })
-  readonly title: string;
+   title: string;
 
   @ApiProperty({
     example:
       'Chemistry is a science subject and is a mandatory subject all over the world',
   })
-  readonly description: string;
+   description: string;
 
   @ApiProperty({ example: '60d0fe4f5311236168a109ca' })
-  readonly subject?: Types.ObjectId;
+   subject?: Types.ObjectId;
 
   @ApiProperty({ example: '60d0fe4f5311236168a109cb' })
-  readonly package?: Types.ObjectId;
+   package?: Types.ObjectId;
 
   @ApiProperty({
     example: ['https://example.com/intro1', 'https://example.com/intro2'],
   })
-  readonly introVideoUrls?: string[];
+   introVideoUrls?: string[];
 
   @ApiProperty({
     example: ['60d0fe4f5311236168a109cc', '60d0fe4f5311236168a109cd'],
   })
-  readonly studyNotes?: Types.ObjectId[];
+   studyNotes?: Types.ObjectId[];
 
   @ApiProperty({
     example: ['60d0fe4f5311236168a109ce', '60d0fe4f5311236168a109cf'],
   })
-  readonly studyPlans?: Types.ObjectId[];
+   studyPlans?: Types.ObjectId[];
 
   @ApiProperty({
     example: ['60d0fe4f5311236168a109d0', '60d0fe4f5311236168a109d1'],
   })
-  readonly practiceProblems?: Types.ObjectId[];
+   practiceProblems?: Types.ObjectId[];
 
-  readonly isParent?: boolean;
+   isParent?: boolean;
 }

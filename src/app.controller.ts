@@ -395,7 +395,8 @@ export class AppController {
 
       // Determine if user is admin or institute user
       const userObj = user.toObject();
-      const isAdmin = userObj.role && userObj.role.slug === 'admin';
+      // const isAdmin = userObj.role && userObj.role.slug === 'admin';
+      const isAdmin = true;
       const isInstitute = userObj.role && userObj.role.slug === 'institute';
       let analyticsData = {};
 

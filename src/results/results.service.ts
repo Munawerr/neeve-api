@@ -104,6 +104,177 @@ export class ResultsService {
       .exec();
   }
 
+  // Find all finished results for a specific subject and test type
+  async findAllFinishedResults(
+    subject: string,
+    testType: string,
+  ): Promise<Result[]> {
+    return this.resultModel
+      .find({
+        subject: subject,
+        testType: testType,
+        status: ResultStatus.FINISHED,
+      })
+      .populate('test')
+      .populate({
+        path: 'questionResults',
+        populate: {
+          path: 'question',
+          populate: {
+            path: 'options',
+          },
+        },
+      })
+      .exec();
+  }
+
+  // Calculate percentile for a student's test result
+  async calculatePercentile(
+    resultId: string,
+    testId: string,
+    score: number,
+  ): Promise<number> {
+    // Get all results for this specific test from all students
+    const allTestResults = await this.resultModel
+      .find({
+        test: testId,
+        status: ResultStatus.FINISHED,
+        _id: { $ne: resultId }, // Exclude current result
+      })
+      .exec();
+
+    // Get all scores for this test
+    const scores = allTestResults.map((result) => {
+      const total = result.marksSummary.totalMarks;
+      const obtained = result.marksSummary.obtainedMarks;
+      return (obtained / total) * 100;
+    });
+
+    // Add current student's score
+    scores.push(score);
+
+    // Sort scores in ascending order
+    scores.sort((a, b) => a - b);
+
+    // Find index of current score
+    const index = scores.indexOf(score);
+
+    // Calculate percentile: (number of scores below) / (total number of scores) * 100
+    const percentile = (index / scores.length) * 100;
+
+    return Math.round(percentile);
+  }
+
+  // Calculate percentile for a subject
+  async calculateSubjectPercentile(
+    studentId: string,
+    subjectId: string,
+    testType: string,
+    averageMarks: number,
+  ): Promise<number> {
+    // Get all results for this subject and test type
+    const allResults = await this.resultModel
+      .find({
+        subject: subjectId,
+        testType: testType,
+        status: ResultStatus.FINISHED,
+        student: { $ne: studentId }, // Exclude current student
+      })
+      .exec();
+
+    // Group results by student
+    const studentResults = allResults.reduce((acc, result) => {
+      const studentId = result.student.toString();
+      if (!acc[studentId]) {
+        acc[studentId] = [];
+      }
+      acc[studentId].push(result);
+      return acc;
+    }, {});
+
+    // Calculate average score for each student
+    const studentScores = Object.values(studentResults).map(
+      (results: Result[]) => {
+        const total = results.reduce(
+          (sum, result) => sum + result.marksSummary.totalMarks,
+          0,
+        );
+        const obtained = results.reduce(
+          (sum, result) => sum + result.marksSummary.obtainedMarks,
+          0,
+        );
+        return (obtained / total) * 100;
+      },
+    );
+
+    // Add current student's score
+    studentScores.push(averageMarks);
+
+    // Sort scores in ascending order
+    studentScores.sort((a, b) => a - b);
+
+    // Find index of current score
+    const index = studentScores.indexOf(averageMarks);
+
+    // Calculate percentile: (number of scores below) / (total number of scores) * 100
+    const percentile = (index / studentScores.length) * 100;
+
+    return Math.round(percentile);
+  }
+
+  // Calculate overall percentile
+  async calculateOverallPercentile(
+    studentId: string,
+    averageMarks: number,
+  ): Promise<number> {
+    // Get all results for all students (excluding current student)
+    const allResults = await this.resultModel
+      .find({
+        status: ResultStatus.FINISHED,
+        student: { $ne: studentId },
+      })
+      .exec();
+
+    // Group results by student
+    const studentResults = allResults.reduce((acc, result) => {
+      const studentId = result.student.toString();
+      if (!acc[studentId]) {
+        acc[studentId] = [];
+      }
+      acc[studentId].push(result);
+      return acc;
+    }, {});
+
+    // Calculate average score for each student
+    const studentScores = Object.values(studentResults).map(
+      (results: Result[]) => {
+        const total = results.reduce(
+          (sum, result) => sum + result.marksSummary.totalMarks,
+          0,
+        );
+        const obtained = results.reduce(
+          (sum, result) => sum + result.marksSummary.obtainedMarks,
+          0,
+        );
+        return (obtained / total) * 100;
+      },
+    );
+
+    // Add current student's score
+    studentScores.push(averageMarks);
+
+    // Sort scores in ascending order
+    studentScores.sort((a, b) => a - b);
+
+    // Find index of current score
+    const index = studentScores.indexOf(averageMarks);
+
+    // Calculate percentile: (number of scores below) / (total number of scores) * 100
+    const percentile = (index / studentScores.length) * 100;
+
+    return Math.round(percentile);
+  }
+
   // Update a result by ID
   async update(
     id: string,

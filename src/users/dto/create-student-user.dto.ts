@@ -14,6 +14,10 @@ export class CreateStudentUserDto {
   @IsNotEmpty()
   password: string;
 
+  @ApiProperty({ example: '21312sfsa12saffa1', required: true })
+  @IsNotEmpty()
+  institute?: string;
+
   @ApiProperty({ example: 'john.doe@example.com', required: false })
   @IsEmail()
   @IsNotEmpty()
@@ -29,7 +33,10 @@ export class CreateStudentUserDto {
   @IsNotEmpty()
   full_name: string;
 
-  @ApiProperty({ example: '2000-01-01', description: 'Date of birth in ISO format (YYYY-MM-DD)' })
+  @ApiProperty({
+    example: '2000-01-01',
+    description: 'Date of birth in ISO format (YYYY-MM-DD)',
+  })
   @IsDateString()
   @IsNotEmpty()
   dob: string;

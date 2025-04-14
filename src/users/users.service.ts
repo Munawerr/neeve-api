@@ -159,6 +159,7 @@ export class UsersService {
       .find(filter)
       .skip((page - 1) * limit)
       .limit(limit)
+      .populate('packages')
       .exec();
     const total = await this.userModel.countDocuments(filter);
     return { users, total };
@@ -180,14 +181,12 @@ export class UsersService {
     createStudentUserDto: CreateStudentUserDto,
     file?: Express.Multer.File,
   ): Promise<User> {
-    const { password, regNo, ...userData } = createStudentUserDto;
+    const { password, ...userData } = createStudentUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
 
-    const institute = await this.userModel.findOne({
-      regNo,
-      role: await this.getInstituteRoleId(),
-    });
+    const institute = await this.userModel.findById(userData.institute);
+
     if (!institute) {
       throw new Error('Institute not found');
     }
@@ -359,7 +358,12 @@ export class UsersService {
   }
 
   async findByPhone(phone: string): Promise<User | null> {
-    return this.userModel.findOne({ phone }).exec();
+    return this.userModel
+      .findOne({ phone })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
   }
 
   async findByEmailOrRegNo(loginData: string): Promise<User | null> {
@@ -371,7 +375,12 @@ export class UsersService {
   }
 
   async findByRegNo(regNo: string): Promise<User | null> {
-    return this.userModel.findOne({ regNo }).exec();
+    return this.userModel
+      .findOne({ regNo })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
   }
 
   async bulkCreateStudents(students: any[]): Promise<any[]> {
