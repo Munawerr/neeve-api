@@ -29,7 +29,7 @@ export class LoginHistoryService {
    */
   async logSuccessfulLogin(
     userId: string,
-    email: string | undefined,
+    email: string | null,
     req: Request,
   ): Promise<LoginHistory> {
     const loginHistoryDto: CreateLoginHistoryDto = {
@@ -53,7 +53,7 @@ export class LoginHistoryService {
    * Log a failed login attempt with request information
    */
   async logFailedLogin(
-    email: string | undefined,
+    email: string | null,
     req: Request,
   ): Promise<LoginHistory | null> {
     try {

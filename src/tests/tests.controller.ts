@@ -354,35 +354,35 @@ export class TestsController {
 
       // Process the question text to find LaTeX equations
       let questionText = question.text;
-      
+
       // Extract LaTeX expressions enclosed in dollar signs
       const latexExpressions = questionText.match(/\$(.*?)\$/g);
       const latexImages: { latexMarker: string; imageId: number }[] = [];
-      
+
       // If LaTeX expressions are found, convert them to images
       if (latexExpressions) {
         for (let i = 0; i < latexExpressions.length; i++) {
           const latexExpression = latexExpressions[i];
           const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
-          
+
           try {
             // Use a LaTeX to PNG conversion API (CodeCogs)
             const response = await axios.get(
               `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
-              { responseType: 'arraybuffer' }
+              { responseType: 'arraybuffer' },
             );
-            
+
             const imageId = workbook.addImage({
               buffer: response.data,
               extension: 'png',
             });
-            
+
             latexImages.push({ latexMarker: latexExpression, imageId });
-            
+
             // Replace the LaTeX expression with a marker
             questionText = questionText.replace(
               latexExpression,
-              `{latex-${imageId}}`
+              `{latex-${imageId}}`,
             );
           } catch (error) {
             console.error(`Failed to convert LaTeX: ${latex}`, error);
@@ -391,23 +391,25 @@ export class TestsController {
       }
 
       // Process options for LaTeX expressions
-      const processedOptions = await Promise.all(question.options.map(async (option) => {
-        let optionText = option.text;
-        const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
-        
-        if (optionLatexExpressions) {
-          let processedOptionText = optionText;
-          for (const latexExpr of optionLatexExpressions) {
-            processedOptionText = processedOptionText.replace(
-              latexExpr,
-              latexExpr.slice(1, -1) // Simply remove $ symbols for display in Excel
-            );
+      const processedOptions = await Promise.all(
+        question.options.map(async (option) => {
+          let optionText = option.text;
+          const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
+
+          if (optionLatexExpressions) {
+            let processedOptionText = optionText;
+            for (const latexExpr of optionLatexExpressions) {
+              processedOptionText = processedOptionText.replace(
+                latexExpr,
+                latexExpr.slice(1, -1), // Simply remove $ symbols for display in Excel
+              );
+            }
+            return `${htmlToText.convert(processedOptionText)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
           }
-          return `${htmlToText.convert(processedOptionText)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
-        }
-        
-        return `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
-      }));
+
+          return `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
+        }),
+      );
 
       const row = worksheet.addRow({
         question: htmlToText.convert(questionText),
@@ -480,29 +482,29 @@ export class TestsController {
 
       // Process the question text to find LaTeX equations
       let questionText = question.text;
-      
+
       // Extract LaTeX expressions enclosed in dollar signs
       const latexExpressions = questionText.match(/\$(.*?)\$/g);
       const latexImages: { latexMarker: string; imgBuffer: Buffer }[] = [];
-      
+
       // If LaTeX expressions are found, convert them to images
       if (latexExpressions) {
         for (let i = 0; i < latexExpressions.length; i++) {
           const latexExpression = latexExpressions[i];
           const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
-          
+
           try {
             // Use a LaTeX to PNG conversion API (CodeCogs)
             const response = await axios.get(
               `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
-              { responseType: 'arraybuffer' }
+              { responseType: 'arraybuffer' },
             );
-            
+
             const imgBuffer = Buffer.from(response.data);
             const marker = `{latex-${i}}`;
-            
+
             latexImages.push({ latexMarker: marker, imgBuffer });
-            
+
             // Replace the LaTeX expression with a marker
             questionText = questionText.replace(latexExpression, marker);
           } catch (error) {
@@ -513,18 +515,20 @@ export class TestsController {
 
       // Split the text by the latex markers
       const textParts = questionText.split(/(\{latex-\d+\})/g);
-      
+
       // Write each part, inserting images where needed
       for (const part of textParts) {
         const latexMatch = part.match(/\{latex-(\d+)\}/);
         if (latexMatch) {
           const index = parseInt(latexMatch[1]);
-          const latexImage = latexImages.find(img => img.latexMarker === part);
-          
+          const latexImage = latexImages.find(
+            (img) => img.latexMarker === part,
+          );
+
           if (latexImage) {
-            doc.image(latexImage.imgBuffer, { 
+            doc.image(latexImage.imgBuffer, {
               fit: [200, 100], // Adjust size as needed for equations
-              align: 'left'
+              align: 'left',
             });
             doc.moveDown(0.5);
           }
@@ -532,55 +536,65 @@ export class TestsController {
           doc.fontSize(14).text(htmlToText.convert(part));
         }
       }
-      
+
       doc.moveDown();
 
       // Process options with LaTeX
       for (const option of question.options) {
         let optionText = option.text;
         const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
-        
+
         if (optionLatexExpressions) {
-          doc.fontSize(12).text(`- ${option.isCorrect ? 'Correct' : 'Incorrect'} option:`);
-          
+          doc
+            .fontSize(12)
+            .text(`- ${option.isCorrect ? 'Correct' : 'Incorrect'} option:`);
+
           // Process each LaTeX expression in the option
-          const optionLatexImages: { latexMarker: string; imgBuffer: Buffer }[] = [];
-          
+          const optionLatexImages: {
+            latexMarker: string;
+            imgBuffer: Buffer;
+          }[] = [];
+
           for (let i = 0; i < optionLatexExpressions.length; i++) {
             const latexExpression = optionLatexExpressions[i];
             const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
-            
+
             try {
               const response = await axios.get(
                 `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
-                { responseType: 'arraybuffer' }
+                { responseType: 'arraybuffer' },
               );
-              
+
               const imgBuffer = Buffer.from(response.data);
               const marker = `{option-latex-${i}}`;
-              
+
               optionLatexImages.push({ latexMarker: marker, imgBuffer });
-              
+
               // Replace the LaTeX expression with a marker
               optionText = optionText.replace(latexExpression, marker);
             } catch (error) {
-              console.error(`Failed to convert LaTeX in option: ${latex}`, error);
+              console.error(
+                `Failed to convert LaTeX in option: ${latex}`,
+                error,
+              );
             }
           }
-          
+
           // Split the option text by the latex markers and render
           const optionParts = optionText.split(/(\{option-latex-\d+\})/g);
-          
+
           for (const optPart of optionParts) {
             const optLatexMatch = optPart.match(/\{option-latex-(\d+)\}/);
             if (optLatexMatch) {
               const index = parseInt(optLatexMatch[1]);
-              const optLatexImage = optionLatexImages.find(img => img.latexMarker === optPart);
-              
+              const optLatexImage = optionLatexImages.find(
+                (img) => img.latexMarker === optPart,
+              );
+
               if (optLatexImage) {
-                doc.image(optLatexImage.imgBuffer, { 
+                doc.image(optLatexImage.imgBuffer, {
                   fit: [150, 75],
-                  align: 'left'
+                  align: 'left',
                 });
                 doc.moveDown(0.5);
               }
@@ -590,11 +604,13 @@ export class TestsController {
           }
         } else {
           // No LaTeX in option, render normally
-          doc.fontSize(12).text(
-            `- ${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
-          );
+          doc
+            .fontSize(12)
+            .text(
+              `- ${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
+            );
         }
-        
+
         doc.moveDown(0.5);
       }
 
@@ -662,5 +678,113 @@ export class TestsController {
         error: error.message,
       };
     }
+  }
+
+  @Post('duplicate/:testId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Duplicate an existing test with a new topic ID' })
+  @ApiParam({
+    name: 'testId',
+    required: true,
+    description: 'ID of the test to duplicate',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        topicId: {
+          type: 'string',
+          description: 'New topic ID for the duplicated test',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Test duplicated successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Test not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid topic ID',
+  })
+  async duplicateTest(
+    @Param('testId') testId: string,
+    @Body('topicId') topicId: string,
+  ) {
+    // Find the original test
+    const originalTest = await this.testsService.findOne(testId);
+    if (!originalTest) {
+      return {
+        status: HttpStatus.NOT_FOUND,
+        message: 'Test not found',
+      };
+    }
+
+    // Verify the new topic exists
+    const newTopic = await this.topicsService.findOne(topicId);
+    if (!newTopic) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Invalid topic ID',
+      };
+    }
+
+    // Create new test object with the original test data, but allow MongoDB to generate a new _id
+    const duplicateTestDto = new CreateTestDto();
+    duplicateTestDto.title = `${originalTest.title}`;
+    duplicateTestDto.marksPerQuestion = originalTest.marksPerQuestion;
+    duplicateTestDto.testDuration = originalTest.testDuration;
+    duplicateTestDto.testType = originalTest.testType;
+    duplicateTestDto.topic = topicId as any; // Set the new topic ID
+    duplicateTestDto.subject = originalTest.subject as any; // Set the new topic ID
+
+    // Create the duplicated test (with a fresh ObjectId)
+    const duplicatedTest = await this.testsService.create(duplicateTestDto);
+
+    // Duplicate the questions - without reusing IDs
+    for (const questionId of originalTest.questions) {
+      try {
+        const _quest: any = questionId;
+        const originalQuestion = await this.questionsService.findOne(
+          _quest._id.toString(),
+        );
+
+        if (originalQuestion) {
+          // Create duplicate question without specifying an ID (let MongoDB generate one)
+          const duplicateQuestionDto = {
+            text: originalQuestion.text,
+            options: originalQuestion.options,
+            corAnsExp: originalQuestion.corAnsExp,
+          };
+
+          const duplicatedQuestion =
+            await this.questionsService.create(duplicateQuestionDto);
+
+          // Add question to duplicated test
+          duplicatedTest.questions.push(duplicatedQuestion._id as any);
+        }
+      } catch (error) {
+        console.error('Error duplicating question:', error);
+        // Continue with the next question even if this one failed
+      }
+    }
+
+    // Save the duplicated test with questions
+    await duplicatedTest.save();
+
+    // Add test to new topic
+    newTopic.tests.push(duplicatedTest._id as any);
+    await newTopic.save();
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Test duplicated successfully',
+      data: duplicatedTest,
+    };
   }
 }

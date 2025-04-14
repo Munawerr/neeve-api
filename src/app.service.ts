@@ -59,6 +59,7 @@ export class AppService implements OnModuleInit {
           'create_threads',
           'edit_threads',
           'delete_threads',
+          'view_notifications',
         ],
       },
       {
@@ -84,6 +85,7 @@ export class AppService implements OnModuleInit {
           'view_threads',
           'create_threads',
           'delete_threads',
+          'view_notifications',
         ],
       },
       {
@@ -100,6 +102,7 @@ export class AppService implements OnModuleInit {
           'view_threads',
           'create_threads',
           'delete_threads',
+          'view_notifications',
         ],
       },
     ];

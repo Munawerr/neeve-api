@@ -357,35 +357,45 @@ export class ResultsController {
       testType,
     );
 
-    const reportCard = results.map((result) => {
-      const test = result.toObject().test;
-      // const title = `${testType == 'mock' ? test.subject.title : test.topic.title} + ${test.title}`;
-      const title = test.title;
-      const totalMarks = result.marksSummary.totalMarks;
-      const obtainedMarks = result.marksSummary.obtainedMarks;
-      const averageMarks = (obtainedMarks / totalMarks) * 100;
-      const correctAnswers = result.marksSummary.correctAnswers;
-      const incorrectAnswers = result.marksSummary.incorrectAnswers;
-      const averageTimePerQuestion = result.marksSummary.averageTimePerQuestion;
-      const mostRecentFinishedAt = result.finishedAt;
+    const reportCard = await Promise.all(
+      results.map(async (result) => {
+        const test = result.toObject().test;
+        const title = test.title;
+        const totalMarks = result.marksSummary.totalMarks;
+        const obtainedMarks = result.marksSummary.obtainedMarks;
+        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const correctAnswers = result.marksSummary.correctAnswers;
+        const incorrectAnswers = result.marksSummary.incorrectAnswers;
+        const averageTimePerQuestion =
+          result.marksSummary.averageTimePerQuestion;
+        const mostRecentFinishedAt = result.finishedAt;
 
-      let _reportCard = {
-        title,
-        totalMarks,
-        obtainedMarks,
-        averageMarks,
-        correctAnswers,
-        incorrectAnswers,
-        averageTimePerQuestion,
-        mostRecentFinishedAt,
-      };
+        // Calculate percentile for this test
+        const percentile = await this.resultsService.calculatePercentile(
+          result.toObject()._id,
+          test._id,
+          averageMarks,
+        );
 
-      if (testType !== 'mock') {
-        _reportCard['topic_title'] = test.topic.title;
-      }
+        let _reportCard = {
+          title,
+          totalMarks,
+          obtainedMarks,
+          averageMarks,
+          percentile,
+          correctAnswers,
+          incorrectAnswers,
+          averageTimePerQuestion,
+          mostRecentFinishedAt,
+        };
 
-      return _reportCard;
-    });
+        if (testType !== 'mock') {
+          _reportCard['topic_title'] = test.topic.title;
+        }
+
+        return _reportCard;
+      }),
+    );
 
     return {
       status: HttpStatus.OK,
@@ -457,11 +467,20 @@ export class ResultsController {
         0,
       ) / uniqueResultsArray.length;
 
+    // Calculate percentile for this subject
+    const percentile = await this.resultsService.calculateSubjectPercentile(
+      studentId,
+      subject,
+      testType,
+      averageMarks,
+    );
+
     const subjectReportCard = {
       subjectId: subject,
       totalMarks,
       obtainedMarks,
       averageMarks,
+      percentile,
       correctAnswers,
       incorrectAnswers,
       averageTimePerQuestion,
@@ -569,6 +588,12 @@ export class ResultsController {
 
     remainingTests = totalTestsInCourse - testsTakenByStudent;
 
+    // Calculate overall percentile
+    const percentile = await this.resultsService.calculateOverallPercentile(
+      studentId,
+      averageMarks,
+    );
+
     const testSummary = {
       totalTestsInCourse,
       testsTakenByStudent,
@@ -579,6 +604,7 @@ export class ResultsController {
       totalMarks,
       obtainedMarks,
       averageMarks,
+      percentile,
       correctAnswers: uniqueResultsArray.reduce(
         (sum, result) => sum + result.marksSummary.correctAnswers,
         0,
