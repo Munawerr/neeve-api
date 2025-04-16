@@ -53,6 +53,9 @@ export class MarksSummary {
 
   @Prop({ required: true })
   averageTimePerQuestion: number;
+
+  @Prop({ required: true })
+  skippedQuestions: number;
 }
 
 @Schema()
@@ -103,6 +106,7 @@ export class Result extends Document {
       correctAnswers: Number,
       incorrectAnswers: Number,
       averageTimePerQuestion: Number,
+      skippedQuestions: Number,
     },
     required: false,
   })

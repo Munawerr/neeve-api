@@ -89,6 +89,32 @@ export class LiveClassesController {
     }
   }
 
+  @Get('count/upcoming')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of upcoming live classes' })
+  @ApiQuery({ name: 'institute', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Count of upcoming live classes retrieved successfully',
+  })
+  @SetMetadata('permissions', ['view_live_classes'])
+  async getUpcomingLiveClassesCount(@Query('institute') institute: string) {
+    try {
+      const count = await this.liveClassesService.countUpcomingLiveClasses(institute);
+      return {
+        status: HttpStatus.OK,
+        message: 'Count of upcoming live classes retrieved successfully',
+        data: { count },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve count of upcoming live classes',
+        error: error.message,
+      };
+    }
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a live class by ID' })

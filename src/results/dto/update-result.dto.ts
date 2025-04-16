@@ -19,6 +19,9 @@ export class MarksSummaryDto {
 
   @ApiPropertyOptional({ example: 3 })
   readonly averageTimePerQuestion: number;
+
+  @ApiPropertyOptional({ example: 2 })
+  readonly skippedQuestions?: number;
 }
 export class UpdateResultDto {
   // @ApiPropertyOptional({ example: '60d0fe4f5311236168a109ca' })

@@ -67,4 +67,13 @@ export class LiveClassesService {
   remove(id: string): Promise<LiveClass | null> {
     return this.liveClassModel.findByIdAndDelete(id).exec();
   }
+
+  async countUpcomingLiveClasses(institute: string): Promise<number> {
+    const today = new Date();
+    const count = await this.liveClassModel.countDocuments({
+      institute,
+      date: { $gte: today },
+    }).exec();
+    return count;
+  }
 }
