@@ -1,23 +1,74 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Types } from 'mongoose';
+import { Type } from 'class-transformer';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { TestType } from '../schemas/test.schema';
 
 export class CreateTestDto {
-  @ApiProperty({ example: 'Midterm Exam' })
+  @ApiProperty({
+    description: 'Title of the test',
+    type: String,
+  })
+  @IsNotEmpty()
+  @IsString()
   title: string;
 
-  @ApiProperty({ example: '60d0fe4f5311236168a109ca', required: false })
-  topic?: Types.ObjectId;
+  @ApiProperty({
+    description: 'Topic ID',
+    type: String,
+  })
+  @IsOptional()
+  topic: string;
 
-  @ApiProperty({ example: '60d0fe4f5311236168a109ca' })
-  subject: Types.ObjectId;
+  @ApiProperty({
+    description: 'Subject ID',
+    type: String,
+  })
+  @IsNotEmpty()
+  subject: string;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty({
+    description: 'Marks per question',
+    type: Number,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
   marksPerQuestion: number;
 
-  @ApiProperty({ example: 120 })
+  @ApiProperty({
+    description: 'Test duration in minutes',
+    type: Number,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
   testDuration: number;
 
-  @ApiProperty({ example: TestType.TEST, enum: TestType })
+  @ApiProperty({
+    description: 'Type of test',
+    enum: TestType,
+  })
+  @IsNotEmpty()
+  @IsEnum(TestType)
   testType: TestType;
+
+  @ApiProperty({
+    description: 'Number of questions a student can skip during the test',
+    type: Number,
+    default: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  skipableQuestionsCount: number;
 }

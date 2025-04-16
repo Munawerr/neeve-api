@@ -29,6 +29,9 @@ export class Test extends Document {
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'Question' })
   questions: MongooseSchema.Types.ObjectId[];
+
+  @Prop({ default: 0 })
+  skipableQuestionsCount: number;
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);
