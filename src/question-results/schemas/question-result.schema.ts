@@ -21,11 +21,11 @@ export class QuestionResult extends Document {
   @Prop({ required: true })
   createdAt: Date;
 
-  @Prop({
-    type: [{ text: String, isCorrect: Boolean, isChecked: Boolean }],
-    required: true,
-  })
+  @Prop({ type: [Option], required: true })
   options: Option[];
+
+  @Prop({ type: Boolean, default: false })
+  skipped: boolean;
 
   @Prop({ required: false })
   corAnsExp: string;

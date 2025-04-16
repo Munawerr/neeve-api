@@ -9,15 +9,18 @@ import { UpdateQuestionResultDto } from './dto/update-question-result.dto';
 export class QuestionResultsService {
   constructor(
     @InjectModel(QuestionResult.name)
-    private questionResultModel: Model<QuestionResult>,
+    private readonly questionResultModel: Model<QuestionResult>,
   ) {}
 
   async create(
     createQuestionResultDto: CreateQuestionResultDto,
   ): Promise<QuestionResult> {
-    const createdQuestionResult = new this.questionResultModel(
-      createQuestionResultDto,
-    );
+    const createdQuestionResult = new this.questionResultModel({
+      ...createQuestionResultDto,
+      createdAt: new Date(),
+      // Explicitly set skipped value if provided, otherwise default to false
+      skipped: createQuestionResultDto.skipped || false,
+    });
     return createdQuestionResult.save();
   }
 

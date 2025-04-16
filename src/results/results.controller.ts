@@ -228,6 +228,15 @@ export class ResultsController {
       };
     }
 
+    // Ensure the question field is provided even for skipped questions
+    if (!createQuestionResultDto.questionText) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Question ID is required even for skipped questions',
+      };
+    }
+
+    // Create question result (whether skipped or not)
     const questionResult = await this.questionResultsService.create(
       createQuestionResultDto,
     );
@@ -242,8 +251,10 @@ export class ResultsController {
     if (updatedResult1) {
       const totalMarks =
         updatedResult1.numOfQuestions * updatedResult1.marksPerQuestion;
+
+      // Calculate obtained marks with negative marking
       const obtainedMarks = updatedResult1.questionResults.reduce(
-        (sum, questionResult) => {
+        (sum, questionResult: any) => {
           const correctOptions = questionResult.options.filter(
             (option) => option.isCorrect,
           );
@@ -251,6 +262,12 @@ export class ResultsController {
             (option) => option.isChecked,
           );
 
+          // If skipped, no marks added or deducted
+          if (questionResult.skipped) {
+            return sum;
+          }
+
+          // If the answer is correct (all correct options selected and only correct options selected)
           if (
             correctOptions.length === checkedOptions.length &&
             correctOptions.every((option) => option.isChecked) &&
@@ -258,20 +275,30 @@ export class ResultsController {
           ) {
             return sum + updatedResult1.marksPerQuestion;
           }
-          return sum;
+
+          // If the answer is incorrect, deduct 1 mark
+          return sum - 1;
         },
         0,
       );
+
       const averageMarks = (obtainedMarks / totalMarks) * 100;
 
+      // Count correct answers
       const correctAnswers = updatedResult1.questionResults.filter(
-        (questionResult) => {
+        (questionResult: any) => {
+          // Skipped questions aren't counted as correct
+          if (questionResult.skipped) {
+            return false;
+          }
+
           const correctOptions = questionResult.options.filter(
             (option) => option.isCorrect,
           );
           const checkedOptions = questionResult.options.filter(
             (option) => option.isChecked,
           );
+
           return (
             correctOptions.length === checkedOptions.length &&
             correctOptions.every((option) => option.isChecked) &&
@@ -280,7 +307,14 @@ export class ResultsController {
         },
       ).length;
 
-      const incorrectAnswers = updatedResult1.numOfQuestions - correctAnswers;
+      // Count skipped questions
+      const skippedQuestions = updatedResult1.questionResults.filter(
+        (questionResult: any) => questionResult.skipped,
+      ).length;
+
+      // Incorrect answers are those that are not correct and not skipped
+      const incorrectAnswers =
+        updatedResult1.numOfQuestions - correctAnswers - skippedQuestions;
 
       const totalTimeInMinutes = updatedResult1
         .toObject()
@@ -313,6 +347,7 @@ export class ResultsController {
         correctAnswers,
         incorrectAnswers,
         averageTimePerQuestion,
+        skippedQuestions,
       };
 
       const updateResultDto: UpdateResultDto = {};
