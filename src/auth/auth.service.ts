@@ -69,9 +69,9 @@ export class AuthService {
 
     // If user not found, log failed login attempt if email provided
     if (!user) {
-      if (identifier.includes('@')) {
-        await this.loginHistoryService.logFailedLogin(identifier, req);
-      }
+      // if (identifier.includes('@')) {
+      //   await this.loginHistoryService.logFailedLogin(identifier, req);
+      // }
       return null;
     }
 
@@ -79,7 +79,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      await this.loginHistoryService.logFailedLogin(user.email, req);
+      // await this.loginHistoryService.logFailedLogin(user.email, req);
       return null;
     }
 
