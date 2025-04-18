@@ -59,6 +59,33 @@ export class MarksSummary {
 }
 
 @Schema()
+export class Option {
+  @Prop({ required: true })
+  text: string;
+
+  @Prop({ required: true })
+  isCorrect: boolean;
+
+  @Prop({ required: true })
+  isChecked: boolean;
+}
+
+@Schema()
+export class QuestionResult {
+  @Prop({ required: true })
+  questionText: string;
+
+  @Prop({ type: [Option], required: true })
+  options: Option[];
+
+  @Prop()
+  corAnsExp: string;
+  
+  @Prop({ default: false })
+  skipped: boolean; // Add a property to track if the question was skipped
+}
+
+@Schema()
 // Schema for Result
 export class Result extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Test', required: true })
@@ -111,6 +138,21 @@ export class Result extends Document {
     required: false,
   })
   marksSummary: MarksSummary;
+
+  @Prop({ required: true, default: false })
+  isCompleted: boolean;
+
+  @Prop({ default: 0 })
+  totalMarks: number;
+
+  @Prop({ required: true, default: Date.now })
+  startTime: Date;
+
+  @Prop()
+  endTime: Date;
+
+  @Prop({ type: [{ type: QuestionResult }], default: [] })
+  questions: QuestionResult[];
 }
 
 // Create the schema for Result

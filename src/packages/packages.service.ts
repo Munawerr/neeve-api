@@ -58,10 +58,11 @@ export class PackagesService {
 
     const packages = await this.packageModel
       .find(query)
-      .select('_id name code description')
-      .sort({ name: 1 })
-      .populate('course', 'name')
-      .populate('class', 'name')
+      .select('_id code description')
+      .sort({ code: 1 })
+      .populate('course', 'title')
+      .populate('class', 'title')
+      .populate('subjects')
       .lean()
       .exec();
 
@@ -72,6 +73,7 @@ export class PackagesService {
       description: pkg.description,
       course: pkg.course,
       class: pkg.class,
+      subjects: pkg.subjects,
       value: pkg._id,
       label: pkg.description,
     }));

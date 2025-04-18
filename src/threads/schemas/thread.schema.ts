@@ -17,7 +17,7 @@ export class Thread extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Institute',
+    ref: 'User',
     required: false,
   })
   institute: mongoose.Schema.Types.ObjectId;
@@ -27,6 +27,9 @@ export class Thread extends Document {
 
   @Prop({ default: false })
   isGlobal: boolean;
+
+  @Prop({ default: false })
+  isInstituteOnly: boolean;
 
   @Prop({ default: Date.now })
   createdAt: Date;

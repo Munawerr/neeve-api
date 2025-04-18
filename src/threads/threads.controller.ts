@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
   SetMetadata,
+  Request,
 } from '@nestjs/common';
 import { ThreadsService } from './threads.service';
 import { CreateThreadDto } from './dto/create-thread.dto';
@@ -38,11 +39,40 @@ export class ThreadsController {
     description: 'Thread created successfully',
   })
   @SetMetadata('permissions', ['create_threads'])
-  async create(@Body() createThreadDto: CreateThreadDto) {
+  async create(@Body() createThreadDto: CreateThreadDto, @Request() req) {
+    const userId = req.user.userId;
+    createThreadDto.user = userId;
+
     const thread = await this.threadsService.create(createThreadDto);
     return {
       status: HttpStatus.OK,
       message: 'Thread created successfully',
+      data: thread,
+    };
+  }
+
+  @Post('institute')
+  @ApiOperation({
+    summary: 'Create an institute-restricted thread',
+  })
+  @ApiBody({ type: CreateThreadDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Institute thread created successfully',
+  })
+  @SetMetadata('permissions', ['create_threads'])
+  async createInstituteThread(
+    @Body() createThreadDto: CreateThreadDto,
+    @Request() req,
+  ) {
+    const userId = req.user.userId;
+    createThreadDto.user = userId;
+    createThreadDto.isInstituteOnly = true;
+
+    const thread = await this.threadsService.create(createThreadDto);
+    return {
+      status: HttpStatus.OK,
+      message: 'Institute thread created successfully',
       data: thread,
     };
   }
@@ -61,6 +91,7 @@ export class ThreadsController {
   async findOrCreateGlobalThread(
     @Query('instituteId') instituteId: string,
     @Query('classId') classId: string,
+    @Request() req,
   ) {
     const thread = await this.threadsService.findOrCreateGlobalThread(
       instituteId,
@@ -70,6 +101,83 @@ export class ThreadsController {
       status: HttpStatus.OK,
       message: 'Global thread retrieved or created successfully',
       data: thread,
+    };
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Get all threads with pagination and optional filters',
+  })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of threads per page',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search term for thread titles',
+  })
+  @ApiQuery({
+    name: 'isGlobal',
+    required: false,
+    description: 'Filter for global threads',
+  })
+  @ApiQuery({
+    name: 'isInstituteOnly',
+    required: false,
+    description: 'Filter for institute-only threads',
+  })
+  @ApiQuery({
+    name: 'institute',
+    required: false,
+    description: 'Filter by institute ID',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Threads retrieved successfully',
+  })
+  @SetMetadata('permissions', ['view_threads'])
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+    @Query('isGlobal') isGlobal: boolean,
+    @Query('isInstituteOnly') isInstituteOnly: boolean,
+    @Query('institute') institute: string,
+    @Request() req,
+  ) {
+    const userId = req.user.userId;
+
+    // Parse boolean query parameters
+    const parsedIsGlobal = isGlobal === true;
+    const parsedIsInstituteOnly = isInstituteOnly === true;
+
+    console.log('Query params:', {
+      page,
+      limit,
+      search,
+      isGlobal: parsedIsGlobal,
+      isInstituteOnly: parsedIsInstituteOnly,
+      institute,
+      userId,
+    });
+
+    const { threads, total } = await this.threadsService.findAll(
+      page,
+      limit,
+      search,
+      userId,
+      parsedIsGlobal,
+      parsedIsInstituteOnly,
+      institute,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Threads retrieved successfully',
+      data: { items: threads, total },
     };
   }
 
@@ -83,17 +191,20 @@ export class ThreadsController {
     description: 'Threads retrieved successfully',
   })
   @SetMetadata('permissions', ['view_threads'])
-  async findAll(
+  async findAllByTopicId(
     @Param('topicId') topicId: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
+    @Request() req,
   ) {
+    const userId = req.user.userId;
     const { threads, total } = await this.threadsService.findAllByTopicId(
       topicId,
       page,
       limit,
       search,
+      userId,
     );
     return {
       status: HttpStatus.OK,
@@ -114,8 +225,9 @@ export class ThreadsController {
     description: 'Thread not found',
   })
   @SetMetadata('permissions', ['view_threads'])
-  async findOne(@Param('id') id: string) {
-    const thread = await this.threadsService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    const thread = await this.threadsService.findOne(id, userId);
     if (!thread) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
@@ -141,8 +253,14 @@ export class ThreadsController {
   async update(
     @Param('id') id: string,
     @Body() updateThreadDto: UpdateThreadDto,
+    @Request() req,
   ) {
-    const updatedThread = await this.threadsService.update(id, updateThreadDto);
+    const userId = req.user.userId;
+    const updatedThread = await this.threadsService.update(
+      id,
+      updateThreadDto,
+      userId,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Thread updated successfully',
@@ -158,8 +276,9 @@ export class ThreadsController {
     description: 'Thread deleted successfully',
   })
   @SetMetadata('permissions', ['delete_threads'])
-  async remove(@Param('id') id: string) {
-    await this.threadsService.remove(id);
+  async remove(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    await this.threadsService.remove(id, userId);
     return {
       status: HttpStatus.OK,
       message: 'Thread deleted successfully',
