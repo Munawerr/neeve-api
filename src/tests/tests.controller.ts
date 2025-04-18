@@ -36,7 +36,6 @@ import * as ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import * as htmlToText from 'html-to-text';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('tests')
