@@ -249,121 +249,166 @@ export class ResultsController {
     const updatedResult1 = await this.resultsService.findOne(id);
 
     if (updatedResult1) {
-      const totalMarks =
-        updatedResult1.numOfQuestions * updatedResult1.marksPerQuestion;
+      // Get test details to access skipableQuestionsCount
+      const testId = updatedResult1.toObject().test._id
+        ? updatedResult1.toObject().test._id
+        : updatedResult1.test;
+      const test = await this.testsService.findOne(testId);
 
-      // Calculate obtained marks with negative marking
-      const obtainedMarks = updatedResult1.questionResults.reduce(
-        (sum, questionResult: any) => {
-          const correctOptions = questionResult.options.filter(
-            (option) => option.isCorrect,
-          );
-          const checkedOptions = questionResult.options.filter(
-            (option) => option.isChecked,
-          );
-
-          // If skipped, no marks added or deducted
-          if (questionResult.skipped) {
-            return sum;
-          }
-
-          // If the answer is correct (all correct options selected and only correct options selected)
-          if (
-            correctOptions.length === checkedOptions.length &&
-            correctOptions.every((option) => option.isChecked) &&
-            checkedOptions.every((option) => option.isCorrect)
-          ) {
-            return sum + updatedResult1.marksPerQuestion;
-          }
-
-          // If the answer is incorrect, deduct 1 mark
-          return sum - 1;
-        },
-        0,
-      );
-
-      const averageMarks = (obtainedMarks / totalMarks) * 100;
-
-      // Count correct answers
-      const correctAnswers = updatedResult1.questionResults.filter(
-        (questionResult: any) => {
-          // Skipped questions aren't counted as correct
-          if (questionResult.skipped) {
-            return false;
-          }
-
-          const correctOptions = questionResult.options.filter(
-            (option) => option.isCorrect,
-          );
-          const checkedOptions = questionResult.options.filter(
-            (option) => option.isChecked,
-          );
-
-          return (
-            correctOptions.length === checkedOptions.length &&
-            correctOptions.every((option) => option.isChecked) &&
-            checkedOptions.every((option) => option.isCorrect)
-          );
-        },
-      ).length;
+      if (!test) {
+        return {
+          status: HttpStatus.EXPECTATION_FAILED,
+          message: 'Test not found',
+        };
+      }
 
       // Count skipped questions
       const skippedQuestions = updatedResult1.questionResults.filter(
         (questionResult: any) => questionResult.skipped,
       ).length;
 
-      // Incorrect answers are those that are not correct and not skipped
-      const incorrectAnswers =
-        updatedResult1.numOfQuestions - correctAnswers - skippedQuestions;
+      // Count answered questions (non-skipped)
+      const answeredQuestions =
+        updatedResult1.questionResults.length - skippedQuestions;
 
-      const totalTimeInMinutes = updatedResult1
-        .toObject()
-        .questionResults.reduce(
-          (
-            sum: number,
-            questionResult: QuestionResult,
-            index: number,
-            array: QuestionResult[],
-          ) => {
-            if (index === 0) return sum;
-            const previousQuestion = array[index - 1];
-            return (
-              sum +
-              (new Date(questionResult.createdAt).getTime() -
-                new Date(previousQuestion.createdAt).getTime()) /
-                60000
+      // Get the number of skippable questions from the test
+      const skipableQuestionsCount = test.skipableQuestionsCount || 0;
+
+      // Calculate the required number of questions to answer (total - skippable)
+      const requiredAnsweredQuestions =
+        updatedResult1.numOfQuestions - skipableQuestionsCount;
+
+      // Check if the test should be completed based on answered questions
+      const shouldCompleteTest = answeredQuestions >= requiredAnsweredQuestions;
+
+      if (shouldCompleteTest) {
+        // Calculate the effective total marks based on required questions, not total questions
+        const effectiveTotalQuestions =
+          updatedResult1.numOfQuestions - skipableQuestionsCount;
+        const totalMarks =
+          effectiveTotalQuestions * updatedResult1.marksPerQuestion;
+
+        // Calculate obtained marks with negative marking
+        let obtainedMarks = updatedResult1.questionResults.reduce(
+          (sum, questionResult: any) => {
+            const correctOptions = questionResult.options.filter(
+              (option) => option.isCorrect,
             );
+            const checkedOptions = questionResult.options.filter(
+              (option) => option.isChecked,
+            );
+
+            // If skipped, no marks added or deducted
+            if (questionResult.skipped) {
+              return sum;
+            }
+
+            // If the answer is correct (all correct options selected and only correct options selected)
+            if (
+              correctOptions.length === checkedOptions.length &&
+              correctOptions.every((option) => option.isChecked) &&
+              checkedOptions.every((option) => option.isCorrect)
+            ) {
+              return sum + updatedResult1.marksPerQuestion;
+            }
+
+            // If the answer is incorrect, deduct 1 mark
+            return sum - 1;
           },
           0,
         );
 
-      const averageTimePerQuestion =
-        totalTimeInMinutes / updatedResult1.numOfQuestions;
+        // Ensure obtained marks is never negative
+        obtainedMarks = Math.max(0, obtainedMarks);
 
-      const marksSummary: MarksSummaryDto = {
-        totalMarks,
-        obtainedMarks,
-        averageMarks,
-        correctAnswers,
-        incorrectAnswers,
-        averageTimePerQuestion,
-        skippedQuestions,
-      };
+        // Calculate average marks based on effective total marks
+        const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
 
-      const updateResultDto: UpdateResultDto = {};
-      updateResultDto.finishedAt = new Date();
-      updateResultDto.status = ResultStatus.FINISHED;
-      updateResultDto.marksSummary = marksSummary;
+        // Count correct answers
+        const correctAnswers = updatedResult1.questionResults.filter(
+          (questionResult: any) => {
+            // Skipped questions aren't counted as correct
+            if (questionResult.skipped) {
+              return false;
+            }
 
-      await this.resultsService.update(id, updateResultDto);
+            const correctOptions = questionResult.options.filter(
+              (option) => option.isCorrect,
+            );
+            const checkedOptions = questionResult.options.filter(
+              (option) => option.isChecked,
+            );
 
-      const updatedResult2 = await this.resultsService.findOne(id);
+            return (
+              correctOptions.length === checkedOptions.length &&
+              correctOptions.every((option) => option.isChecked) &&
+              checkedOptions.every((option) => option.isCorrect)
+            );
+          },
+        ).length;
 
-      return {
-        status: HttpStatus.OK,
-        message: 'Result updated successfully',
-        data: updatedResult2,
-      };
+        // Incorrect answers are those that are not correct and not skipped
+        const incorrectAnswers =
+          updatedResult1.questionResults.length -
+          correctAnswers -
+          skippedQuestions;
+
+        const totalTimeInMinutes = updatedResult1
+          .toObject()
+          .questionResults.reduce(
+            (
+              sum: number,
+              questionResult: QuestionResult,
+              index: number,
+              array: QuestionResult[],
+            ) => {
+              if (index === 0) return sum;
+              const previousQuestion = array[index - 1];
+              return (
+                sum +
+                (new Date(questionResult.createdAt).getTime() -
+                  new Date(previousQuestion.createdAt).getTime()) /
+                  60000
+              );
+            },
+            0,
+          );
+
+        const averageTimePerQuestion =
+          totalTimeInMinutes / updatedResult1.questionResults.length;
+
+        const marksSummary: MarksSummaryDto = {
+          totalMarks,
+          obtainedMarks,
+          averageMarks,
+          correctAnswers,
+          incorrectAnswers,
+          averageTimePerQuestion,
+          skippedQuestions,
+        };
+
+        const updateResultDto: UpdateResultDto = {};
+        updateResultDto.finishedAt = new Date();
+        updateResultDto.status = ResultStatus.FINISHED;
+        updateResultDto.marksSummary = marksSummary;
+
+        await this.resultsService.update(id, updateResultDto);
+
+        const updatedResult2 = await this.resultsService.findOne(id);
+
+        return {
+          status: HttpStatus.OK,
+          message: 'Result updated successfully',
+          data: updatedResult2,
+        };
+      } else {
+        // If test is not complete yet, just return the updated result
+        return {
+          status: HttpStatus.OK,
+          message: 'Question recorded successfully',
+          data: updatedResult1,
+        };
+      }
     }
   }
 
@@ -395,8 +440,13 @@ export class ResultsController {
     const reportCard = await Promise.all(
       results.map(async (result) => {
         const test = result.toObject().test;
-        const title = test.title;
-        const totalMarks = result.marksSummary.totalMarks;
+
+        // Consider skippable questions in total marks calculation
+        const skipableQuestionsCount = test.skipableQuestionsCount || 0;
+        const effectiveQuestionCount =
+          result.numOfQuestions - skipableQuestionsCount;
+        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+
         const obtainedMarks = result.marksSummary.obtainedMarks;
         const averageMarks = (obtainedMarks / totalMarks) * 100;
         const correctAnswers = result.marksSummary.correctAnswers;
@@ -413,7 +463,7 @@ export class ResultsController {
         );
 
         let _reportCard = {
-          title,
+          title: test.title,
           totalMarks,
           obtainedMarks,
           averageMarks,
@@ -478,15 +528,24 @@ export class ResultsController {
 
     const uniqueResultsArray = Object.values(uniqueResults) as Result[];
 
-    const totalMarks = uniqueResultsArray.reduce(
-      (sum, result) => sum + result.marksSummary.totalMarks,
-      0,
+    // Recalculate total marks accounting for skippable questions
+    const totalMarks = await uniqueResultsArray.reduce(
+      async (sumPromise, result) => {
+        const sum = await sumPromise;
+        const test = await this.testsService.findOne(result.test.toString());
+        const skipableQuestionsCount = test?.skipableQuestionsCount || 0;
+        const effectiveQuestionCount =
+          result.numOfQuestions - skipableQuestionsCount;
+        return sum + effectiveQuestionCount * result.marksPerQuestion;
+      },
+      Promise.resolve(0),
     );
-    const obtainedMarks = uniqueResultsArray.reduce(
+
+    const obtainedMarks = Math.max(0, uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.obtainedMarks,
       0,
-    );
-    const averageMarks = (obtainedMarks / totalMarks) * 100;
+    ));
+    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
 
     const correctAnswers = uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.correctAnswers,
@@ -559,15 +618,34 @@ export class ResultsController {
 
     const uniqueResultsArray: Result[] = Object.values(uniqueResults);
 
-    const totalMarks = uniqueResultsArray.reduce(
-      (sum, result) => sum + result.marksSummary.totalMarks,
-      0,
+    // Get all test IDs to fetch their skipableQuestionsCount
+    const testIds = uniqueResultsArray.map((result) => result.test.toString());
+    const tests = await Promise.all(
+      testIds.map((id) => this.testsService.findOne(id)),
     );
-    const obtainedMarks = uniqueResultsArray.reduce(
+
+    // Create a map of test IDs to their skipableQuestionsCount for quick lookup
+    const testSkipableCountMap = tests.reduce((map, test) => {
+      if (test) {
+        map[test._id as string] = test.skipableQuestionsCount || 0;
+      }
+      return map;
+    }, {});
+
+    // Calculate total marks considering skippable questions for each test
+    const totalMarks = uniqueResultsArray.reduce((sum, result) => {
+      const testId = result.test.toString();
+      const skipableQuestionsCount = testSkipableCountMap[testId] || 0;
+      const effectiveQuestionCount =
+        result.numOfQuestions - skipableQuestionsCount;
+      return sum + effectiveQuestionCount * result.marksPerQuestion;
+    }, 0);
+
+    const obtainedMarks = Math.max(0, uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.obtainedMarks,
       0,
-    );
-    const averageMarks = (obtainedMarks / totalMarks) * 100;
+    ));
+    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
 
     const totalQuestions = uniqueResultsArray.reduce(
       (sum, result) => sum + result.numOfQuestions,
