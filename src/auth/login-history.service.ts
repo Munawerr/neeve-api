@@ -58,6 +58,7 @@ export class LoginHistoryService {
   ): Promise<LoginHistory | null> {
     try {
       const loginHistoryDto: Partial<CreateLoginHistoryDto> = {
+        userId: '', // User ID is not available for failed login attempts
         ipAddress: this.getIpFromRequest(req),
         userAgent: req.headers['user-agent'],
         loginTime: new Date(),
