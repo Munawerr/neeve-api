@@ -27,7 +27,8 @@ export enum ResultStatus {
   NOT_FINISHED = 'not_finished',
 }
 
-enum TestType {
+// Make the TestType enum exportable
+export enum TestType {
   MOCK = 'mock',
   PRACTICE = 'practice',
   TEST = 'test',
