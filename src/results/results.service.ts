@@ -104,6 +104,25 @@ export class ResultsService {
       .exec();
   }
 
+  // Find all test attempts for a student and specific test
+  async findAllAttemptsByStudentAndTest(
+    studentId: string,
+    testId: string,
+  ): Promise<Result[]> {
+    return this.resultModel
+      .find({ student: studentId, test: testId, status: ResultStatus.FINISHED })
+      .sort({ finishedAt: -1 }) // Sort by most recent first
+      .populate('test')
+      .populate('subject')
+      .populate('institute')
+      .populate('student')
+      .populate({
+        path: 'questionResults',
+        model: 'QuestionResult',
+      })
+      .exec();
+  }
+
   // Find all finished results for a specific subject and test type
   async findAllFinishedResults(
     subject: string,

@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResultsService } from './results.service';
@@ -39,6 +41,7 @@ import { ReportCardDto } from './dto/report-card.dto';
 import { QuestionResult } from 'src/question-results/schemas/question-result.schema';
 import { UsersService } from '../users/users.service';
 import { TestsService } from 'src/tests/tests.service';
+import { TestType } from 'src/tests/schemas/test.schema';
 
 @ApiTags('results')
 @Controller('results')
@@ -67,7 +70,8 @@ export class ResultsController {
       createResultDto.test,
     );
 
-    if (existingResult) {
+    // Only delete previous result if it's not a practice test
+    if (existingResult && createResultDto.testType !== TestType.PRACTICE) {
       // Delete the previous result
       await this.resultsService.remove(existingResult.toObject()._id);
     }
@@ -160,6 +164,60 @@ export class ResultsController {
     return {
       status: HttpStatus.OK,
       message: 'Results retrieved successfully',
+      data: results,
+    };
+  }
+
+  // Check if student has attempted tests
+  @Get('student/:studentId/attempted')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if student has attempted tests' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiQuery({ name: 'testIds', required: true, type: String })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attempted tests retrieved successfully',
+  })
+  async checkAttemptedTests(
+    @Param('studentId') studentId: string,
+    @Query('testIds') testIds: string,
+  ) {
+    const testIdArray = testIds.split(',');
+    const attemptedTests = {};
+
+    // Check each test if the student has attempted it
+    for (const testId of testIdArray) {
+      const result = await this.resultsService.findOneByStudentAndTest(studentId, testId);
+      attemptedTests[testId] = result ? true : false;
+    }
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Attempted tests retrieved successfully',
+      data: attemptedTests,
+    };
+  }
+
+  // Get all practice test attempts for a specific test by a student
+  @Get('student/:studentId/test/:testId/practice-attempts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all practice test attempts for a specific test by a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiParam({ name: 'testId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Practice test attempts retrieved successfully',
+  })
+  async getPracticeTestAttempts(
+    @Param('studentId') studentId: string,
+    @Param('testId') testId: string,
+  ) {
+    const results = await this.resultsService.findAllAttemptsByStudentAndTest(studentId, testId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Practice test attempts retrieved successfully',
       data: results,
     };
   }

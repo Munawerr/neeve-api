@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
-import { Result } from './../results/schemas/result.schema'; // Import Result schema
+import { Result, TestType } from './../results/schemas/result.schema'; // Import Result schema
 import { Package } from 'src/packages/schemas/package.schema';
 import { LoginHistory } from '../auth/schemas/login-history.schema'; // Import LoginHistory model
 
@@ -267,11 +267,12 @@ export class UsersService {
       });
       const testResultsCount = await this.resultModel.countDocuments({
         institute: user._id,
+        testType: { $ne: TestType.PRACTICE },
       });
       return { studentCount, testResultsCount };
     } else if (_user.role && _user.role.slug === 'student') {
       const testResults = await this.resultModel
-        .find({ student: user._id })
+        .find({ student: user._id, testType: { $ne: TestType.PRACTICE } })
         .exec();
       const testsTaken = testResults.length;
       const totalScore = testResults.reduce(
@@ -316,7 +317,9 @@ export class UsersService {
       const studentCount = await this.userModel.countDocuments({
         role: await this.getStudentRoleId(),
       });
-      const testCount = await this.resultModel.countDocuments();
+      const testCount = await this.resultModel.countDocuments({
+        testType: { $ne: TestType.PRACTICE },
+      });
       return { instituteCount, studentCount, testCount };
     }
     return {};
