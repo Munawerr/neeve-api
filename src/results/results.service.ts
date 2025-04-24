@@ -80,13 +80,43 @@ export class ResultsService {
       .exec();
   }
 
+  // Find finished results for a student and test type across all subjects
+  async findFinishedResultsAllSubjects(
+    student: string,
+    testType: string,
+  ): Promise<Result[]> {
+    return this.resultModel
+      .find({
+        student,
+        status: ResultStatus.FINISHED,
+        testType,
+      })
+      .populate({
+        path: 'test',
+        model: 'Test',
+        populate: [
+          { path: 'topic', model: 'Topic' },
+          { path: 'subject', model: 'Subject' },
+        ],
+      })
+      .populate({
+        path: 'subject',
+        model: 'Subject',
+      })
+      .populate({
+        path: 'questionResults',
+        model: 'QuestionResult',
+      })
+      .exec();
+  }
+
   // Find finished results for a student and test type
   async findFinishedResultsByStudent(student: string): Promise<Result[]> {
     return this.resultModel
       .find({
         student,
         status: ResultStatus.FINISHED,
-        testType: { $ne: TestType.PRACTICE },
+        // testType: { $ne: TestType.PRACTICE },
       })
       .populate({
         path: 'questionResults',

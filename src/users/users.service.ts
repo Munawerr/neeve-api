@@ -267,12 +267,15 @@ export class UsersService {
       });
       const testResultsCount = await this.resultModel.countDocuments({
         institute: user._id,
-        testType: { $ne: TestType.PRACTICE },
+        // testType: { $ne: TestType.PRACTICE },
       });
       return { studentCount, testResultsCount };
     } else if (_user.role && _user.role.slug === 'student') {
       const testResults = await this.resultModel
-        .find({ student: user._id, testType: { $ne: TestType.PRACTICE } })
+        .find({
+          student: user._id,
+          // testType: { $ne: TestType.PRACTICE }
+        })
         .exec();
       const testsTaken = testResults.length;
       const totalScore = testResults.reduce(
@@ -318,7 +321,7 @@ export class UsersService {
         role: await this.getStudentRoleId(),
       });
       const testCount = await this.resultModel.countDocuments({
-        testType: { $ne: TestType.PRACTICE },
+        // testType: { $ne: TestType.PRACTICE },
       });
       return { instituteCount, studentCount, testCount };
     }
