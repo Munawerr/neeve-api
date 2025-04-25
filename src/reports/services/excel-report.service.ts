@@ -7,8 +7,8 @@ export class ExcelReportService {
   async generateReport(data: any, report: Report): Promise<Buffer> {
     // Create a new Excel workbook
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'VRKSH API';
-    workbook.lastModifiedBy = 'VRKSH API';
+    workbook.creator = 'VRIKSH API';
+    workbook.lastModifiedBy = 'VRIKSH API';
     workbook.created = new Date();
     workbook.modified = new Date();
     

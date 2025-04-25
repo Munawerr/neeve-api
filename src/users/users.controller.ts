@@ -281,6 +281,47 @@ export class UsersController {
     }
   }
 
+  @Get(':id/packages')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all packages for a user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Packages retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to retrieve packages',
+  })
+  async getPackages(@Param('id') id: string) {
+    try {
+      const user = await this.usersService.findOne(id, true);
+
+      if (user) {
+        const packageIds = user.packages.map((pkg) => pkg.toObject()._id);
+        const packages = await this.PackagesService.findByIds(packageIds, true);
+
+        return {
+          status: HttpStatus.OK,
+          message: 'Packages retrieved successfully',
+          data: packages,
+        };
+      } else {
+        return {
+          status: HttpStatus.EXPECTATION_FAILED,
+          message: 'User not found',
+        };
+      }
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve packages',
+        error: error.message,
+      };
+    }
+  }
+
   @Get('institutes')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

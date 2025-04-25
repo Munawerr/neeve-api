@@ -645,6 +645,86 @@ export class ResultsController {
     };
   }
 
+  // Get report card for all subjects for a student
+  @Post('all-subjects-report-card/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get report card for all subjects for a student' })
+  @ApiParam({ name: 'studentId', required: true })
+  @ApiBody({ type: ReportCardDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'All subjects report card retrieved successfully',
+  })
+  async getAllSubjectsReportCard(
+    @Param('studentId') studentId: string,
+    @Body() reportCardDto: ReportCardDto,
+  ) {
+    const { testType } = reportCardDto;
+    const results = await this.resultsService.findFinishedResultsAllSubjects(
+      studentId,
+      testType,
+    );
+
+    const reportCard = await Promise.all(
+      results.map(async (result) => {
+        const test = result.toObject().test;
+        const subject = result.toObject().subject;
+
+        // Consider skippable questions in total marks calculation
+        const skipableQuestionsCount = test.skipableQuestionsCount || 0;
+        const effectiveQuestionCount =
+          result.numOfQuestions - skipableQuestionsCount;
+        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+
+        const obtainedMarks = result.marksSummary.obtainedMarks;
+        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const correctAnswers = result.marksSummary.correctAnswers;
+        const incorrectAnswers = result.marksSummary.incorrectAnswers;
+        const averageTimePerQuestion =
+          result.marksSummary.averageTimePerQuestion;
+        const mostRecentFinishedAt = result.finishedAt;
+
+        // Calculate percentile for this test
+        const percentile = await this.resultsService.calculatePercentile(
+          result.toObject()._id,
+          test._id,
+          averageMarks,
+        );
+
+        let _reportCard = {
+          title: test.title,
+          subject_title: subject.title,
+          totalMarks,
+          obtainedMarks,
+          averageMarks,
+          percentile,
+          correctAnswers,
+          incorrectAnswers,
+          averageTimePerQuestion,
+          mostRecentFinishedAt,
+        };
+
+        if (testType !== 'mock' && test.topic) {
+          _reportCard['topic_title'] = test.topic.title;
+        }
+
+        return _reportCard;
+      }),
+    );
+
+    // Sort by most recent test first
+    reportCard.sort((a, b) => 
+      new Date(b.mostRecentFinishedAt).getTime() - new Date(a.mostRecentFinishedAt).getTime()
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'All subjects report card retrieved successfully',
+      data: reportCard,
+    };
+  }
+
   // Get combined report card for a student
   @Get('combined-report-card/:studentId')
   @UseGuards(JwtAuthGuard)
