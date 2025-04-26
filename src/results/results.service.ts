@@ -202,14 +202,15 @@ export class ResultsService {
     // Add current student's score
     scores.push(score);
 
-    // Sort scores in ascending order
-    scores.sort((a, b) => a - b);
+    // Sort scores in descending order (highest first)
+    scores.sort((a, b) => b - a);
 
-    // Find index of current score
+    // Find index of current score (0-based index)
     const index = scores.indexOf(score);
 
-    // Calculate percentile: (number of scores below) / (total number of scores) * 100
-    const percentile = (index / scores.length) * 100;
+    // Calculate percentile: (Position from top / total number of scores) 
+    // Add 1 to index to get 1-based position
+    const percentile = ((index + 1) / scores.length) * 100;
 
     return Math.round(percentile);
   }
@@ -259,14 +260,15 @@ export class ResultsService {
     // Add current student's score
     studentScores.push(averageMarks);
 
-    // Sort scores in ascending order
-    studentScores.sort((a, b) => a - b);
+    // Sort scores in descending order (highest first)
+    studentScores.sort((a, b) => b - a);
 
-    // Find index of current score
+    // Find index of current score (0-based index)
     const index = studentScores.indexOf(averageMarks);
 
-    // Calculate percentile: (number of scores below) / (total number of scores) * 100
-    const percentile = (index / studentScores.length) * 100;
+    // Calculate percentile: (Position from top / total number of scores)
+    // Add 1 to index to get 1-based position
+    const percentile = ((index + 1) / studentScores.length) * 100;
 
     return Math.round(percentile);
   }
@@ -312,16 +314,53 @@ export class ResultsService {
     // Add current student's score
     studentScores.push(averageMarks);
 
-    // Sort scores in ascending order
-    studentScores.sort((a, b) => a - b);
+    // Sort scores in descending order (highest first)
+    studentScores.sort((a, b) => b - a);
 
-    // Find index of current score
+    // Find index of current score (0-based index)
     const index = studentScores.indexOf(averageMarks);
 
-    // Calculate percentile: (number of scores below) / (total number of scores) * 100
-    const percentile = (index / studentScores.length) * 100;
+    // Calculate percentile: (Position from top / total number of scores)
+    // Add 1 to index to get 1-based position
+    const percentile = ((index + 1) / studentScores.length) * 100;
 
     return Math.round(percentile);
+  }
+
+  // Calculate test-specific percentile
+  async calculateTestSpecificPercentile(
+    testId: string,
+    studentScore: number,
+  ): Promise<{ percentile: number; rank: number; totalStudents: number }> {
+    // Get all finished results for this test
+    const allResults = await this.resultModel
+      .find({
+        test: testId,
+        status: ResultStatus.FINISHED,
+      })
+      .exec();
+
+    // Get all scores for this test
+    const scores = allResults.map((result) => ({
+      score: (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100,
+    }));
+
+    // Add current score if not already in the list
+    if (!scores.some(s => Math.abs(s.score - studentScore) < 0.001)) {
+      scores.push({ score: studentScore });
+    }
+
+    // Sort scores in descending order (highest first)
+    scores.sort((a, b) => b.score - a.score);
+
+    // Find position of current score (0-based index)
+    const rank = scores.findIndex(s => Math.abs(s.score - studentScore) < 0.001) + 1;
+    const totalStudents = scores.length;
+
+    // Calculate percentile (rank based)
+    const percentile = Math.round((rank / totalStudents) * 100);
+
+    return { percentile, rank, totalStudents };
   }
 
   // Update a result by ID

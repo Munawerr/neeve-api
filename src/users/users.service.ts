@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
-import { Result, TestType } from './../results/schemas/result.schema'; // Import Result schema
+import {
+  Result,
+  ResultStatus,
+  TestType,
+} from './../results/schemas/result.schema'; // Import Result schema
 import { Package } from 'src/packages/schemas/package.schema';
 import { LoginHistory } from '../auth/schemas/login-history.schema'; // Import LoginHistory model
 
@@ -267,35 +271,114 @@ export class UsersService {
       });
       const testResultsCount = await this.resultModel.countDocuments({
         institute: user._id,
-        // testType: { $ne: TestType.PRACTICE },
       });
       return { studentCount, testResultsCount };
     } else if (_user.role && _user.role.slug === 'student') {
       const testResults = await this.resultModel
         .find({
           student: user._id,
-          // testType: { $ne: TestType.PRACTICE }
+          status: ResultStatus.FINISHED,
         })
+        .populate('test')
         .exec();
-      const testsTaken = testResults.length;
-      const totalScore = testResults.reduce(
-        (sum, result) => sum + result.marksPerQuestion * result.numOfQuestions,
+
+      // Get unique test results (best attempt for each test)
+      const uniqueResults = testResults.reduce((acc, result: any) => {
+        const testId = result.test._id.toString();
+        if (
+          !acc[testId] ||
+          acc[testId].marksSummary.obtainedMarks <
+            result.marksSummary.obtainedMarks
+        ) {
+          acc[testId] = result;
+        }
+        return acc;
+      }, {});
+
+      const uniqueResultsArray: any[] = Object.values(uniqueResults);
+      const testsTaken = uniqueResultsArray.length;
+
+      // Calculate total marks considering skippable questions
+      const totalScore: number = uniqueResultsArray.reduce(
+        (sum: number, result: any) => {
+          const skipableQuestionsCount =
+            result.test.skipableQuestionsCount || 0;
+          const effectiveQuestionCount =
+            result.numOfQuestions - skipableQuestionsCount;
+          return sum + effectiveQuestionCount * result.marksPerQuestion;
+        },
         0,
       );
-      const acquiredScore = testResults.reduce(
-        (sum, result) =>
-          sum +
-          result
-            .toObject()
-            .questionResults.reduce(
-              (qSum, qResult: any) => qSum + qResult.score,
-              0,
-            ),
+
+      const acquiredScore: number = uniqueResultsArray.reduce(
+        (sum: number, result: any) => sum + result.marksSummary.obtainedMarks,
         0,
       );
-      const percentage = (acquiredScore / totalScore) * 100;
+
+      const percentage = Math.max(0, (acquiredScore / totalScore) * 100);
+
+      // Get all other students' results
+      const allStudentResults = await this.resultModel
+        .find({
+          status: ResultStatus.FINISHED,
+          student: { $ne: user._id },
+        })
+        .populate('test')
+        .exec();
+
+      // Group results by student
+      const studentResults = allStudentResults.reduce((acc, result: any) => {
+        const studentId = result.student.toString();
+        if (!acc[studentId]) {
+          acc[studentId] = {};
+        }
+        const testId = result.test._id.toString();
+        if (
+          !acc[studentId][testId] ||
+          acc[studentId][testId].marksSummary.obtainedMarks <
+            result.marksSummary.obtainedMarks
+        ) {
+          acc[studentId][testId] = result;
+        }
+        return acc;
+      }, {});
+
+      // Calculate average score for each student
+      const studentScores = Object.values(studentResults).map((tests: any) => {
+        const testArray: any[] = Object.values(tests);
+        const total = testArray.reduce((sum: number, result: any) => {
+          const skipableQuestionsCount =
+            result.test.skipableQuestionsCount || 0;
+          const effectiveQuestionCount =
+            result.numOfQuestions - skipableQuestionsCount;
+          return sum + effectiveQuestionCount * result.marksPerQuestion;
+        }, 0);
+
+        const obtained = testArray.reduce(
+          (sum: number, result: any) => sum + result.marksSummary.obtainedMarks,
+          0,
+        );
+        return (obtained / total) * 100;
+      });
+
+      // Add current student's score
+      studentScores.push(percentage);
+
+      // Sort scores in descending order (highest first)
+      studentScores.sort((a, b) => b - a);
+
+      // Find position of current score (0-based index)
+      const rank =
+        studentScores.findIndex(
+          (score) => Math.abs(score - percentage) < 0.001,
+        ) + 1;
+      const totalStudents = studentScores.length;
+
+      // Calculate percentile (rank based)
+      const percentile = Math.round((rank / totalStudents) * 100);
+
       const avgTimePerQuestion =
-        testResults.reduce(
+        uniqueResultsArray.reduce(
           (sum, result) =>
             result.finishedAt && result.startedAt
               ? sum +
@@ -306,12 +389,34 @@ export class UsersService {
         ) /
         testsTaken /
         60000;
+
+      const correctAnswers = uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.correctAnswers,
+        0,
+      );
+
+      const incorrectAnswers = uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.incorrectAnswers,
+        0,
+      );
+
+      const skippedQuestions = uniqueResultsArray.reduce(
+        (sum, result) => sum + (result.marksSummary.skippedQuestions || 0),
+        0,
+      );
+
       return {
         testsTaken,
-        acquiredScore,
         totalScore,
-        percentage,
+        acquiredScore,
+        percentage: Math.round(percentage),
+        percentile,
+        rank,
+        totalStudents,
         avgTimePerQuestion,
+        correctAnswers,
+        incorrectAnswers,
+        skippedQuestions,
       };
     } else if (_user.role && _user.role.slug === 'admin') {
       const instituteCount = await this.userModel.countDocuments({

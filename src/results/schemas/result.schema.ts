@@ -57,6 +57,15 @@ export class MarksSummary {
 
   @Prop({ required: true })
   skippedQuestions: number;
+
+  @Prop()
+  percentile: number;
+
+  @Prop()
+  rank: number;
+
+  @Prop()
+  totalStudents: number;
 }
 
 @Schema()

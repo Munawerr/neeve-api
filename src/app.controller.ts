@@ -398,7 +398,7 @@ export class AppController {
       // const isAdmin = userObj.role && userObj.role.slug === 'admin';
       const isAdmin = true;
       const isInstitute = userObj.role && userObj.role.slug === 'institute';
-      let analyticsData = {};
+      let analyticsData: any = {};
 
       if (isAdmin) {
         // Admin analytics data
