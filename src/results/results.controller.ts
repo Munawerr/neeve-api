@@ -435,6 +435,12 @@ export class ResultsController {
         const averageTimePerQuestion =
           totalTimeInMinutes / updatedResult1.questionResults.length;
 
+        // Calculate test-specific rank and percentile
+        const rankingData = await this.resultsService.calculateTestSpecificPercentile(
+          testId,
+          averageMarks
+        );
+
         const marksSummary: MarksSummaryDto = {
           totalMarks,
           obtainedMarks,
@@ -443,6 +449,9 @@ export class ResultsController {
           incorrectAnswers,
           averageTimePerQuestion,
           skippedQuestions,
+          percentile: rankingData.percentile,
+          rank: rankingData.rank,
+          totalStudents: rankingData.totalStudents
         };
 
         const updateResultDto: UpdateResultDto = {};
