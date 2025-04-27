@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Schema as MongooseSchema } from 'mongoose'; // Import Mongoose Schema
+import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
 import {
   Result,
@@ -804,5 +804,160 @@ export class UsersService {
     return result
       .sort((a, b) => b.averageScore - a.averageScore)
       .slice(0, limit);
+  }
+
+  async getUserGrowthTrend(months: number): Promise<any[]> {
+    const result = await this.userModel.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - months)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+    ]);
+
+    return result.map((item) => ({
+      month: `${item._id.year}-${item._id.month}`,
+      count: item.count,
+    }));
+  }
+
+  async getInstituteGrowthTrend(months: number): Promise<any[]> {
+    const role = await this.roleModel.findOne({ slug: 'institute' });
+    const result = await this.userModel.aggregate([
+      {
+        $match: {
+          role: role?._id,
+          createdAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - months)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+    ]);
+
+    return result.map((item) => ({
+      month: `${item._id.year}-${item._id.month}`,
+      count: item.count,
+    }));
+  }
+
+  async getTopPerformingInstitutes(limit: number): Promise<any[]> {
+    const role = await this.roleModel.findOne({ slug: 'institute' });
+    return this.userModel.aggregate([
+      {
+        $match: {
+          role: role?._id,
+        },
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: '_id',
+          foreignField: 'institute',
+          as: 'results',
+        },
+      },
+      {
+        $project: {
+          name: '$name',
+          performance: {
+            $avg: '$results.marksSummary.averageMarks',
+          },
+        },
+      },
+      { $sort: { performance: -1 } },
+      { $limit: limit },
+    ]);
+  }
+
+  async getHourlyEngagement(): Promise<any[]> {
+    const result = await this.userModel.aggregate([
+      {
+        $lookup: {
+          from: 'results',
+          localField: '_id',
+          foreignField: 'student',
+          as: 'results',
+        },
+      },
+      {
+        $unwind: '$results',
+      },
+      {
+        $group: {
+          _id: {
+            hour: { $hour: '$results.startedAt' },
+            day: { $dayOfWeek: '$results.startedAt' },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return result.map((item) => ({
+      hour: item._id.hour,
+      day: item._id.day - 1, // Convert to 0-based day index
+      count: item.count,
+    }));
+  }
+
+  async getInstituteActivityTimes(instituteId: string): Promise<any[]> {
+    return this.userModel.aggregate([
+      {
+        $match: { institute: new Types.ObjectId(instituteId) },
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: '_id',
+          foreignField: 'student',
+          as: 'results',
+        },
+      },
+      {
+        $unwind: '$results',
+      },
+      {
+        $group: {
+          _id: { $hour: '$results.startedAt' },
+          activityLevel: {
+            $sum: 1,
+          },
+        },
+      },
+      {
+        $project: {
+          hour: '$_id',
+          activityLevel: {
+            $multiply: [
+              { $divide: ['$activityLevel', { $max: '$activityLevel' }] },
+              100,
+            ],
+          },
+        },
+      },
+      { $sort: { hour: 1 } },
+    ]);
   }
 }

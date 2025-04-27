@@ -7,7 +7,7 @@ enum UserStatus {
   INACTIVE = 'inactive',
 }
 
-@Schema()
+@Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true })
   password: string;
