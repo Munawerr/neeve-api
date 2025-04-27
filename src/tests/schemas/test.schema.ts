@@ -7,7 +7,7 @@ export enum TestType {
   TEST = 'test',
 }
 
-@Schema()
+@Schema({ timestamps: true })
 export class Test extends Document {
   @Prop({ required: true })
   title: string;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Course } from './schemas/course.schema';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -94,19 +94,21 @@ export class CoursesService {
   // Dashboard Analytics Methods
 
   async countAllCourses(): Promise<number> {
-    return await this.courseModel.countDocuments({ status: 'active' });
+    return await this.courseModel.countDocuments();
   }
 
   async countAllTests(): Promise<number> {
-    return await this.testModel.countDocuments({ status: 'active' });
+    return await this.testModel.countDocuments();
   }
 
   async countAllTestAttempts(): Promise<number> {
-    return await this.resultModel.countDocuments();
+    return await this.resultModel.countDocuments({
+      status: ResultStatus.FINISHED,
+    });
   }
 
   async getMostPopularCourses(limit: number): Promise<any[]> {
-    const courses = await this.courseModel.find({ status: 'active' }).lean();
+    const courses = await this.courseModel.find().lean();
     const coursesWithAttempts: any[] = [];
 
     for (const course of courses) {
@@ -114,7 +116,6 @@ export class CoursesService {
       const tests = await this.testModel
         .find({
           course: course._id,
-          status: 'active',
         })
         .select('_id');
 
@@ -140,102 +141,104 @@ export class CoursesService {
   async getTestsCompletedByDay(
     days: number,
   ): Promise<Array<{ date: string; count: number }>> {
-    const results: any[] = [];
-    const date = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
 
-    for (let i = 0; i < days; i++) {
-      const currentDate = new Date();
-      currentDate.setDate(date.getDate() - i);
+    const attempts = await this.resultModel.aggregate([
+      {
+        $match: {
+          status: ResultStatus.FINISHED,
+          finishedAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$finishedAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
 
-      const startOfDay = new Date(currentDate.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(currentDate.setHours(23, 59, 59, 999));
-
-      const count = await this.resultModel.countDocuments({
-        finishedAt: { $gte: startOfDay, $lte: endOfDay },
-        status: ResultStatus.FINISHED,
-      });
-
-      results.unshift({
-        date: startOfDay.toISOString().split('T')[0],
-        count,
-      });
-    }
-
-    return results;
+    return attempts.map((attempt) => ({
+      date: attempt._id,
+      count: attempt.count,
+    }));
   }
 
   async getMostPopularTests(limit: number): Promise<any[]> {
-    const testAttempts = await this.resultModel.aggregate([
-      { $match: { status: ResultStatus.FINISHED } },
-      { $group: { _id: '$test', attemptCount: { $sum: 1 } } },
-      { $sort: { attemptCount: -1 } },
-      { $limit: limit },
-    ]);
-
-    const result: any[] = [];
-
-    for (const item of testAttempts) {
-      const test = await this.testModel
-        .findById(item._id)
-        .populate('subject')
-        .lean();
-
-      if (test) {
-        result.push({
-          test: {
-            id: test._id,
-            name: test.title,
-            // @ts-ignore
-            subject: test.subject?.title || 'Unknown',
+    return await this.testModel.aggregate([
+      {
+        $lookup: {
+          from: 'results',
+          localField: '_id',
+          foreignField: 'test',
+          as: 'attempts',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          attempts: {
+            $size: {
+              $filter: {
+                input: '$attempts',
+                as: 'attempt',
+                cond: { $eq: ['$$attempt.status', ResultStatus.FINISHED] },
+              },
+            },
           },
-          attemptCount: item.attemptCount,
-        });
-      }
-    }
-
-    return result;
+        },
+      },
+      {
+        $sort: { attempts: -1 },
+      },
+      {
+        $limit: limit,
+      },
+    ]);
   }
 
-  async getAverageTestScores(): Promise<any[]> {
-    const tests = await this.testModel
-      .find({ status: 'active' })
-      .populate('subject')
-      .lean();
-
-    const result: any[] = [];
-
-    for (const test of tests) {
-      if (!test) {
-        continue; // Skip if test is not found
-      }
-      const attempts = await this.resultModel.find({
-        test: test._id,
-        status: ResultStatus.FINISHED,
-      });
-
-      if (attempts.length > 0) {
-        // Calculate average score using marksSummary
-        const totalScore = attempts.reduce((acc, curr) => {
-          const marksSummary = curr.marksSummary;
-          return acc + (marksSummary ? marksSummary.obtainedMarks : 0);
-        }, 0);
-
-        const averageScore = totalScore / attempts.length;
-
-        result.push({
-          test: {
-            id: test._id,
-            name: test.title,
-            // @ts-ignore
-            subject: test.subject?.title || 'Unknown',
+  async getAverageTestScores(): Promise<any> {
+    const result = await this.resultModel.aggregate([
+      {
+        $match: {
+          status: ResultStatus.FINISHED,
+          'marksSummary.obtainedMarks': { $exists: true },
+          'marksSummary.totalMarks': { $exists: true },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          overall: {
+            $avg: {
+              $multiply: [
+                {
+                  $divide: [
+                    '$marksSummary.obtainedMarks',
+                    '$marksSummary.totalMarks',
+                  ],
+                },
+                100,
+              ],
+            },
           },
-          averageScore: parseFloat(averageScore.toFixed(2)),
-          attemptCount: attempts.length,
-        });
-      }
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+
+    if (result.length === 0) {
+      return { overall: 0, total: 0 };
     }
 
-    return result;
+    return {
+      overall: Math.round(result[0].overall || 0),
+      total: result[0].total,
+    };
   }
 
   // Institute-specific analytics methods
@@ -243,7 +246,6 @@ export class CoursesService {
   async countInstituteCoursesById(instituteId: string): Promise<number> {
     return await this.courseModel.countDocuments({
       institute: instituteId,
-      status: 'active',
     });
   }
 
@@ -251,14 +253,12 @@ export class CoursesService {
     const courseIds = await this.courseModel
       .find({
         institute: instituteId,
-        status: 'active',
       })
       .select('_id');
 
     return await this.testModel
       .find({
         course: { $in: courseIds.map((course) => course._id) },
-        status: 'active',
       })
       .populate('subject');
   }
@@ -396,7 +396,6 @@ export class CoursesService {
     const courses = await this.courseModel
       .find({
         institute: instituteId,
-        status: 'active',
       })
       .lean();
 
@@ -407,7 +406,6 @@ export class CoursesService {
       const tests = await this.testModel
         .find({
           course: course._id,
-          status: 'active',
         })
         .select('_id');
 
@@ -436,14 +434,12 @@ export class CoursesService {
     const courseIds = await this.courseModel
       .find({
         institute: instituteId,
-        status: 'active',
       })
       .select('_id');
 
     const tests = await this.testModel
       .find({
         course: { $in: courseIds.map((course) => course._id) },
-        status: 'active',
       })
       .populate('subject')
       .lean();
@@ -483,5 +479,338 @@ export class CoursesService {
     }
 
     return result.sort((a, b) => b.attemptCount - a.attemptCount);
+  }
+
+  async getCoursesOverview(): Promise<any[]> {
+    return this.courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'subjects',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'subjects',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          code: 1,
+          subjectCount: { $size: '$subjects' },
+          topicCount: {
+            $reduce: {
+              input: '$subjects',
+              initialValue: 0,
+              in: { $add: ['$$value', { $size: '$$this.topics' }] },
+            },
+          },
+        },
+      },
+    ]);
+  }
+
+  async getCoursePerformanceStats(courseId: string): Promise<any> {
+    const stats = await this.courseModel.aggregate([
+      {
+        $match: { _id: new MongooseSchema.Types.ObjectId(courseId) },
+      },
+      {
+        $lookup: {
+          from: 'subjects',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'subjects',
+        },
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: 'subjects._id',
+          foreignField: 'subject',
+          as: 'results',
+        },
+      },
+      {
+        $project: {
+          averageScore: {
+            $avg: '$results.marksSummary.averageMarks',
+          },
+          completionRate: {
+            $multiply: [
+              {
+                $divide: [{ $size: '$results' }, { $size: '$subjects' }],
+              },
+              100,
+            ],
+          },
+          studentCount: {
+            $size: {
+              $setUnion: '$results.student',
+            },
+          },
+        },
+      },
+    ]);
+
+    return stats[0];
+  }
+
+  async getCourseEnrollmentTrends(months: number): Promise<any[]> {
+    return this.courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: 'courses',
+          as: 'enrollments',
+        },
+      },
+      {
+        $unwind: '$enrollments',
+      },
+      {
+        $match: {
+          'enrollments.createdAt': {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - months)),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            courseId: '$_id',
+            year: { $year: '$enrollments.createdAt' },
+            month: { $month: '$enrollments.createdAt' },
+          },
+          courseName: { $first: '$title' },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: {
+          '_id.year': 1,
+          '_id.month': 1,
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          courseId: '$_id.courseId',
+          courseName: 1,
+          month: {
+            $concat: [
+              { $toString: '$_id.year' },
+              '-',
+              { $toString: '$_id.month' },
+            ],
+          },
+          count: 1,
+        },
+      },
+    ]);
+  }
+
+  async getTopPerformingCourses(limit: number): Promise<any[]> {
+    return this.courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'subjects',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'subjects',
+        },
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: 'subjects._id',
+          foreignField: 'subject',
+          as: 'results',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          performance: {
+            $avg: '$results.marksSummary.averageMarks',
+          },
+          studentCount: {
+            $size: {
+              $setUnion: '$results.student',
+            },
+          },
+        },
+      },
+      {
+        $sort: { performance: -1 },
+      },
+      {
+        $limit: limit,
+      },
+    ]);
+  }
+
+  async getInstituteDifficultTopics(instituteId: string, limit: number = 5): Promise<any[]> {
+    return this.courseModel.aggregate([
+      {
+        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
+      },
+      {
+        $lookup: {
+          from: 'subjects',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'subjects'
+        }
+      },
+      {
+        $unwind: '$subjects'
+      },
+      {
+        $lookup: {
+          from: 'topics',
+          localField: 'subjects._id',
+          foreignField: 'subject',
+          as: 'topics'
+        }
+      },
+      {
+        $unwind: '$topics'
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: 'topics._id',
+          foreignField: 'topic',
+          as: 'results'
+        }
+      },
+      {
+        $project: {
+          topicId: '$topics._id',
+          topicName: '$topics.title',
+          subjectName: '$subjects.title',
+          averageScore: {
+            $avg: '$results.marksSummary.averageMarks'
+          },
+          attemptCount: { $size: '$results' }
+        }
+      },
+      {
+        $match: {
+          attemptCount: { $gt: 0 }
+        }
+      },
+      {
+        $sort: { averageScore: 1 }
+      },
+      {
+        $limit: limit
+      }
+    ]);
+  }
+
+  async getInstituteSubjectPerformance(instituteId: string): Promise<any[]> {
+    return this.courseModel.aggregate([
+      {
+        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
+      },
+      {
+        $lookup: {
+          from: 'subjects',
+          localField: '_id',
+          foreignField: 'course',
+          as: 'subjects'
+        }
+      },
+      {
+        $unwind: '$subjects'
+      },
+      {
+        $lookup: {
+          from: 'results',
+          localField: 'subjects._id',
+          foreignField: 'subject',
+          as: 'results'
+        }
+      },
+      {
+        $project: {
+          subjectId: '$subjects._id',
+          subjectName: '$subjects.title',
+          courseName: '$title',
+          performance: {
+            averageScore: { $avg: '$results.marksSummary.averageMarks' },
+            totalAttempts: { $size: '$results' },
+            completionRate: {
+              $multiply: [
+                {
+                  $divide: [
+                    { $size: { $filter: { input: '$results', as: 'result', cond: { $eq: ['$$result.status', 'finished'] } } } },
+                    { $size: '$results' }
+                  ]
+                },
+                100
+              ]
+            }
+          }
+        }
+      },
+      {
+        $sort: { 'performance.averageScore': -1 }
+      }
+    ]);
+  }
+
+  async getInstituteStudentPerformanceTrend(instituteId: string, days: number = 30): Promise<any[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    return this.courseModel.aggregate([
+      {
+        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
+      },
+      {
+        $lookup: {
+          from: 'results',
+          let: { courseId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$institute', new MongooseSchema.Types.ObjectId(instituteId)] },
+                    { $gte: ['$finishedAt', startDate] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'results'
+        }
+      },
+      {
+        $unwind: '$results'
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$results.finishedAt' } }
+          },
+          averageScore: { $avg: '$results.marksSummary.averageMarks' },
+          totalAttempts: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id.date',
+          averageScore: { $round: ['$averageScore', 2] },
+          totalAttempts: 1
+        }
+      },
+      {
+        $sort: { date: 1 }
+      }
+    ]);
   }
 }
