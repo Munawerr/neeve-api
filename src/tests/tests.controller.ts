@@ -33,10 +33,10 @@ import { CreateQuestionDto } from 'src/questions/dto/create-question.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
 import * as htmlToText from 'html-to-text';
 import axios from 'axios';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { jsPDF } from 'jspdf';
 
 @ApiTags('tests')
 @Controller('tests')
@@ -460,166 +460,126 @@ export class TestsController {
       });
     }
 
-    const doc = new PDFDocument();
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=test-${id}.pdf`);
+    const doc = new jsPDF();
+    let yPosition = 20;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
 
-    doc.pipe(res);
+    // Title
+    doc.setFontSize(20);
+    doc.text(htmlToText.convert(test.title), pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
 
-    doc.fontSize(20).text(htmlToText.convert(test.title), { align: 'center' });
-    doc.moveDown();
-
+    let questionNumber = 1;
     for (const questionId of test.questions) {
       const _quest: any = questionId;
-      const question = await this.questionsService.findOne(
-        _quest._id.toString(),
-      );
+      const question = await this.questionsService.findOne(_quest._id.toString());
 
-      if (!question) {
-        continue;
+      if (!question) continue;
+
+      // Check if we need a new page
+      if (yPosition > doc.internal.pageSize.height - 40) {
+        doc.addPage();
+        yPosition = 20;
       }
 
-      // Process the question text to find LaTeX equations
+      // Process LaTeX in question text
       let questionText = question.text;
-
-      // Extract LaTeX expressions enclosed in dollar signs
       const latexExpressions = questionText.match(/\$(.*?)\$/g);
-      const latexImages: { latexMarker: string; imgBuffer: Buffer }[] = [];
 
-      // If LaTeX expressions are found, convert them to images
       if (latexExpressions) {
-        for (let i = 0; i < latexExpressions.length; i++) {
-          const latexExpression = latexExpressions[i];
-          const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
-
+        for (const latexExpr of latexExpressions) {
+          const latex = latexExpr.slice(1, -1);
           try {
-            // Use a LaTeX to PNG conversion API (CodeCogs)
             const response = await axios.get(
               `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
               { responseType: 'arraybuffer' },
             );
 
-            const imgBuffer = Buffer.from(response.data);
-            const marker = `{latex-${i}}`;
+            // Convert image to base64
+            const base64Image = Buffer.from(response.data).toString('base64');
+            
+            // Add image to PDF
+            doc.addImage(
+              `data:image/png;base64,${base64Image}`,
+              'PNG',
+              margin,
+              yPosition,
+              50,
+              20
+            );
+            yPosition += 25;
 
-            latexImages.push({ latexMarker: marker, imgBuffer });
-
-            // Replace the LaTeX expression with a marker
-            questionText = questionText.replace(latexExpression, marker);
+            // Replace LaTeX in text
+            questionText = questionText.replace(latexExpr, '');
           } catch (error) {
             console.error(`Failed to convert LaTeX: ${latex}`, error);
           }
         }
       }
 
-      // Split the text by the latex markers
-      const textParts = questionText.split(/(\{latex-\d+\})/g);
+      // Add question text
+      doc.setFontSize(12);
+      doc.text(`${questionNumber}. ${htmlToText.convert(questionText)}`, margin, yPosition);
+      yPosition += 10;
 
-      // Write each part, inserting images where needed
-      for (const part of textParts) {
-        const latexMatch = part.match(/\{latex-(\d+)\}/);
-        if (latexMatch) {
-          const index = parseInt(latexMatch[1]);
-          const latexImage = latexImages.find(
-            (img) => img.latexMarker === part,
-          );
-
-          if (latexImage) {
-            doc.image(latexImage.imgBuffer, {
-              fit: [200, 100], // Adjust size as needed for equations
-              align: 'left',
-            });
-            doc.moveDown(0.5);
-          }
-        } else if (part.trim()) {
-          doc.fontSize(14).text(htmlToText.convert(part));
-        }
-      }
-
-      doc.moveDown();
-
-      // Process options with LaTeX
+      // Process options
       for (const option of question.options) {
+        if (yPosition > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
         let optionText = option.text;
         const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
 
         if (optionLatexExpressions) {
-          doc
-            .fontSize(12)
-            .text(`- ${option.isCorrect ? 'Correct' : 'Incorrect'} option:`);
-
-          // Process each LaTeX expression in the option
-          const optionLatexImages: {
-            latexMarker: string;
-            imgBuffer: Buffer;
-          }[] = [];
-
-          for (let i = 0; i < optionLatexExpressions.length; i++) {
-            const latexExpression = optionLatexExpressions[i];
-            const latex = latexExpression.slice(1, -1); // Remove enclosing $ symbols
-
+          for (const latexExpr of optionLatexExpressions) {
+            const latex = latexExpr.slice(1, -1);
             try {
               const response = await axios.get(
                 `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`,
                 { responseType: 'arraybuffer' },
               );
 
-              const imgBuffer = Buffer.from(response.data);
-              const marker = `{option-latex-${i}}`;
+              const base64Image = Buffer.from(response.data).toString('base64');
+              
+              doc.addImage(
+                `data:image/png;base64,${base64Image}`,
+                'PNG',
+                margin + 10,
+                yPosition,
+                40,
+                15
+              );
+              yPosition += 20;
 
-              optionLatexImages.push({ latexMarker: marker, imgBuffer });
-
-              // Replace the LaTeX expression with a marker
-              optionText = optionText.replace(latexExpression, marker);
+              // Replace LaTeX in text
+              optionText = optionText.replace(latexExpr, '');
             } catch (error) {
-              console.error(
-                `Failed to convert LaTeX in option: ${latex}`,
-                error,
-              );
+              console.error(`Failed to convert LaTeX: ${latex}`, error);
             }
           }
-
-          // Split the option text by the latex markers and render
-          const optionParts = optionText.split(/(\{option-latex-\d+\})/g);
-
-          for (const optPart of optionParts) {
-            const optLatexMatch = optPart.match(/\{option-latex-(\d+)\}/);
-            if (optLatexMatch) {
-              const index = parseInt(optLatexMatch[1]);
-              const optLatexImage = optionLatexImages.find(
-                (img) => img.latexMarker === optPart,
-              );
-
-              if (optLatexImage) {
-                doc.image(optLatexImage.imgBuffer, {
-                  fit: [150, 75],
-                  align: 'left',
-                });
-                doc.moveDown(0.5);
-              }
-            } else if (optPart.trim()) {
-              doc.fontSize(12).text(htmlToText.convert(optPart));
-            }
-          }
-        } else {
-          // No LaTeX in option, render normally
-          doc
-            .fontSize(12)
-            .text(
-              `- ${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`,
-            );
         }
 
-        doc.moveDown(0.5);
+        doc.setFontSize(10);
+        doc.text(
+          `${option.isCorrect ? '✓' : '○'} ${htmlToText.convert(optionText)}`,
+          margin + 5,
+          yPosition
+        );
+        yPosition += 8;
       }
 
-      doc.moveDown();
+      yPosition += 10;
+      questionNumber++;
     }
 
-    doc.end();
-    doc.on('finish', () => {
-      res.end();
-    });
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=test-${id}.pdf`);
+    res.send(pdfBuffer);
   }
 
   @Post(':testId/upload-questions')
