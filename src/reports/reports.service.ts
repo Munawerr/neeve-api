@@ -128,7 +128,7 @@ export class ReportsService {
       query.$or = query.$or || [];
       query.$or.push(
         { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { description: { $regex: search, $options: 'i' } },
       );
     }
 
@@ -181,13 +181,13 @@ export class ReportsService {
     // Get paginated reports
     const reports = await this.reportModel
       .find(query)
-      .populate('createdBy', 'name email')
-      .populate('institute', 'name')
-      .populate('student', 'name email')
-      .populate('subject', 'name')
-      .populate('course', 'name')
-      .populate('package', 'name')
-      .populate('test', 'name')
+      .populate('createdBy', 'full_name email')
+      .populate('institute', 'full_name')
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .populate('course', 'title')
+      .populate('package', 'title')
+      .populate('test', 'title')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -199,13 +199,13 @@ export class ReportsService {
   async findOne(id: string, userId: string, isAdmin: boolean): Promise<Report> {
     const report = await this.reportModel
       .findById(id)
-      .populate('createdBy', 'name email')
-      .populate('institute', 'name')
-      .populate('student', 'name email')
-      .populate('subject', 'name')
-      .populate('course', 'name')
-      .populate('package', 'name')
-      .populate('test', 'name')
+      .populate('createdBy', 'full_name email')
+      .populate('institute', 'full_name')
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .populate('course', 'title')
+      .populate('package', 'title')
+      .populate('test', 'title')
       .exec();
 
     if (!report) {

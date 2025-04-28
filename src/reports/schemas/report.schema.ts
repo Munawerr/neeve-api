@@ -8,7 +8,7 @@ export enum ReportType {
   PACKAGE = 'package',
   TEST = 'test',
   INSTITUTE = 'institute',
-  OVERALL = 'overall'
+  OVERALL = 'overall',
 }
 
 export enum ReportFormat {
@@ -41,7 +41,7 @@ export class Report extends Document {
 
   @Prop({ required: true, enum: ReportFormat })
   format: ReportFormat;
-  
+
   @Prop({ required: true })
   name: string;
 
@@ -51,7 +51,7 @@ export class Report extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   institute: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Student' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   student: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject' })
