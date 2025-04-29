@@ -385,9 +385,11 @@ export class ReportGeneratorService {
     let topicIds: any[] = [];
 
     let packageId: any = null;
+    const reportCourseId = report.course.toString();
     if (user) {
       for (let x = 0; x < user.packages.length; x++) {
-        if (user.packages[x].course == report.course) {
+        const courseId = user.packages[x].course.toString();
+        if (courseId == reportCourseId) {
           packageId = user.toObject().packages[x]._id.toString();
           break;
         }
