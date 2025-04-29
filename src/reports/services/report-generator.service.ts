@@ -402,7 +402,9 @@ export class ReportGeneratorService {
       topicIds = topics
         .map((topic) =>
           topic.subTopics.map((subTopic: any) =>
-            typeof subTopic == 'object' ? subTopic._id : subTopic,
+            typeof subTopic == 'object'
+              ? subTopic._id.toString()
+              : subTopic.toString(),
           ),
         )
         .flat();
