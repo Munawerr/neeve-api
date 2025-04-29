@@ -412,6 +412,8 @@ export class ReportGeneratorService {
     }
 
     // Log to debug
+    console.log('User:', user);
+    console.log('packageId:', packageId);
     console.log('Extracted testIds:', topicIds.length, topicIds);
 
     // Get tests associated with this course
