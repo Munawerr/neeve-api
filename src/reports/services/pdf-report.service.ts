@@ -148,17 +148,137 @@ export class PdfReportService {
   }
 
   private async buildSubjectReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Subject Information
     doc.setFontSize(16);
-    doc.text(`Subject Report: ${data.subjectInfo.title}`, 20, 60);
+    doc.text('Subject Information', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text('Subject-specific report details would be included here.', 20, 80);
+    doc.text(`Name: ${data.subjectInfo.name}`, margin, yPos);
+    yPos += 15;
+
+    // Performance Summary
+    doc.setFontSize(16);
+    doc.text('Performance Summary', margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 7;
+    doc.text(
+      `Total Score: ${data.summary.totalScore}/${data.summary.totalPossibleScore}`,
+      margin,
+      yPos,
+    );
+    yPos += 15;
+
+    // Test Performance
+    if (data.testPerformance?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Test Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = ['Test Name', 'Attempts', 'Completed', 'Avg Score'];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.testPerformance.forEach((test: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(test.test, margin, yPos);
+        doc.text(test.attempts.toString(), margin + colWidth, yPos);
+        doc.text(test.completed.toString(), margin + 2 * colWidth, yPos);
+        doc.text(`${test.averageScore}%`, margin + 3 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 
   private async buildCourseReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Course Information
     doc.setFontSize(16);
-    doc.text('Course Report', 20, 60);
+    doc.text('Course Information', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text('Course-specific report details would be included here.', 20, 80);
+    doc.text(`Name: ${data.courseInfo.name}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Code: ${data.courseInfo.code}`, margin, yPos);
+    yPos += 15;
+
+    // Performance Summary
+    doc.setFontSize(16);
+    doc.text('Performance Summary', margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 7;
+    doc.text(
+      `Total Score: ${data.summary.totalScore}/${data.summary.totalPossibleScore}`,
+      margin,
+      yPos,
+    );
+    yPos += 7;
+    doc.text(`Number of Subjects: ${data.summary.subjectCount}`, margin, yPos);
+    yPos += 15;
+
+    // Subject Performance
+    if (data.subjectPerformance?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Subject Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.subjectPerformance.forEach((subject: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(subject.name, margin, yPos);
+        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
+        doc.text(
+          subject.completedTests.toString(),
+          margin + 2 * colWidth,
+          yPos,
+        );
+        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 
   private async buildPackageReport(doc: jsPDF, data: any): Promise<void> {

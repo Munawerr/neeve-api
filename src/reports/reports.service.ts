@@ -25,9 +25,13 @@ export class ReportsService {
     userId: string,
   ): Promise<Report> {
     // Verify user exists
-    const user = await this.userModel.findById(userId);
+    const user: any = await this.userModel.findById(userId).populate('role');
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (user && user.toObject().role?.slug == 'institute') {
+      createReportDto.institute = user._id;
     }
 
     // Validate required fields based on report type
