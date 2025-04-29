@@ -15,6 +15,7 @@ import { Test } from '../../tests/schemas/test.schema';
 import { Subject } from '../../subjects/schemas/subject.schema';
 import { Course } from '../../courses/schemas/course.schema';
 import { Package } from '../../packages/schemas/package.schema';
+import { Topic } from '../../topics/schemas/topic.schema';
 import { S3Service } from '../../s3/s3.service';
 import {
   CourseReportData,
@@ -22,6 +23,7 @@ import {
   OverallReportData,
   TestReportData,
 } from '../interfaces/report.interface';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ReportGeneratorService {
@@ -33,8 +35,10 @@ export class ReportGeneratorService {
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
     @InjectModel(Course.name) private courseModel: Model<Course>,
     @InjectModel(Package.name) private packageModel: Model<Package>,
+    @InjectModel(Topic.name) private topicModel: Model<Topic>,
     private pdfReportService: PdfReportService,
     private excelReportService: ExcelReportService,
+    private userService: UsersService,
     private s3Service: S3Service,
   ) {}
 
@@ -115,7 +119,7 @@ export class ReportGeneratorService {
   private async getStudentReportData(report: Report): Promise<any> {
     const student = await this.userModel
       .findById(report.student)
-      .populate('institute', 'name');
+      .populate('institute', 'full_name');
 
     if (!student) {
       throw new NotFoundException(
@@ -135,8 +139,8 @@ export class ReportGeneratorService {
 
     const results = await this.resultModel
       .find(query)
-      .populate('test', 'name')
-      .populate('subject', 'name')
+      .populate('test', 'title')
+      .populate('subject', 'title')
       .exec();
 
     // Calculate performance metrics
@@ -265,9 +269,9 @@ export class ReportGeneratorService {
 
     const results = await this.resultModel
       .find(query)
-      .populate('student', 'name')
-      .populate('test', 'name')
-      .populate('institute', 'name')
+      .populate('student', 'full_name')
+      .populate('test', 'title')
+      .populate('institute', 'full_name')
       .exec();
 
     // Calculate overall performance
@@ -373,24 +377,62 @@ export class ReportGeneratorService {
       throw new NotFoundException(`Course with ID ${report.course} not found`);
     }
 
+    const user: any = await this.userModel
+      .findById(report.institute)
+      .populate('packages')
+      .exec();
+
+    let topicIds: any[] = [];
+
+    let packageId: any = null;
+    if (user) {
+      for (let x = 0; x < user.packages.length; x++) {
+        if (user.packages[x].course == report.course) {
+          packageId = user.toObject().packages[x]._id.toString();
+          break;
+        }
+      }
+
+      const topics = await this.topicModel
+        .find({ package: packageId, isParent: true })
+        .exec();
+
+      topicIds = topics
+        .map((topic) =>
+          topic.subTopics.map((subTopic: any) =>
+            typeof subTopic == 'object' ? subTopic._id : subTopic,
+          ),
+        )
+        .flat();
+
+      // Make sure we extract test IDs properly, handling both ObjectIDs and references
+      // topicIds = topics.map((topic: any) => topic._id.toString());
+    } else {
+      throw new NotFoundException(`User not found`);
+    }
+
+    // Log to debug
+    console.log('Extracted testIds:', topicIds.length, topicIds);
+
     // Get tests associated with this course
     const tests = await this.testModel
       .find({
-        course: report.course,
-        status: 'active',
+        topic: { $in: topicIds },
       })
       .populate('subject')
       .lean();
 
-    // Get subjects associated with the tests
-    const subjectIds = new Set(
-      tests.map((test: any) => test.subject?._id.toString()),
-    );
-    const subjects = await this.subjectModel
-      .find({
-        _id: { $in: Array.from(subjectIds) },
-      })
-      .lean();
+    // Log if tests are empty
+    if (!tests.length) {
+      console.log(
+        'No tests found for the given IDs. Verify test IDs in the database.',
+      );
+    }
+
+    // Get unique subject IDs from tests
+    const subjectIds = [
+      ...new Set(tests.map((test: any) => test.subject?._id.toString())),
+    ];
 
     // Query to filter results
     const query: any = {
@@ -411,13 +453,16 @@ export class ReportGeneratorService {
     // Get results for all tests in this course
     const results = await this.resultModel
       .find(query)
-      .populate('student', 'name email')
-      .populate('test', 'name')
-      .populate('subject', 'name')
+      .populate('student', 'full_name email')
+      .populate('test', 'title')
+      .populate('subject', 'title')
       .exec();
 
+    console.log('query', query);
+    console.log('results', results);
+
     // Calculate overall performance metrics
-    const totalTests = results.length;
+    const totalTests = tests.length;
     const completedTests = results.filter(
       (r) => r.status === ResultStatus.FINISHED,
     ).length;
@@ -435,6 +480,55 @@ export class ReportGeneratorService {
       totalPossibleScore > 0
         ? ((totalScore / totalPossibleScore) * 100).toFixed(2)
         : '0';
+
+    // Group performance by subject
+    const subjectMap = new Map();
+    tests.forEach((test: any) => {
+      const subjectId = test.subject?._id.toString();
+      if (!subjectId) return;
+
+      if (!subjectMap.has(subjectId)) {
+        subjectMap.set(subjectId, {
+          id: subjectId,
+          name: test.subject?.title || 'Unknown',
+          totalTests: 0,
+          completedTests: 0,
+          totalScore: 0,
+          totalPossibleScore: 0,
+        });
+      }
+
+      const subjectData = subjectMap.get(subjectId);
+      subjectData.totalTests++;
+    });
+
+    // Add results data to subject mapping
+    results.forEach((result: any) => {
+      const subjectId = result.subject?._id.toString();
+      if (!subjectId || !subjectMap.has(subjectId)) return;
+
+      const subjectData = subjectMap.get(subjectId);
+      if (result.status === ResultStatus.FINISHED) {
+        subjectData.completedTests++;
+      }
+
+      if (result.marksSummary) {
+        subjectData.totalScore += result.marksSummary.obtainedMarks;
+        subjectData.totalPossibleScore += result.marksSummary.totalMarks;
+      }
+    });
+
+    const subjectPerformance = Array.from(subjectMap.values()).map(
+      (subject) => ({
+        ...subject,
+        averageScore:
+          subject.totalPossibleScore > 0
+            ? ((subject.totalScore / subject.totalPossibleScore) * 100).toFixed(
+                2,
+              )
+            : '0',
+      }),
+    );
 
     // Group student performance by student
     const studentMap = new Map();
@@ -484,6 +578,7 @@ export class ReportGeneratorService {
       courseInfo: {
         id: course._id as string,
         name: course.title,
+        code: course.code,
       },
       summary: {
         totalTests,
@@ -491,16 +586,9 @@ export class ReportGeneratorService {
         averageScore,
         totalScore,
         totalPossibleScore,
+        subjectCount: subjectIds.length,
       },
-      subjects: subjects.map((subject) => ({
-        id: subject._id as string,
-        name: subject.title,
-      })),
-      tests: tests.map((test: any) => ({
-        id: test._id,
-        name: test.title,
-        subject: test.subject?.title,
-      })),
+      subjectPerformance,
       studentPerformance,
     };
   }
@@ -518,7 +606,6 @@ export class ReportGeneratorService {
     const courses = await this.courseModel
       .find({
         packages: { $in: [report.package] },
-        status: 'active',
       })
       .lean();
 
@@ -528,7 +615,6 @@ export class ReportGeneratorService {
     const tests = await this.testModel
       .find({
         course: { $in: courseIds },
-        status: 'active',
       })
       .populate('subject')
       .populate('course')
@@ -553,9 +639,9 @@ export class ReportGeneratorService {
     // Get results for all tests in this package
     const results = await this.resultModel
       .find(query)
-      .populate('student', 'name email')
-      .populate('test', 'name')
-      .populate('subject', 'name')
+      .populate('student', 'full_name email')
+      .populate('test', 'title')
+      .populate('subject', 'title')
       .exec();
 
     // Calculate overall metrics
@@ -870,7 +956,6 @@ export class ReportGeneratorService {
     const students = await this.userModel
       .find({
         institute: report.institute,
-        status: 'active',
       })
       .lean();
 
@@ -878,7 +963,6 @@ export class ReportGeneratorService {
     const courses = await this.courseModel
       .find({
         institute: report.institute,
-        status: 'active',
       })
       .lean();
 
@@ -887,7 +971,6 @@ export class ReportGeneratorService {
     const tests = await this.testModel
       .find({
         course: { $in: courseIds },
-        status: 'active',
       })
       .populate('subject')
       .lean();
@@ -905,9 +988,9 @@ export class ReportGeneratorService {
     // Get all results for this institute
     const results = await this.resultModel
       .find(query)
-      .populate('test', 'name')
-      .populate('subject', 'name')
-      .populate('student', 'name')
+      .populate('test', 'title')
+      .populate('subject', 'title')
+      .populate('student', 'full_name')
       .exec();
 
     // Calculate overall metrics
@@ -1095,20 +1178,16 @@ export class ReportGeneratorService {
     report: Report,
   ): Promise<OverallReportData> {
     // Get counts for various entities
+    const studentRoleId = await this.userService.getStudentRoleId();
+    const instituteRoleId = await this.userService.getInstituteRoleId();
     const totalInstitutes = await this.userModel.countDocuments({
-      role: 'institute',
-      status: 'active',
+      role: instituteRoleId,
     });
     const totalStudents = await this.userModel.countDocuments({
-      role: 'student',
-      status: 'active',
+      role: studentRoleId,
     });
-    const totalCourses = await this.courseModel.countDocuments({
-      status: 'active',
-    });
-    const totalTests = await this.testModel.countDocuments({
-      status: 'active',
-    });
+    const totalCourses = await this.courseModel.countDocuments({});
+    const totalTests = await this.testModel.countDocuments({});
 
     // Build query for results
     const query: any = {};
@@ -1123,9 +1202,9 @@ export class ReportGeneratorService {
     // Get all results based on query
     const results = await this.resultModel
       .find(query)
-      .populate('test', 'name')
-      .populate('subject', 'name')
-      .populate('institute', 'name')
+      .populate('test', 'title')
+      .populate('subject', 'title')
+      .populate('institute', 'full_name')
       .exec();
 
     // Calculate overall metrics

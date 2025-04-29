@@ -16,6 +16,7 @@ export interface SubjectInfo {
 export interface CourseInfo {
   id: string;
   name: string;
+  code: string;
 }
 
 export interface TestInfo {
@@ -35,6 +36,7 @@ export interface PerformanceSummary {
   averageScore: string;
   totalScore: number;
   totalPossibleScore: number;
+  subjectCount: number;
 }
 
 export interface SubjectPerformance {
@@ -91,9 +93,10 @@ export interface SubjectReportData {
 export interface CourseReportData {
   courseInfo: CourseInfo;
   summary: PerformanceSummary;
-  subjects: SubjectInfo[];
-  tests: TestInfo[];
+  // subjects: SubjectInfo[];
+  // tests: TestInfo[];
   studentPerformance: any[];
+  subjectPerformance: any[];
 }
 
 export interface TestReportData {

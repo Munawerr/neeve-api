@@ -16,7 +16,11 @@ import { ResultsService } from '../results/results.service';
 import { Role, RoleSchema } from '../roles/schemas/role.schema';
 import { S3Service } from '../s3/s3.service';
 import { Report, ReportSchema } from './schemas/report.schema';
-import { LoginHistory, LoginHistorySchema } from '../auth/schemas/login-history.schema';
+import {
+  LoginHistory,
+  LoginHistorySchema,
+} from '../auth/schemas/login-history.schema';
+import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
 
 @Module({
   imports: [
@@ -29,6 +33,7 @@ import { LoginHistory, LoginHistorySchema } from '../auth/schemas/login-history.
       { name: Course.name, schema: CourseSchema },
       { name: Package.name, schema: PackageSchema },
       { name: Role.name, schema: RoleSchema },
+      { name: Topic.name, schema: TopicSchema },
       { name: LoginHistory.name, schema: LoginHistorySchema },
     ]),
   ],
