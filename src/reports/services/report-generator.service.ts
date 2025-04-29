@@ -427,7 +427,7 @@ export class ReportGeneratorService {
     // Get tests associated with this course
     const tests = await this.testModel
       .find({
-        _ids: { $in: testIds },
+        _id: { $in: testIds },
       })
       .populate('subject')
       .lean();
