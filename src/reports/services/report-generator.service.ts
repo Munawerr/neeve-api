@@ -382,7 +382,7 @@ export class ReportGeneratorService {
       .populate('packages')
       .exec();
 
-    let topicIds: any[] = [];
+    let testIds: any[] = [];
 
     let packageId: any = null;
     const reportCourseId = report.course.toString();
@@ -397,18 +397,24 @@ export class ReportGeneratorService {
 
       const topics = await this.topicModel
         .find({ package: packageId, isParent: true })
+        .populate({
+          path: 'subTopics',
+          model: 'Topic',
+          populate: [{ path: 'tests', model: 'Test' }],
+        })
         .exec();
 
-      topicIds = topics
+      testIds = topics
         .map((topic) =>
-          topic.subTopics.map((subTopic: any) =>
-            typeof subTopic == 'object'
-              ? subTopic._id.toString()
-              : subTopic.toString(),
-          ),
+          topic.subTopics
+            .map((subTopic: any) =>
+              subTopic.tests.map((test: any) => test._id.toString()),
+            )
+            .flat(),
         )
         .flat();
 
+      console.log('Topics:', topics);
       // Make sure we extract test IDs properly, handling both ObjectIDs and references
       // topicIds = topics.map((topic: any) => topic._id.toString());
     } else {
@@ -416,14 +422,12 @@ export class ReportGeneratorService {
     }
 
     // Log to debug
-    console.log('User:', user);
-    console.log('packageId:', packageId);
-    console.log('Extracted testIds:', topicIds.length, topicIds);
+    console.log('Extracted testIds:', testIds.length, testIds);
 
     // Get tests associated with this course
     const tests = await this.testModel
       .find({
-        topic: { $in: topicIds },
+        _ids: { $in: testIds },
       })
       .populate('subject')
       .lean();
@@ -442,7 +446,7 @@ export class ReportGeneratorService {
 
     // Query to filter results
     const query: any = {
-      test: { $in: tests.map((test) => test._id) },
+      test: { $in: tests.map((test) => test._id.toString()) },
     };
 
     if (report.institute) {
