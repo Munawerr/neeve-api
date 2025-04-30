@@ -72,7 +72,7 @@ export class PdfReportService {
     yPos += 10;
 
     doc.setFontSize(12);
-    doc.text(`Name: ${data.studentInfo.full_name}`, margin, yPos);
+    doc.text(`Name: ${data.studentInfo.name}`, margin, yPos);
     yPos += 7;
     doc.text(`Email: ${data.studentInfo.email}`, margin, yPos);
     yPos += 7;
@@ -282,34 +282,390 @@ export class PdfReportService {
   }
 
   private async buildPackageReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Package Information
     doc.setFontSize(16);
-    doc.text('Package Report', 20, 60);
+    doc.text('Package Information', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text('Package-specific report details would be included here.', 20, 80);
+    doc.text(`Description: ${data.packageInfo.description}`, margin, yPos);
+    yPos += 15;
+
+    // Summary
+    doc.setFontSize(16);
+    doc.text('Performance Summary', margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Tests Attempted: ${data.summary.testsAttempted}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Tests Completed: ${data.summary.testsCompleted}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 15;
+
+    // Course Performance
+    if (data.coursePerformance?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Course Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = [
+        'Course',
+        'Tests Attempted',
+        'Completed',
+        'Avg Score',
+        'Students',
+      ];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.coursePerformance.forEach((course: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(course.course, margin, yPos);
+        doc.text(course.testsAttempted.toString(), margin + colWidth, yPos);
+        doc.text(course.testsCompleted.toString(), margin + 2 * colWidth, yPos);
+        doc.text(course.averageScore, margin + 3 * colWidth, yPos);
+        doc.text(course.studentCount.toString(), margin + 4 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 
   private async buildTestReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Test Information
     doc.setFontSize(16);
-    doc.text('Test Report', 20, 60);
+    doc.text('Test Information', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text('Test-specific report details would be included here.', 20, 80);
+    doc.text(`Name: ${data.testInfo.name}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Subject: ${data.testInfo.subject || '-'}`, margin, yPos);
+    yPos += 15;
+
+    // Summary
+    doc.setFontSize(16);
+    doc.text('Performance Summary', margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Attempts: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 15;
+
+    // Question Analysis
+    if (data.questionAnalysis?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Question Analysis', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = [
+        'Question',
+        'Attempts',
+        'Correct',
+        'Correct %',
+        'Avg Time',
+      ];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.questionAnalysis.forEach((question: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(question.questionId, margin, yPos);
+        doc.text(question.attempts.toString(), margin + colWidth, yPos);
+        doc.text(question.correct.toString(), margin + 2 * colWidth, yPos);
+        doc.text(question.correctPercentage, margin + 3 * colWidth, yPos);
+        doc.text(question.averageTime, margin + 4 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
+
+    // Student Results
+    if (data.studentResults?.length > 0) {
+      doc.addPage();
+      yPos = 20;
+
+      doc.setFontSize(16);
+      doc.text('Student Results', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = [
+        'Student',
+        'Score',
+        'Percentage',
+        'Correct',
+        'Incorrect',
+        'Avg Time',
+      ];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.studentResults.forEach((result: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(result.student.name, margin, yPos);
+        doc.text(result.score.toString(), margin + colWidth, yPos);
+        doc.text(result.percentage.toString(), margin + 2 * colWidth, yPos);
+        doc.text(result.correctAnswers.toString(), margin + 3 * colWidth, yPos);
+        doc.text(
+          result.incorrectAnswers.toString(),
+          margin + 4 * colWidth,
+          yPos,
+        );
+        doc.text(result.averageTimePerQuestion, margin + 5 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 
   private async buildInstituteReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Institute Information
     doc.setFontSize(16);
-    doc.text('Institute Report', 20, 60);
+    doc.text('Institute Information', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text(
-      'Institute-specific report details would be included here.',
-      20,
-      80,
-    );
+    doc.text(`Name: ${data.instituteInfo.name}`, margin, yPos);
+    yPos += 15;
+
+    // Summary
+    doc.setFontSize(16);
+    doc.text('Performance Summary', margin, yPos);
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Students: ${data.summary.totalStudents}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Test Attempts: ${data.summary.testAttempts}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 15;
+
+    // Course Performance
+    if (data.coursePerformance?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Course Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = [
+        'Course',
+        'Tests Attempted',
+        'Completed',
+        'Students',
+        'Avg Score',
+      ];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.coursePerformance.forEach((course: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(course.courseName, margin, yPos);
+        doc.text(course.testsAttempted.toString(), margin + colWidth, yPos);
+        doc.text(course.testsCompleted.toString(), margin + 2 * colWidth, yPos);
+        doc.text(course.studentCount.toString(), margin + 3 * colWidth, yPos);
+        doc.text(course.averageScore.toString(), margin + 4 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
+
+    // Subject Performance
+    if (data.subjectPerformance?.length > 0) {
+      doc.addPage();
+      yPos = 20;
+
+      doc.setFontSize(16);
+      doc.text('Subject Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.subjectPerformance.forEach((subject: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(subject.subject, margin, yPos);
+        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
+        doc.text(
+          subject.completedTests.toString(),
+          margin + 2 * colWidth,
+          yPos,
+        );
+        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 
   private async buildOverallReport(doc: jsPDF, data: any): Promise<void> {
+    let yPos = 60;
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // System Summary
     doc.setFontSize(16);
-    doc.text('Overall System Report', 20, 60);
+    doc.text('System Summary', margin, yPos);
+    yPos += 10;
+
     doc.setFontSize(12);
-    doc.text('Overall system report details would be included here.', 20, 80);
+    doc.text(`Total Institutes: ${data.summary.totalInstitutes}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Students: ${data.summary.totalStudents}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Test Attempts: ${data.summary.testAttempts}`, margin, yPos);
+    yPos += 7;
+    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
+    yPos += 15;
+
+    // Institute Performance
+    if (data.institutePerformance?.length > 0) {
+      doc.setFontSize(16);
+      doc.text('Institute Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = [
+        'Institute',
+        'Tests Attempted',
+        'Completed',
+        'Students',
+        'Avg Score',
+      ];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.institutePerformance.forEach((institute: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(institute.institute, margin, yPos);
+        doc.text(institute.testsAttempted.toString(), margin + colWidth, yPos);
+        doc.text(
+          institute.testsCompleted.toString(),
+          margin + 2 * colWidth,
+          yPos,
+        );
+        doc.text(
+          institute.studentCount.toString(),
+          margin + 3 * colWidth,
+          yPos,
+        );
+        doc.text(institute.averageScore, margin + 4 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
+
+    // Subject Performance
+    if (data.subjectPerformance?.length > 0) {
+      doc.addPage();
+      yPos = 20;
+
+      doc.setFontSize(16);
+      doc.text('Subject Performance', margin, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
+      const colWidth = (pageWidth - 2 * margin) / headers.length;
+
+      headers.forEach((header, i) => {
+        doc.text(header, margin + i * colWidth, yPos);
+      });
+      yPos += 7;
+
+      data.subjectPerformance.forEach((subject: any) => {
+        if (yPos > doc.internal.pageSize.height - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        doc.text(subject.subject, margin, yPos);
+        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
+        doc.text(
+          subject.completedTests.toString(),
+          margin + 2 * colWidth,
+          yPos,
+        );
+        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
+        yPos += 7;
+      });
+    }
   }
 }

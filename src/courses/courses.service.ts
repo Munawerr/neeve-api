@@ -8,6 +8,7 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 import { User } from '../users/schemas/user.schema';
 import { Test } from '../tests/schemas/test.schema';
 import { Result, ResultStatus } from '../results/schemas/result.schema';
+import { Topic } from 'src/topics/schemas/topic.schema';
 
 @Injectable()
 export class CoursesService {
@@ -16,6 +17,7 @@ export class CoursesService {
     @InjectModel(Test.name) private testModel: Model<Test>,
     @InjectModel(Result.name) private resultModel: Model<Result>,
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(User.name) private topicModel: Model<Topic>,
   ) {}
 
   create(createCourseDto: CreateCourseDto): Promise<Course> {
@@ -51,19 +53,7 @@ export class CoursesService {
   }
 
   async getAllCoursesForDropdown(instituteId?: string): Promise<any[]> {
-    const query: any = {};
-
-    // Filter by institute if provided
-    if (instituteId) {
-      query.institute = instituteId;
-    }
-
-    const courses = await this.courseModel
-      .find(query)
-      .select('_id title')
-      .sort({ title: 1 })
-      .lean()
-      .exec();
+    const courses = await this.getInstituteCourses(instituteId);
 
     return courses.map((course) => ({
       _id: course._id,
@@ -89,6 +79,21 @@ export class CoursesService {
 
   remove(id: string): Promise<Course | null> {
     return this.courseModel.findByIdAndDelete(id).exec();
+  }
+
+  async getInstituteCourses(instituteId?: string): Promise<Course[]> {
+    const user = await this.userModel
+      .findById(instituteId)
+      .populate({
+        path: 'packages',
+        model: 'Package',
+        populate: [{ path: 'course', model: 'Course' }],
+      })
+      .exec();
+
+    return user
+      ? user.packages.flatMap((packageItem: any) => packageItem.course)
+      : [];
   }
 
   // Dashboard Analytics Methods
@@ -244,17 +249,11 @@ export class CoursesService {
   // Institute-specific analytics methods
 
   async countInstituteCoursesById(instituteId: string): Promise<number> {
-    return await this.courseModel.countDocuments({
-      institute: instituteId,
-    });
+    return (await this.getInstituteCourses(instituteId)).length;
   }
 
   async getInstituteTests(instituteId: string): Promise<any[]> {
-    const courseIds = await this.courseModel
-      .find({
-        institute: instituteId,
-      })
-      .select('_id');
+    const courseIds = await this.getInstituteCourses(instituteId);
 
     return await this.testModel
       .find({
@@ -393,21 +392,47 @@ export class CoursesService {
     limit: number,
   ): Promise<any[]> {
     // Find courses for this institute
-    const courses = await this.courseModel
-      .find({
-        institute: instituteId,
-      })
-      .lean();
+    const courses = await this.getInstituteCourses(instituteId);
 
     const coursesWithAttempts: any[] = [];
 
     for (const course of courses) {
       // Find tests belonging to this course
-      const tests = await this.testModel
-        .find({
-          course: course._id,
-        })
-        .select('_id');
+
+      const user: any = await this.userModel
+        .findById(instituteId)
+        .populate('packages')
+        .exec();
+
+      let tests: any[] = [];
+
+      let packageId: any = null;
+      const reportCourseId = course._id as string;
+      if (user) {
+        for (let x = 0; x < user.packages.length; x++) {
+          const courseId = user.packages[x].course.toString();
+          if (courseId == reportCourseId) {
+            packageId = user.toObject().packages[x]._id.toString();
+            break;
+          }
+        }
+
+        const topics = await this.topicModel
+          .find({ package: packageId, isParent: true })
+          .populate({
+            path: 'tests',
+            model: 'Test',
+            populate: [
+              {
+                path: 'subject',
+                model: 'Subject',
+              },
+            ],
+          })
+          .exec();
+
+        tests = topics.map((topic) => topic.tests).flat();
+      }
 
       const testIds = tests.map((test) => test._id);
 
@@ -431,11 +456,7 @@ export class CoursesService {
 
   async getInstituteAverageTestScores(instituteId: string): Promise<any[]> {
     // Get all tests available for this institute
-    const courseIds = await this.courseModel
-      .find({
-        institute: instituteId,
-      })
-      .select('_id');
+    const courseIds = await this.getInstituteCourses(instituteId);
 
     const tests = await this.testModel
       .find({
@@ -649,40 +670,40 @@ export class CoursesService {
     ]);
   }
 
-  async getInstituteDifficultTopics(instituteId: string, limit: number = 5): Promise<any[]> {
+  async getInstituteDifficultTopics(
+    instituteId: string,
+    limit: number = 5,
+  ): Promise<any[]> {
     return this.courseModel.aggregate([
-      {
-        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
-      },
       {
         $lookup: {
           from: 'subjects',
           localField: '_id',
           foreignField: 'course',
-          as: 'subjects'
-        }
+          as: 'subjects',
+        },
       },
       {
-        $unwind: '$subjects'
+        $unwind: '$subjects',
       },
       {
         $lookup: {
           from: 'topics',
           localField: 'subjects._id',
           foreignField: 'subject',
-          as: 'topics'
-        }
+          as: 'topics',
+        },
       },
       {
-        $unwind: '$topics'
+        $unwind: '$topics',
       },
       {
         $lookup: {
           from: 'results',
           localField: 'topics._id',
           foreignField: 'topic',
-          as: 'results'
-        }
+          as: 'results',
+        },
       },
       {
         $project: {
@@ -690,48 +711,48 @@ export class CoursesService {
           topicName: '$topics.title',
           subjectName: '$subjects.title',
           averageScore: {
-            $avg: '$results.marksSummary.averageMarks'
+            $avg: '$results.marksSummary.averageMarks',
           },
-          attemptCount: { $size: '$results' }
-        }
+          attemptCount: { $size: '$results' },
+        },
       },
       {
         $match: {
-          attemptCount: { $gt: 0 }
-        }
+          attemptCount: { $gt: 0 },
+        },
       },
       {
-        $sort: { averageScore: 1 }
+        $sort: { averageScore: 1 },
       },
       {
-        $limit: limit
-      }
+        $limit: limit,
+      },
     ]);
   }
 
   async getInstituteSubjectPerformance(instituteId: string): Promise<any[]> {
     return this.courseModel.aggregate([
       {
-        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
+        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) },
       },
       {
         $lookup: {
           from: 'subjects',
           localField: '_id',
           foreignField: 'course',
-          as: 'subjects'
-        }
+          as: 'subjects',
+        },
       },
       {
-        $unwind: '$subjects'
+        $unwind: '$subjects',
       },
       {
         $lookup: {
           from: 'results',
           localField: 'subjects._id',
           foreignField: 'subject',
-          as: 'results'
-        }
+          as: 'results',
+        },
       },
       {
         $project: {
@@ -745,30 +766,38 @@ export class CoursesService {
               $multiply: [
                 {
                   $divide: [
-                    { $size: { $filter: { input: '$results', as: 'result', cond: { $eq: ['$$result.status', 'finished'] } } } },
-                    { $size: '$results' }
-                  ]
+                    {
+                      $size: {
+                        $filter: {
+                          input: '$results',
+                          as: 'result',
+                          cond: { $eq: ['$$result.status', 'finished'] },
+                        },
+                      },
+                    },
+                    { $size: '$results' },
+                  ],
                 },
-                100
-              ]
-            }
-          }
-        }
+                100,
+              ],
+            },
+          },
+        },
       },
       {
-        $sort: { 'performance.averageScore': -1 }
-      }
+        $sort: { 'performance.averageScore': -1 },
+      },
     ]);
   }
 
-  async getInstituteStudentPerformanceTrend(instituteId: string, days: number = 30): Promise<any[]> {
+  async getInstituteStudentPerformanceTrend(
+    instituteId: string,
+    days: number = 30,
+  ): Promise<any[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     return this.courseModel.aggregate([
-      {
-        $match: { institute: new MongooseSchema.Types.ObjectId(instituteId) }
-      },
       {
         $lookup: {
           from: 'results',
@@ -778,39 +807,49 @@ export class CoursesService {
               $match: {
                 $expr: {
                   $and: [
-                    { $eq: ['$institute', new MongooseSchema.Types.ObjectId(instituteId)] },
-                    { $gte: ['$finishedAt', startDate] }
-                  ]
-                }
-              }
-            }
+                    {
+                      $eq: [
+                        '$institute',
+                        new MongooseSchema.Types.ObjectId(instituteId),
+                      ],
+                    },
+                    { $gte: ['$finishedAt', startDate] },
+                  ],
+                },
+              },
+            },
           ],
-          as: 'results'
-        }
+          as: 'results',
+        },
       },
       {
-        $unwind: '$results'
+        $unwind: '$results',
       },
       {
         $group: {
           _id: {
-            date: { $dateToString: { format: '%Y-%m-%d', date: '$results.finishedAt' } }
+            date: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$results.finishedAt',
+              },
+            },
           },
           averageScore: { $avg: '$results.marksSummary.averageMarks' },
-          totalAttempts: { $sum: 1 }
-        }
+          totalAttempts: { $sum: 1 },
+        },
       },
       {
         $project: {
           _id: 0,
           date: '$_id.date',
           averageScore: { $round: ['$averageScore', 2] },
-          totalAttempts: 1
-        }
+          totalAttempts: 1,
+        },
       },
       {
-        $sort: { date: 1 }
-      }
+        $sort: { date: 1 },
+      },
     ]);
   }
 }

@@ -105,7 +105,7 @@ export class ReportsController {
         isAdmin,
         page,
         limit,
-        search
+        search,
       );
 
       return {
@@ -131,8 +131,12 @@ export class ReportsController {
       status: HttpStatus.OK,
       message: 'Report types and formats retrieved successfully',
       data: {
-        types: Object.values(ReportType),
-        formats: Object.values(ReportFormat),
+        types: Object.values(ReportType).filter(
+          (type) => ![ReportType.PACKAGE].includes(type),
+        ),
+        formats: Object.values(ReportFormat).filter(
+          (format) => format !== ReportFormat.EXCEL,
+        ),
       },
     };
   }

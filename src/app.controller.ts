@@ -393,118 +393,42 @@ export class AppController {
         };
       }
 
-      const userObj = user.toObject();
-      const isAdmin = userObj.role && userObj.role.slug === 'admin';
-      const isInstitute = userObj.role && userObj.role.slug === 'institute';
-      let analyticsData: any = {};
+      const totalUsers = await this.usersService.countAllUsers();
+      const activeUsers = await this.usersService.countActiveUsers(30);
+      const totalInstitutes = await this.usersService.countInstitutes();
+      const totalCourses = await this.coursesService.countAllCourses();
 
-      if (isAdmin) {
-        const totalUsers = await this.usersService.countAllUsers();
-        const activeUsers = await this.usersService.countActiveUsers(30);
-        const totalInstitutes = await this.usersService.countInstitutes();
-        const totalCourses = await this.coursesService.countAllCourses();
+      const userGrowthTrend = await this.usersService.getUserGrowthTrend(6);
+      const instituteGrowthTrend = await this.usersService.getInstituteGrowthTrend(6);
+      const topInstitutes = await this.usersService.getTopPerformingInstitutes(5);
+      const hourlyEngagement = await this.usersService.getHourlyEngagement();
 
-        const userGrowthTrend = await this.usersService.getUserGrowthTrend(6);
-        const instituteGrowthTrend =
-          await this.usersService.getInstituteGrowthTrend(6);
-        const topInstitutes =
-          await this.usersService.getTopPerformingInstitutes(5);
-        // const subjectWiseCompletion =
-        //   await this.coursesService.getSubjectWiseTestCompletion();
-        const hourlyEngagement = await this.usersService.getHourlyEngagement();
-
-        analyticsData = {
-          userMetrics: {
-            totalUsers,
-            activeUsers,
-            newUsersTrend: await this.usersService.getNewUsersByMonth(6),
-            engagementTrend: await this.usersService.getUserEngagementByDay(30),
-            growthTrend: userGrowthTrend,
-            hourlyEngagement,
-          },
-          instituteMetrics: {
-            totalInstitutes,
-            growthTrend: instituteGrowthTrend,
-            topPerformers: topInstitutes,
-          },
-          courseMetrics: {
-            totalCourses,
-            popularCourses: await this.coursesService.getMostPopularCourses(5),
-            // subjectWiseCompletion,
-          },
-          testMetrics: {
-            totalTests: await this.coursesService.countAllTests(),
-            totalAttempts: await this.coursesService.countAllTestAttempts(),
-            testCompletionTrend:
-              await this.coursesService.getTestsCompletedByDay(30),
-            mostPopularTests: await this.coursesService.getMostPopularTests(5),
-            averageScores: await this.coursesService.getAverageTestScores(),
-          },
-        };
-      } else if (isInstitute) {
-        const instituteId = user._id as string;
-        const totalStudents =
-          await this.usersService.countInstituteUsers(instituteId);
-        const activeStudents =
-          await this.usersService.countActiveInstituteUsers(instituteId, 30);
-
-        const studentPerformanceTrend =
-          await this.coursesService.getInstituteStudentPerformanceTrend(
-            instituteId,
-            30,
-          );
-        const subjectPerformance =
-          await this.coursesService.getInstituteSubjectPerformance(instituteId);
-        const difficultTopics =
-          await this.coursesService.getInstituteDifficultTopics(instituteId);
-        const peakActivityTimes =
-          await this.usersService.getInstituteActivityTimes(instituteId);
-
-        analyticsData = {
-          studentMetrics: {
-            totalStudents,
-            activeStudents,
-            newStudentsTrend:
-              await this.usersService.getNewInstituteUsersByMonth(
-                instituteId,
-                6,
-              ),
-            engagementTrend:
-              await this.usersService.getInstituteUserEngagementByDay(
-                instituteId,
-                30,
-              ),
-            performanceTrend: studentPerformanceTrend,
-            peakActivityTimes,
-          },
-          academicMetrics: {
-            subjectPerformance,
-            difficultTopics,
-            improvementAreas: difficultTopics.slice(0, 3),
-          },
-          testMetrics: {
-            totalTests: (
-              await this.coursesService.getInstituteTests(instituteId)
-            ).length,
-            totalAttempts:
-              await this.coursesService.countInstituteTestAttempts(instituteId),
-            testCompletionTrend:
-              await this.coursesService.getInstituteTestsCompletedByDay(
-                instituteId,
-                30,
-              ),
-            mostPopularTests:
-              await this.coursesService.getMostPopularInstituteTests(
-                instituteId,
-                5,
-              ),
-            averageScores:
-              await this.coursesService.getInstituteAverageTestScores(
-                instituteId,
-              ),
-          },
-        };
-      }
+      const analyticsData = {
+        userMetrics: {
+          totalUsers,
+          activeUsers,
+          newUsersTrend: await this.usersService.getNewUsersByMonth(6),
+          engagementTrend: await this.usersService.getUserEngagementByDay(30),
+          growthTrend: userGrowthTrend,
+          hourlyEngagement,
+        },
+        instituteMetrics: {
+          totalInstitutes,
+          growthTrend: instituteGrowthTrend,
+          topPerformers: topInstitutes,
+        },
+        courseMetrics: {
+          totalCourses,
+          popularCourses: await this.coursesService.getMostPopularCourses(5),
+        },
+        testMetrics: {
+          totalTests: await this.coursesService.countAllTests(),
+          totalAttempts: await this.coursesService.countAllTestAttempts(),
+          testCompletionTrend: await this.coursesService.getTestsCompletedByDay(30),
+          mostPopularTests: await this.coursesService.getMostPopularTests(5),
+          averageScores: await this.coursesService.getAverageTestScores(),
+        },
+      };
 
       return {
         status: HttpStatus.OK,
@@ -512,10 +436,14 @@ export class AppController {
         data: analyticsData,
       };
     } catch (error) {
-      console.log('Error retrieving analytics data:', error);
+      console.error('Error retrieving analytics data:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: 'Failed to retrieve analytics data',
+        message: `Failed to retrieve analytics data: ${error.name}`,
         error: error.message,
       };
     }
