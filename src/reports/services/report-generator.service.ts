@@ -382,7 +382,7 @@ export class ReportGeneratorService {
       .populate('packages')
       .exec();
 
-    let testIds: any[] = [];
+    let tests: any[] = [];
 
     let packageId: any = null;
     const reportCourseId = report.course.toString();
@@ -398,39 +398,29 @@ export class ReportGeneratorService {
       const topics = await this.topicModel
         .find({ package: packageId, isParent: true })
         .populate({
-          path: 'subTopics',
-          model: 'Topic',
-          populate: [{ path: 'tests', model: 'Test' }],
+          path: 'tests',
+          model: 'Test',
+          populate: [
+            {
+              path: 'subject',
+              model: 'Subject',
+            },
+          ],
         })
         .exec();
 
-      testIds = topics
-        .map((topic) =>
-          topic.subTopics
-            .map((subTopic: any) =>
-              subTopic.tests.map((test: any) => test._id.toString()),
-            )
-            .flat(),
-        )
-        .flat();
-
-      console.log('Topics:', topics);
-      // Make sure we extract test IDs properly, handling both ObjectIDs and references
-      // topicIds = topics.map((topic: any) => topic._id.toString());
+      tests = topics.map((topic) => topic.tests).flat();
     } else {
       throw new NotFoundException(`User not found`);
     }
 
-    // Log to debug
-    console.log('Extracted testIds:', testIds.length, testIds);
-
     // Get tests associated with this course
-    const tests = await this.testModel
-      .find({
-        _id: { $in: testIds },
-      })
-      .populate('subject')
-      .lean();
+    // const tests = await this.testModel
+    //   .find({
+    //     _id: { $in: testIds },
+    //   })
+    //   .populate('subject')
+    //   .lean();
 
     // Log if tests are empty
     if (!tests.length) {
@@ -467,9 +457,6 @@ export class ReportGeneratorService {
       .populate('test', 'title')
       .populate('subject', 'title')
       .exec();
-
-    console.log('query', query);
-    console.log('results', results);
 
     // Calculate overall performance metrics
     const totalTests = tests.length;
@@ -793,11 +780,7 @@ export class ReportGeneratorService {
   }
 
   private async getTestReportData(report: Report): Promise<TestReportData> {
-    const test = await this.testModel
-      .findById(report.test)
-      .populate('subject')
-      .populate('course')
-      .lean();
+    const test = await this.testModel.findById(report.test).lean();
 
     if (!test) {
       throw new NotFoundException(`Test with ID ${report.test} not found`);
@@ -951,6 +934,21 @@ export class ReportGeneratorService {
     };
   }
 
+  async getInstituteCourses(instituteId?: string): Promise<Course[]> {
+    const user = await this.userModel
+      .findById(instituteId)
+      .populate({
+        path: 'packages',
+        model: 'Package',
+        populate: [{ path: 'course', model: 'Course' }],
+      })
+      .exec();
+
+    return user
+      ? user.packages.flatMap((packageItem: any) => packageItem.course)
+      : [];
+  }
+
   private async getInstituteReportData(
     report: Report,
   ): Promise<InstituteReportData> {
@@ -970,11 +968,7 @@ export class ReportGeneratorService {
       .lean();
 
     // Get courses offered by this institute
-    const courses = await this.courseModel
-      .find({
-        institute: report.institute,
-      })
-      .lean();
+    const courses = await this.getInstituteCourses(report.institute.toString());
 
     // Get tests for all courses of this institute
     const courseIds = courses.map((course) => course._id);
@@ -1032,7 +1026,7 @@ export class ReportGeneratorService {
       if (!test || !test.course) return;
 
       const courseId = test.course.toString();
-      const course = courses.find((c) => c._id.toString() === courseId);
+      const course = courses.find((c: any) => c._id.toString() === courseId);
       const courseName = course?.title || 'Unknown';
 
       if (!courseMap.has(courseId)) {
