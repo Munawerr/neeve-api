@@ -17,7 +17,7 @@ export class CoursesService {
     @InjectModel(Test.name) private testModel: Model<Test>,
     @InjectModel(Result.name) private resultModel: Model<Result>,
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(User.name) private topicModel: Model<Topic>,
+    @InjectModel(Topic.name) private topicModel: Model<Topic>,
   ) {}
 
   create(createCourseDto: CreateCourseDto): Promise<Course> {

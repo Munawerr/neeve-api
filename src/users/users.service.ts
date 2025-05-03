@@ -388,7 +388,7 @@ export class UsersService {
           0,
         ) /
         testsTaken /
-        60000;
+        1000; // Division by 1000 converts milliseconds to seconds
 
       const correctAnswers = uniqueResultsArray.reduce(
         (sum, result) => sum + result.marksSummary.correctAnswers,
@@ -405,6 +405,77 @@ export class UsersService {
         0,
       );
 
+      const totalAnswersInclSkipped =
+        correctAnswers + incorrectAnswers + skippedQuestions;
+      const totalAnswers = correctAnswers + incorrectAnswers;
+
+      // Calculate success chance based on multiple factors
+      const successChance = Math.min(
+        100,
+        Math.max(
+          0,
+          (correctAnswers / totalAnswers) * 40 + // Weight for correct answer ratio
+            percentage * 0.3 + // Weight for overall score
+            Math.max(0, 100 - percentile) * 0.3, // Weight for class performance
+        ),
+      );
+
+      // Get login history for study time analytics
+      const studyTimeData = await this.loginHistoryModel.aggregate([
+        {
+          $match: {
+            userId: new Types.ObjectId(user._id as string),
+            loginTime: {
+              $gte: new Date(new Date().getFullYear(), 0, 1),
+              $lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              month: { $subtract: [{ $month: '$loginTime' }, 1] }, // Convert to 0-based month
+              day: { $dayOfMonth: '$loginTime' },
+              dayOfWeek: {
+                $subtract: [
+                  {
+                    $cond: [
+                      { $eq: [{ $dayOfWeek: '$loginTime' }, 1] },
+                      7,
+                      { $dayOfWeek: '$loginTime' },
+                    ],
+                  },
+                  1,
+                ],
+              },
+            },
+            loginCount: { $sum: 1 },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            month: '$_id.month',
+            day: '$_id.day',
+            dayOfWeek: {
+              $cond: [
+                { $eq: ['$_id.dayOfWeek', 7] },
+                6,
+                { $subtract: ['$_id.dayOfWeek', 1] },
+              ],
+            },
+            hours: { $min: [{ $multiply: ['$loginCount', 2] }, 24] }, // Each login counts as 2 hours, max 24
+          },
+        },
+        {
+          $sort: {
+            month: 1,
+            day: 1,
+            dayOfWeek: 1,
+          },
+        },
+      ]);
+
       return {
         testsTaken,
         totalScore,
@@ -417,6 +488,10 @@ export class UsersService {
         correctAnswers,
         incorrectAnswers,
         skippedQuestions,
+        totalAnswersInclSkipped,
+        totalAnswers,
+        successChance,
+        studyTimeData,
       };
     } else if (_user.role && _user.role.slug === 'admin') {
       const instituteCount = await this.userModel.countDocuments({

@@ -5,6 +5,7 @@ export enum TestType {
   MOCK = 'mock',
   PRACTICE = 'practice',
   TEST = 'test',
+  SCREENING = 'screening',
 }
 
 @Schema({ timestamps: true })
