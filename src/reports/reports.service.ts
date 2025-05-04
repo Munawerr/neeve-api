@@ -11,12 +11,18 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { FilterReportDto } from './dto/filter-report.dto';
 import { ReportGeneratorService } from './services/report-generator.service';
 import { User } from '../users/schemas/user.schema';
+import { Subject } from '../subjects/schemas/subject.schema';
+import { Course } from '../courses/schemas/course.schema';
+import { Test } from '../tests/schemas/test.schema';
 
 @Injectable()
 export class ReportsService {
   constructor(
     @InjectModel(Report.name) private reportModel: Model<Report>,
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Subject.name) private subjectModel: Model<Subject>,
+    @InjectModel(Course.name) private courseModel: Model<Course>,
+    @InjectModel(Test.name) private testModel: Model<Test>,
     private reportGeneratorService: ReportGeneratorService,
   ) {}
 
@@ -37,6 +43,11 @@ export class ReportsService {
     // Validate required fields based on report type
     this.validateReportFields(createReportDto);
 
+    // Generate report name if not provided
+    if (!createReportDto.name) {
+      createReportDto.name = await this.generateReportName(createReportDto);
+    }
+
     // Create a new report
     const newReport = new this.reportModel({
       ...createReportDto,
@@ -55,6 +66,62 @@ export class ReportsService {
       );
 
     return savedReport;
+  }
+
+  private async generateReportName(
+    reportDto: CreateReportDto,
+  ): Promise<string> {
+    const formatDate = (date: string) => {
+      if (!date) return '';
+      return new Date(date)
+        .toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+        .toUpperCase();
+    };
+
+    let name = '';
+    const dateRange = reportDto.dateRange
+      ? ` ${formatDate(reportDto.dateRange.startDate)} - ${formatDate(reportDto.dateRange.endDate)}`
+      : '';
+
+    switch (reportDto.reportType) {
+      case ReportType.STUDENT:
+        const student = await this.userModel.findById(reportDto.student);
+        name = `${student?.full_name || 'Student'}${dateRange} - Performance Report`;
+        break;
+
+      case ReportType.SUBJECT:
+        const subject = await this.subjectModel.findById(reportDto.subject);
+        name = `${subject?.title || 'Subject'}${dateRange} - Subject Report`;
+        break;
+
+      case ReportType.COURSE:
+        const course = await this.courseModel.findById(reportDto.course);
+        name = `${course?.title || 'Course'}${dateRange} - Course Report`;
+        break;
+
+      case ReportType.TEST:
+        const test = await this.testModel.findById(reportDto.test);
+        name = `${test?.title || 'Test'}${dateRange} - Test Report`;
+        break;
+
+      case ReportType.INSTITUTE:
+        const institute = await this.userModel.findById(reportDto.institute);
+        name = `${institute?.full_name || 'Institute'}${dateRange} - Institute Report`;
+        break;
+
+      case ReportType.OVERALL:
+        name = `Overall Performance Report${dateRange}`;
+        break;
+
+      default:
+        name = `Report${dateRange}`;
+    }
+
+    return name;
   }
 
   private validateReportFields(createReportDto: CreateReportDto): void {

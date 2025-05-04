@@ -6,6 +6,7 @@ import { Course, CourseSchema } from './schemas/course.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Result, ResultSchema } from '../results/schemas/result.schema';
 import { Test, TestSchema } from '../tests/schemas/test.schema';
+import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
 import { S3Service } from 'src/s3/s3.service';
 
 @Module({
@@ -15,6 +16,7 @@ import { S3Service } from 'src/s3/s3.service';
       { name: Test.name, schema: TestSchema },
       { name: User.name, schema: UserSchema },
       { name: Result.name, schema: ResultSchema },
+      { name: Topic.name, schema: TopicSchema },
     ]),
   ],
   controllers: [CoursesController],

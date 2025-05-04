@@ -16,6 +16,7 @@ import { ResultsModule } from './results/results.module';
 import { QuestionResultsModule } from './question-results/question-results.module';
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
 import { ReportsModule } from './reports/reports.module'; // Import the new ReportsModule
+import { AnalyticsModule } from './analytics/analytics.module'; // Import AnalyticsModule
 
 import { Role, RoleSchema } from './roles/schemas/role.schema';
 import { User, UserSchema } from './users/schemas/user.schema'; // Import User schema
@@ -54,6 +55,7 @@ import { ConfigModule } from '@nestjs/config'; // Import ConfigModule and Config
 import { LoginHistoryModule } from './auth/login-history.module';
 import { SmsService } from './sms/sms.service';
 import { NotificationsModule } from './notifications/notifications.module'; // Import NotificationsModule
+import { CacheModule } from '@nestjs/cache-manager'; // Import CacheModule
 
 env.config();
 
@@ -66,6 +68,11 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
     ConfigModule.forRoot({
       isGlobal: true,
     }), // Add ConfigModule with isGlobal option
+
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 300000, // 5 minutes in milliseconds
+    }),
 
     MongooseModule.forRoot(DB_URL),
     JwtModule.register({
@@ -108,6 +115,7 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
     LoginHistoryModule, // Add LoginHistoryModule
     ReportsModule, // Add the new ReportsModule
     NotificationsModule, // Add NotificationsModule
+    AnalyticsModule, // Add AnalyticsModule
   ],
   controllers: [AppController],
   providers: [AppService, AuthService, SmsService],

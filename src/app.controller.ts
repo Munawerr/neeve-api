@@ -7,7 +7,10 @@ import {
   UseGuards,
   Headers,
   Req,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import {
   ApiTags,
   ApiOperation,
@@ -32,6 +35,7 @@ import { AuthService } from './auth/auth.service';
 import { CoursesService } from './courses/courses.service';
 import { UsersService } from './users/users.service';
 import { Course } from './courses/schemas/course.schema';
+import { AnalyticsService } from './analytics/analytics.service';
 
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Messages } from './utils/messages';
@@ -41,10 +45,12 @@ import { LoginDto } from './dto/login.dto';
 @Controller()
 export class AppController {
   constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly appService: AppService,
     private readonly authService: AuthService,
     private readonly coursesService: CoursesService,
     private readonly usersService: UsersService,
+    private readonly analyticsService: AnalyticsService, // Add analytics service
   ) {}
 
   @Get()
@@ -384,6 +390,18 @@ export class AppController {
       }
 
       const userId = decodedToken.sub;
+
+      // Try to get data from cache
+      const cacheKey = `dashboard_analytics_${userId}`;
+      const cachedData = await this.cacheManager.get(cacheKey);
+      if (cachedData) {
+        return {
+          status: HttpStatus.OK,
+          message: 'Analytics data retrieved from cache',
+          data: cachedData,
+        };
+      }
+
       const user = await this.usersService.getInstituteUser(userId, true);
 
       if (!user) {
@@ -393,42 +411,148 @@ export class AppController {
         };
       }
 
-      const totalUsers = await this.usersService.countAllUsers();
-      const activeUsers = await this.usersService.countActiveUsers(30);
-      const totalInstitutes = await this.usersService.countInstitutes();
-      const totalCourses = await this.coursesService.countAllCourses();
+      let analyticsData = {};
+      const isAdmin = user.toObject().role.slug === 'admin';
 
-      const userGrowthTrend = await this.usersService.getUserGrowthTrend(6);
-      const instituteGrowthTrend = await this.usersService.getInstituteGrowthTrend(6);
-      const topInstitutes = await this.usersService.getTopPerformingInstitutes(5);
-      const hourlyEngagement = await this.usersService.getHourlyEngagement();
+      if (isAdmin) {
+        const totalUsers = await this.usersService.countAllUsers();
+        const activeUsers = await this.usersService.countActiveUsers(30);
+        const totalInstitutes = await this.usersService.countInstitutes();
+        const totalCourses = await this.coursesService.countAllCourses();
 
-      const analyticsData = {
-        userMetrics: {
-          totalUsers,
-          activeUsers,
-          newUsersTrend: await this.usersService.getNewUsersByMonth(6),
-          engagementTrend: await this.usersService.getUserEngagementByDay(30),
-          growthTrend: userGrowthTrend,
-          hourlyEngagement,
-        },
-        instituteMetrics: {
-          totalInstitutes,
-          growthTrend: instituteGrowthTrend,
-          topPerformers: topInstitutes,
-        },
-        courseMetrics: {
-          totalCourses,
-          popularCourses: await this.coursesService.getMostPopularCourses(5),
-        },
-        testMetrics: {
-          totalTests: await this.coursesService.countAllTests(),
-          totalAttempts: await this.coursesService.countAllTestAttempts(),
-          testCompletionTrend: await this.coursesService.getTestsCompletedByDay(30),
-          mostPopularTests: await this.coursesService.getMostPopularTests(5),
-          averageScores: await this.coursesService.getAverageTestScores(),
-        },
-      };
+        const userGrowthTrend = await this.usersService.getUserGrowthTrend(6);
+        const instituteGrowthTrend =
+          await this.usersService.getInstituteGrowthTrend(6);
+        const topInstitutes =
+          await this.usersService.getTopPerformingInstitutes(5);
+        const hourlyEngagement = await this.usersService.getHourlyEngagement();
+
+        // Get resource and video analytics
+        const resourceViewsLast7Days =
+          await this.analyticsService.getResourceViewsLast7Days();
+        const videoViewsLast7Days =
+          await this.analyticsService.getVideoViewsLast7Days();
+        const openDiscussionsCount =
+          await this.analyticsService.getOpenDiscussionsCount();
+        const liveClassesMetrics =
+          await this.analyticsService.getLiveClassesMetrics();
+
+        // Get last 7 days test completion data
+        const testCompletionTrend =
+          await this.coursesService.getTestsCompletedByDay(7);
+
+        analyticsData = {
+          userMetrics: {
+            totalUsers,
+            activeUsers,
+            newUsersTrend: await this.usersService.getNewUsersByMonth(6),
+            engagementTrend: await this.usersService.getUserEngagementByDay(30),
+            growthTrend: userGrowthTrend,
+            hourlyEngagement,
+          },
+          instituteMetrics: {
+            totalInstitutes,
+            growthTrend: instituteGrowthTrend,
+            topPerformers: topInstitutes,
+          },
+          courseMetrics: {
+            totalCourses,
+            popularCourses: await this.coursesService.getMostPopularCourses(5),
+          },
+          testMetrics: {
+            totalTests: await this.coursesService.countAllTests(),
+            totalAttempts: await this.coursesService.countAllTestAttempts(),
+            testCompletionTrend,
+            mostPopularTests: await this.coursesService.getMostPopularTests(5),
+            averageScores: await this.coursesService.getAverageTestScores(),
+          },
+          contentMetrics: {
+            resourceViewsLast7Days,
+            videoViewsLast7Days,
+            openDiscussionsCount,
+            liveClassesMetrics,
+          },
+        };
+      } else {
+        const userId = user._id as string;
+        const totalUsers = await this.usersService.countAllUsers(userId);
+        const activeUsers = await this.usersService.countActiveUsers(
+          30,
+          userId,
+        );
+        const userGrowthTrend = await this.usersService.getUserGrowthTrend(
+          6,
+          userId,
+        );
+        const hourlyEngagement =
+          await this.usersService.getHourlyEngagement(userId);
+
+        // Get all students for this institute and count those with success chance >= 80%
+        const students = await this.usersService.getInstituteUsers(userId);
+        let topStudentsCount = 0;
+        for (const student of students) {
+          const analytics = await this.usersService.getUserAnalytics(student);
+          if (analytics.successChance >= 80) {
+            topStudentsCount++;
+          }
+        }
+
+        const totalCourses = user.packages.length;
+
+        // Get resource and video analytics
+        const resourceViewsLast7Days =
+          await this.analyticsService.getResourceViewsLast7Days(userId);
+        const videoViewsLast7Days =
+          await this.analyticsService.getVideoViewsLast7Days(userId);
+        const openDiscussionsCount =
+          await this.analyticsService.getOpenDiscussionsCount(userId);
+        const liveClassesMetrics =
+          await this.analyticsService.getLiveClassesMetrics(userId);
+
+        analyticsData = {
+          userMetrics: {
+            totalUsers,
+            activeUsers,
+            topStudents: topStudentsCount,
+            newUsersTrend: await this.usersService.getNewInstituteUsersByMonth(
+              userId,
+              6,
+            ),
+            engagementTrend:
+              await this.usersService.getInstituteUserEngagementByDay(
+                userId,
+                30,
+              ),
+            growthTrend: userGrowthTrend,
+            hourlyEngagement,
+          },
+          courseMetrics: {
+            totalCourses,
+            popularCourses:
+              await this.coursesService.getMostPopularInstituteCourses(
+                userId,
+                5,
+              ),
+          },
+          testMetrics: {
+            totalTests: await this.coursesService.countAllTests(),
+            totalAttempts: await this.coursesService.countAllTestAttempts(),
+            testCompletionTrend:
+              await this.coursesService.getTestsCompletedByDay(7, userId),
+            mostPopularTests: await this.coursesService.getMostPopularTests(5),
+            averageScores: await this.coursesService.getAverageTestScores(),
+          },
+          contentMetrics: {
+            resourceViewsLast7Days,
+            videoViewsLast7Days,
+            openDiscussionsCount,
+            liveClassesMetrics,
+          },
+        };
+      }
+
+      // Store analytics data in cache before returning
+      await this.cacheManager.set(cacheKey, analyticsData, 300000); // Cache for 5 minutes
 
       return {
         status: HttpStatus.OK,
@@ -439,7 +563,7 @@ export class AppController {
       console.error('Error retrieving analytics data:', {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,

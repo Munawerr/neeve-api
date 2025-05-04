@@ -34,6 +34,10 @@ import {
 import { PackagesService } from 'src/packages/packages.service';
 import { Workbook } from 'exceljs';
 import { Response, Express } from 'express';
+import { CreateStaffUserDto } from './dto/create-staff-user.dto';
+import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
+import { CreateRoleDto } from 'src/roles/dto/create-role.dto';
+import { UpdateRoleDto } from 'src/roles/dto/update-role.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -251,6 +255,14 @@ export class UsersController {
         instituteId,
         true,
       );
+
+      if (instituteUser && instituteUser.toObject().role?.slug == 'student') {
+        return {
+          status: HttpStatus.OK,
+          message: 'Packages retrieved successfully',
+          data: instituteUser.packages,
+        };
+      }
 
       if (instituteUser) {
         const _packages = instituteUser.packages.filter(
@@ -827,6 +839,302 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve user',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('u/staff')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all staff users' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Staff users retrieved successfully',
+  })
+  async getAllStaffUsers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    try {
+      const { users, total } = await this.usersService.getAllStaffUsers(
+        page,
+        limit,
+        search,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Staff users retrieved successfully',
+        data: { items: users, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve staff users',
+        error: error.message,
+      };
+    }
+  }
+
+  @Post('u/staff')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create staff user' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Staff user created successfully',
+  })
+  async createStaffUser(
+    @Body() createStaffUserDto: CreateStaffUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try {
+      const newUser = await this.usersService.createStaffUser(
+        createStaffUserDto,
+        file,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Staff user created successfully',
+        data: newUser,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to create staff user',
+        error: error.message,
+      };
+    }
+  }
+
+  @Put('u/staff/:id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update staff user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Staff user updated successfully',
+  })
+  async updateStaffUser(
+    @Param('id') id: string,
+    @Body() updateStaffUserDto: UpdateStaffUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try {
+      const updatedUser = await this.usersService.updateStaffUser(
+        id,
+        updateStaffUserDto,
+        file,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Staff user updated successfully',
+        data: updatedUser,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to update staff user',
+        error: error.message,
+      };
+    }
+  }
+
+  @Delete('u/staff/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete staff user' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Staff user deleted successfully',
+  })
+  async deleteStaffUser(@Param('id') id: string) {
+    try {
+      const deletedUser = await this.usersService.deleteStaffUser(id);
+      return {
+        status: HttpStatus.OK,
+        message: 'Staff user deleted successfully',
+        data: deletedUser,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to delete staff user',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('c/roles')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all roles' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Roles retrieved successfully',
+  })
+  async getAllRoles(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ) {
+    try {
+      const { roles, total } = await this.usersService.getAllRoles(
+        page,
+        limit,
+        search,
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Roles retrieved successfully',
+        data: { items: roles, total },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve roles',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('c/roles/dropdown')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all roles for dropdown' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Roles retrieved successfully',
+  })
+  async getRolesForDropdown() {
+    try {
+      const roles = await this.usersService.getRolesForDropdown();
+      return {
+        status: HttpStatus.OK,
+        message: 'Roles retrieved successfully',
+        data: roles,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve roles',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('c/roles/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get role by ID' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role retrieved successfully',
+  })
+  async getRole(@Param('id') id: string) {
+    try {
+      const role = await this.usersService.findRoleById(id);
+      return {
+        status: HttpStatus.OK,
+        message: 'Role retrieved successfully',
+        data: role,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to retrieve role',
+        error: error.message,
+      };
+    }
+  }
+
+  @Post('c/roles')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create role' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role created successfully',
+  })
+  async createRole(@Body() createRoleDto: CreateRoleDto) {
+    try {
+      const newRole = await this.usersService.createRole(createRoleDto);
+      return {
+        status: HttpStatus.OK,
+        message: 'Role created successfully',
+        data: newRole,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to create role',
+        error: error.message,
+      };
+    }
+  }
+
+  @Put('c/roles/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update role' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role updated successfully',
+  })
+  async updateRole(
+    @Param('id') id: string,
+    @Body() updateRoleDto: UpdateRoleDto,
+  ) {
+    try {
+      const updatedRole = await this.usersService.updateRole(id, updateRoleDto);
+      return {
+        status: HttpStatus.OK,
+        message: 'Role updated successfully',
+        data: updatedRole,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to update role',
+        error: error.message,
+      };
+    }
+  }
+
+  @Delete('c/roles/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete role' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Role deleted successfully',
+  })
+  async deleteRole(@Param('id') id: string) {
+    try {
+      const deletedRole = await this.usersService.deleteRole(id);
+      return {
+        status: HttpStatus.OK,
+        message: 'Role deleted successfully',
+        data: deletedRole,
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to delete role',
         error: error.message,
       };
     }

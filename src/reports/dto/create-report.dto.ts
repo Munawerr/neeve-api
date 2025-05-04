@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsDateString, ValidateNested, IsObject, IsMongoId } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsDateString,
+  ValidateNested,
+  IsObject,
+  IsMongoId,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReportFormat, ReportType } from '../schemas/report.schema';
 import { Prop } from '@nestjs/mongoose';
@@ -18,11 +27,13 @@ class DateRangeDto {
 
 export class CreateReportDto {
   @ApiProperty({ description: 'Report name', example: 'Q1 Performance Report' })
-  @IsNotEmpty()
-  @IsString()
+  @IsOptional()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Report description', example: 'Quarterly performance report for students' })
+  @ApiPropertyOptional({
+    description: 'Report description',
+    example: 'Quarterly performance report for students',
+  })
   @IsOptional()
   @IsString()
   description?: string;
@@ -31,21 +42,30 @@ export class CreateReportDto {
   @IsEnum(ReportType)
   reportType: ReportType;
 
-  @ApiProperty({ description: 'Format of the generated report', enum: ReportFormat })
+  @ApiProperty({
+    description: 'Format of the generated report',
+    enum: ReportFormat,
+  })
   @IsEnum(ReportFormat)
   format: ReportFormat;
 
-  @ApiPropertyOptional({ description: 'Institute ID for institute-specific reports' })
+  @ApiPropertyOptional({
+    description: 'Institute ID for institute-specific reports',
+  })
   @IsOptional()
   @IsMongoId()
   institute?: string;
 
-  @ApiPropertyOptional({ description: 'Student ID for student-specific reports' })
+  @ApiPropertyOptional({
+    description: 'Student ID for student-specific reports',
+  })
   @IsOptional()
   @IsMongoId()
   student?: string;
 
-  @ApiPropertyOptional({ description: 'Subject ID for subject-specific reports' })
+  @ApiPropertyOptional({
+    description: 'Subject ID for subject-specific reports',
+  })
   @IsOptional()
   @IsMongoId()
   subject?: string;
@@ -55,7 +75,9 @@ export class CreateReportDto {
   @IsMongoId()
   course?: string;
 
-  @ApiPropertyOptional({ description: 'Package ID for package-specific reports' })
+  @ApiPropertyOptional({
+    description: 'Package ID for package-specific reports',
+  })
   @IsOptional()
   @IsMongoId()
   package?: string;
@@ -72,9 +94,9 @@ export class CreateReportDto {
   @Prop({ type: DateRangeDto })
   dateRange?: DateRangeDto;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Additional filters for report',
-    example: { 'gender': 'male', 'score': { 'gt': 70 } }
+    example: { gender: 'male', score: { gt: 70 } },
   })
   @IsOptional()
   @IsObject()

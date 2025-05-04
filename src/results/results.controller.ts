@@ -188,7 +188,10 @@ export class ResultsController {
 
     // Check each test if the student has attempted it
     for (const testId of testIdArray) {
-      const result = await this.resultsService.findOneByStudentAndTest(studentId, testId);
+      const result = await this.resultsService.findOneByStudentAndTest(
+        studentId,
+        testId,
+      );
       attemptedTests[testId] = result ? true : false;
     }
 
@@ -203,7 +206,9 @@ export class ResultsController {
   @Get('student/:studentId/test/:testId/practice-attempts')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all practice test attempts for a specific test by a student' })
+  @ApiOperation({
+    summary: 'Get all practice test attempts for a specific test by a student',
+  })
   @ApiParam({ name: 'studentId', required: true })
   @ApiParam({ name: 'testId', required: true })
   @ApiResponse({
@@ -214,7 +219,10 @@ export class ResultsController {
     @Param('studentId') studentId: string,
     @Param('testId') testId: string,
   ) {
-    const results = await this.resultsService.findAllAttemptsByStudentAndTest(studentId, testId);
+    const results = await this.resultsService.findAllAttemptsByStudentAndTest(
+      studentId,
+      testId,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Practice test attempts retrieved successfully',
@@ -411,7 +419,7 @@ export class ResultsController {
           correctAnswers -
           skippedQuestions;
 
-        const totalTimeInMinutes = updatedResult1
+        const totalTimeInSeconds = updatedResult1
           .toObject()
           .questionResults.reduce(
             (
@@ -426,20 +434,21 @@ export class ResultsController {
                 sum +
                 (new Date(questionResult.createdAt).getTime() -
                   new Date(previousQuestion.createdAt).getTime()) /
-                  60000
+                  1000 // convert to seconds
               );
             },
             0,
           );
 
         const averageTimePerQuestion =
-          totalTimeInMinutes / updatedResult1.questionResults.length;
+          totalTimeInSeconds / updatedResult1.questionResults.length;
 
         // Calculate test-specific rank and percentile
-        const rankingData = await this.resultsService.calculateTestSpecificPercentile(
-          testId,
-          averageMarks
-        );
+        const rankingData =
+          await this.resultsService.calculateTestSpecificPercentile(
+            testId,
+            averageMarks,
+          );
 
         const marksSummary: MarksSummaryDto = {
           totalMarks,
@@ -451,7 +460,7 @@ export class ResultsController {
           skippedQuestions,
           percentile: rankingData.percentile,
           rank: rankingData.rank,
-          totalStudents: rankingData.totalStudents
+          totalStudents: rankingData.totalStudents,
         };
 
         const updateResultDto: UpdateResultDto = {};
@@ -541,7 +550,7 @@ export class ResultsController {
           mostRecentFinishedAt,
         };
 
-        if (testType !== 'mock') {
+        if (testType !== TestType.MOCK && test.topic) {
           _reportCard['topic_title'] = test.topic.title;
         }
 
@@ -608,10 +617,13 @@ export class ResultsController {
       Promise.resolve(0),
     );
 
-    const obtainedMarks = Math.max(0, uniqueResultsArray.reduce(
-      (sum, result) => sum + result.marksSummary.obtainedMarks,
+    const obtainedMarks = Math.max(
       0,
-    ));
+      uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.obtainedMarks,
+        0,
+      ),
+    );
     const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
 
     const correctAnswers = uniqueResultsArray.reduce(
@@ -714,7 +726,7 @@ export class ResultsController {
           mostRecentFinishedAt,
         };
 
-        if (testType !== 'mock' && test.topic) {
+        if (testType !== TestType.MOCK && test.topic) {
           _reportCard['topic_title'] = test.topic.title;
         }
 
@@ -723,8 +735,10 @@ export class ResultsController {
     );
 
     // Sort by most recent test first
-    reportCard.sort((a, b) => 
-      new Date(b.mostRecentFinishedAt).getTime() - new Date(a.mostRecentFinishedAt).getTime()
+    reportCard.sort(
+      (a, b) =>
+        new Date(b.mostRecentFinishedAt).getTime() -
+        new Date(a.mostRecentFinishedAt).getTime(),
     );
 
     return {
@@ -788,10 +802,13 @@ export class ResultsController {
       return sum + effectiveQuestionCount * result.marksPerQuestion;
     }, 0);
 
-    const obtainedMarks = Math.max(0, uniqueResultsArray.reduce(
-      (sum, result) => sum + result.marksSummary.obtainedMarks,
+    const obtainedMarks = Math.max(
       0,
-    ));
+      uniqueResultsArray.reduce(
+        (sum, result) => sum + result.marksSummary.obtainedMarks,
+        0,
+      ),
+    );
     const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
 
     const totalQuestions = uniqueResultsArray.reduce(
