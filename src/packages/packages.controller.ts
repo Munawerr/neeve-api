@@ -116,7 +116,7 @@ export class PackagesController {
         message: 'Packages retrieved successfully',
         data: user ? user.packages : [],
       };
-    } else if (decodedToken.role === 'admin') {
+    } else if (!['institute', 'student'].includes(decodedToken.role)) {
       const { packages, total } = await this.packagesService.findAll(
         page,
         limit,
@@ -138,7 +138,11 @@ export class PackagesController {
   @Get('dropdown')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all packages for dropdown' })
-  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter packages by institute' })
+  @ApiQuery({
+    name: 'instituteId',
+    required: false,
+    description: 'Filter packages by institute',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Packages retrieved successfully for dropdown',
@@ -148,11 +152,10 @@ export class PackagesController {
     description: 'Failed to retrieve packages for dropdown',
   })
   @SetMetadata('permissions', ['view_packages'])
-  async getAllPackagesForDropdown(
-    @Query('instituteId') instituteId?: string
-  ) {
+  async getAllPackagesForDropdown(@Query('instituteId') instituteId?: string) {
     try {
-      const packages = await this.packagesService.getAllPackagesForDropdown(instituteId);
+      const packages =
+        await this.packagesService.getAllPackagesForDropdown(instituteId);
       return {
         status: HttpStatus.OK,
         message: 'Packages retrieved successfully for dropdown',

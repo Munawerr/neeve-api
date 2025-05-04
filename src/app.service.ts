@@ -23,6 +23,7 @@ export class AppService implements OnModuleInit {
       {
         name: 'Admin',
         slug: 'admin',
+        unlisted: true,
         permissions: [
           'view_all_analytics',
           'view_all_reports',
@@ -60,11 +61,18 @@ export class AppService implements OnModuleInit {
           'edit_threads',
           'delete_threads',
           'view_notifications',
+          'view_roles',
+          'view_staff',
+          'edit_roles',
+          'edit_staff',
+          'delete_roles',
+          'delete_staff',
         ],
       },
       {
         name: 'Institute',
         slug: 'institute',
+        unlisted: true,
         permissions: [
           'view_course_reports',
           'view_subject_reports',
@@ -91,6 +99,7 @@ export class AppService implements OnModuleInit {
       {
         name: 'Student',
         slug: 'student',
+        unlisted: true,
         permissions: [
           'view_own_report',
           'view_live_classes',

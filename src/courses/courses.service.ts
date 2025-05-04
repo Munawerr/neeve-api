@@ -112,8 +112,16 @@ export class CoursesService {
     });
   }
 
-  async getMostPopularCourses(limit: number): Promise<any[]> {
-    const courses = await this.courseModel.find().lean();
+  async getMostPopularCourses(
+    limit: number,
+    institute: string | null = null,
+    courseIds: string[] = [],
+  ): Promise<any[]> {
+    let courses: any[] = [];
+    if (courseIds.length > 0) {
+      courses = await this.courseModel.find({ _id: { $in: courseIds } }).lean();
+    } else courses = await this.courseModel.find().lean();
+
     const coursesWithAttempts: any[] = [];
 
     for (const course of courses) {
@@ -145,16 +153,23 @@ export class CoursesService {
 
   async getTestsCompletedByDay(
     days: number,
+    instituteId: string | null = null,
   ): Promise<Array<{ date: string; count: number }>> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    let aggregateMatch = {
+      status: ResultStatus.FINISHED,
+      finishedAt: { $gte: startDate },
+    };
+
+    if (instituteId) {
+      aggregateMatch['institute'] = instituteId;
+    }
+
     const attempts = await this.resultModel.aggregate([
       {
-        $match: {
-          status: ResultStatus.FINISHED,
-          finishedAt: { $gte: startDate },
-        },
+        $match: aggregateMatch,
       },
       {
         $group: {
@@ -422,12 +437,6 @@ export class CoursesService {
           .populate({
             path: 'tests',
             model: 'Test',
-            populate: [
-              {
-                path: 'subject',
-                model: 'Subject',
-              },
-            ],
           })
           .exec();
 

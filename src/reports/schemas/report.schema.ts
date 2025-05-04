@@ -42,7 +42,7 @@ export class Report extends Document {
   @Prop({ required: true, enum: ReportFormat })
   format: ReportFormat;
 
-  @Prop({ required: true })
+  @Prop()
   name: string;
 
   @Prop()

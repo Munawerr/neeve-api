@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
+import { model, Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
 import {
   Result,
@@ -18,6 +18,10 @@ import { CreateStudentUserDto } from './dto/create-student-user.dto';
 import { S3Service } from '../s3/s3.service';
 import { UpdateInstituteUserDto } from './dto/update-institute-user.dto';
 import { UpdateStudentUserDto } from './dto/update-student-user.dto';
+import { CreateStaffUserDto } from './dto/create-staff-user.dto';
+import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
+import { CreateRoleDto } from 'src/roles/dto/create-role.dto';
+import { UpdateRoleDto } from 'src/roles/dto/update-role.dto';
 
 @Injectable()
 export class UsersService {
@@ -133,9 +137,16 @@ export class UsersService {
         .findById(id)
         .populate({
           path: 'packages',
-          populate: {
-            path: 'subjects',
-          },
+          populate: [
+            {
+              path: 'subjects',
+              model: 'Subject',
+            },
+            {
+              path: 'course',
+              model: 'Course',
+            },
+          ],
         })
         .populate('role')
         .populate('institute')
@@ -626,20 +637,155 @@ export class UsersService {
     return createdInstitutes;
   }
 
-  // Analytics methods for dashboard
-
-  async countAllUsers(): Promise<number> {
-    return await this.userModel.countDocuments({ status: 'active' });
+  async getAllStaffUsers(
+    page: number,
+    limit: number,
+    search: string,
+  ): Promise<{ users: User[]; total: number }> {
+    const filter = {
+      role: {
+        $nin: [await this.getStudentRoleId(), await this.getInstituteRoleId()],
+      },
+      ...(search && {
+        $or: [
+          { full_name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ],
+      }),
+    };
+    const users = await this.userModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('role')
+      .exec();
+    const total = await this.userModel.countDocuments(filter);
+    return { users, total };
   }
 
-  async countActiveUsers(days: number): Promise<number> {
+  async createStaffUser(
+    createStaffUserDto: CreateStaffUserDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
+    const { password, ...userData } = createStaffUserDto;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+
+    const newUser = new this.userModel({
+      ...userData,
+      password: hashedPassword,
+      imageUrl,
+      status: 'active',
+    });
+
+    return newUser.save();
+  }
+
+  async updateStaffUser(
+    id: string,
+    updateStaffUserDto: UpdateStaffUserDto,
+    file?: Express.Multer.File,
+  ): Promise<User | null> {
+    const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+    const updateData = imageUrl
+      ? { ...updateStaffUserDto, imageUrl }
+      : updateStaffUserDto;
+
+    return this.userModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .exec();
+  }
+
+  async deleteStaffUser(id: string): Promise<User | null> {
+    return this.userModel.findByIdAndDelete(id).exec();
+  }
+
+  async getAllRoles(
+    page: number,
+    limit: number,
+    search: string,
+  ): Promise<{ roles: Role[]; total: number }> {
+    const filter = {
+      unlisted: false,
+      ...(search && {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { slug: { $regex: search, $options: 'i' } },
+        ],
+      }),
+    };
+    const roles = await this.roleModel
+      .find(filter)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
+    const total = await this.roleModel.countDocuments(filter);
+    return { roles, total };
+  }
+
+  async getRolesForDropdown(): Promise<Role[]> {
+    return this.roleModel
+      .find({ unlisted: false })
+      .select('unlisted name _id')
+      .exec();
+  }
+
+  async createRole(createRoleDto: CreateRoleDto): Promise<Role> {
+    const newRole = new this.roleModel(createRoleDto);
+    return newRole.save();
+  }
+
+  async findRoleById(roleId: string): Promise<Role | null> {
+    return await this.roleModel.findById(roleId);
+  }
+
+  async updateRole(
+    id: string,
+    updateRoleDto: UpdateRoleDto,
+  ): Promise<Role | null> {
+    return this.roleModel
+      .findByIdAndUpdate(id, updateRoleDto, { new: true })
+      .exec();
+  }
+
+  async deleteRole(id: string): Promise<Role | null> {
+    return this.roleModel.findByIdAndDelete(id).exec();
+  }
+
+  // Analytics methods for dashboard
+
+  async countAllUsers(institute: string | null = null): Promise<number> {
+    if (institute) {
+      return await this.userModel.countDocuments({ institute });
+    }
+    return await this.userModel.countDocuments();
+  }
+
+  async countActiveUsers(
+    days: number,
+    institute: string | null = null,
+  ): Promise<number> {
     const date = new Date();
     date.setDate(date.getDate() - days);
 
+    if (institute) {
+      return await this.userModel.countDocuments({
+        institute,
+        lastLogin: { $gte: date },
+      });
+    }
+
     return await this.userModel.countDocuments({
-      status: 'active',
       lastLogin: { $gte: date },
     });
+  }
+
+  async getInstituteUsers(institute: string): Promise<User[]> {
+    return await this.userModel
+      .find({
+        institute,
+      })
+      .exec();
   }
 
   async countInstitutes(): Promise<number> {
@@ -650,12 +796,12 @@ export class UsersService {
     // Then query users with that role id
     return this.userModel.countDocuments({
       role: instituteRole._id,
-      status: 'active',
     });
   }
 
   async getNewUsersByMonth(
     months: number,
+    institute: string | null = null,
   ): Promise<Array<{ month: string; count: number }>> {
     const results: any[] = [];
     const date = new Date();
@@ -669,10 +815,18 @@ export class UsersService {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0);
 
-      const count = await this.userModel.countDocuments({
-        createdAt: { $gte: startDate, $lte: endDate },
-        status: 'active',
-      });
+      let count: number = 0;
+
+      if (institute) {
+        count = await this.userModel.countDocuments({
+          createdAt: { $gte: startDate, $lte: endDate },
+          institute,
+        });
+      } else {
+        count = await this.userModel.countDocuments({
+          createdAt: { $gte: startDate, $lte: endDate },
+        });
+      }
 
       results.unshift({
         month:
@@ -686,6 +840,7 @@ export class UsersService {
 
   async getUserEngagementByDay(
     days: number,
+    institute: string | null = null,
   ): Promise<Array<{ date: string; count: number }>> {
     const results: any[] = [];
     const date = new Date();
@@ -698,10 +853,18 @@ export class UsersService {
       // Start and end of the day
       const startOfDay = new Date(currentDate.setHours(0, 0, 0, 0));
       const endOfDay = new Date(currentDate.setHours(23, 59, 59, 999));
+      let count = 0;
 
-      const count = await this.loginHistoryModel.countDocuments({
-        loginTime: { $gte: startOfDay, $lte: endOfDay },
-      });
+      if (institute) {
+        count = await this.loginHistoryModel.countDocuments({
+          institute,
+          loginTime: { $gte: startOfDay, $lte: endOfDay },
+        });
+      } else {
+        count = await this.loginHistoryModel.countDocuments({
+          loginTime: { $gte: startOfDay, $lte: endOfDay },
+        });
+      }
 
       results.unshift({
         date: startOfDay.toISOString().split('T')[0],
@@ -720,7 +883,6 @@ export class UsersService {
     // Get all active institutes
     const institutes = await this.userModel.find({
       role: instituteRole._id,
-      status: 'active',
     });
 
     // For each institute, count their students
@@ -743,21 +905,6 @@ export class UsersService {
   async countInstituteUsers(instituteId: string): Promise<number> {
     return await this.userModel.countDocuments({
       institute: instituteId,
-      status: 'active',
-    });
-  }
-
-  async countActiveInstituteUsers(
-    instituteId: string,
-    days: number,
-  ): Promise<number> {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-
-    return await this.userModel.countDocuments({
-      institute: instituteId,
-      status: 'active',
-      lastLogin: { $gte: date },
     });
   }
 
@@ -780,7 +927,6 @@ export class UsersService {
       const count = await this.userModel.countDocuments({
         institute: instituteId,
         createdAt: { $gte: startDate, $lte: endDate },
-        status: 'active',
       });
 
       results.unshift({
@@ -804,7 +950,6 @@ export class UsersService {
     const instituteUsers = await this.userModel
       .find({
         institute: instituteId,
-        status: 'active',
       })
       .select('_id');
 
@@ -837,14 +982,15 @@ export class UsersService {
     instituteId: string,
     limit: number,
   ): Promise<Array<any>> {
+    const studentRole = await this.roleModel.findOne({ slug: 'student' });
+    if (!studentRole) return [];
     // Get all students in this institute
     const students = await this.userModel
       .find({
         institute: instituteId,
-        role: { $ne: 'admin' }, // Exclude admins
-        status: 'active',
+        role: studentRole._id, // Exclude admins
       })
-      .select('_id name email')
+      .select('_id full_name email')
       .lean();
 
     const result: any[] = [];
@@ -881,14 +1027,23 @@ export class UsersService {
       .slice(0, limit);
   }
 
-  async getUserGrowthTrend(months: number): Promise<any[]> {
+  async getUserGrowthTrend(
+    months: number,
+    institute: string | null = null,
+  ): Promise<any[]> {
+    let match: any = {
+      createdAt: {
+        $gte: new Date(new Date().setMonth(new Date().getMonth() - months)),
+      },
+    };
+
+    if (institute) {
+      match = { ...match, institute };
+    }
+
     const result = await this.userModel.aggregate([
       {
-        $match: {
-          createdAt: {
-            $gte: new Date(new Date().setMonth(new Date().getMonth() - months)),
-          },
-        },
+        $match: match,
       },
       {
         $group: {
@@ -966,8 +1121,8 @@ export class UsersService {
     ]);
   }
 
-  async getHourlyEngagement(): Promise<any[]> {
-    const result = await this.userModel.aggregate([
+  async getHourlyEngagement(institute: string | null = null): Promise<any[]> {
+    let aggregateQuery: any[] = [
       {
         $lookup: {
           from: 'results',
@@ -988,7 +1143,17 @@ export class UsersService {
           count: { $sum: 1 },
         },
       },
-    ]);
+    ];
+
+    if (institute) {
+      aggregateQuery.unshift({
+        $match: {
+          institute: new Types.ObjectId(institute),
+        },
+      });
+    }
+
+    const result = await this.userModel.aggregate(aggregateQuery);
 
     return result.map((item) => ({
       hour: item._id.hour,

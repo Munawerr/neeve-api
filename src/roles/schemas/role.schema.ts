@@ -9,6 +9,9 @@ export class Role extends Document {
   @Prop({ required: true })
   slug: string;
 
+  @Prop({ default: false })
+  unlisted: boolean;
+
   @Prop({ required: true, type: [String] })
   permissions: string[];
 }
