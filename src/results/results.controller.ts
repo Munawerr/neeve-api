@@ -419,7 +419,7 @@ export class ResultsController {
           correctAnswers -
           skippedQuestions;
 
-        const totalTimeInMinutes = updatedResult1
+        const totalTimeInSeconds = updatedResult1
           .toObject()
           .questionResults.reduce(
             (
@@ -441,7 +441,7 @@ export class ResultsController {
           );
 
         const averageTimePerQuestion =
-          totalTimeInMinutes / updatedResult1.questionResults.length;
+          totalTimeInSeconds / updatedResult1.questionResults.length;
 
         // Calculate test-specific rank and percentile
         const rankingData =
