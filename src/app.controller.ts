@@ -474,21 +474,21 @@ export class AppController {
           },
         };
       } else {
-        const user_id = user._id as string;
-        const totalUsers = await this.usersService.countAllUsers(user_id);
+        const userId = user._id as string;
+        const totalUsers = await this.usersService.countAllUsers(userId);
         const activeUsers = await this.usersService.countActiveUsers(
           30,
-          user_id,
+          userId,
         );
         const userGrowthTrend = await this.usersService.getUserGrowthTrend(
           6,
-          user_id,
+          userId,
         );
         const hourlyEngagement =
-          await this.usersService.getHourlyEngagement(user_id);
+          await this.usersService.getHourlyEngagement(userId);
 
         // Get all students for this institute and count those with success chance >= 80%
-        const students = await this.usersService.getInstituteUsers(user_id);
+        const students = await this.usersService.getInstituteUsers(userId);
         let topStudentsCount = 0;
         for (const student of students) {
           const analytics = await this.usersService.getUserAnalytics(student);
@@ -501,13 +501,13 @@ export class AppController {
 
         // Get resource and video analytics
         const resourceViewsLast7Days =
-          await this.analyticsService.getResourceViewsLast7Days(user_id);
+          await this.analyticsService.getResourceViewsLast7Days(userId);
         const videoViewsLast7Days =
-          await this.analyticsService.getVideoViewsLast7Days(user_id);
+          await this.analyticsService.getVideoViewsLast7Days(userId);
         const openDiscussionsCount =
-          await this.analyticsService.getOpenDiscussionsCount(user_id);
+          await this.analyticsService.getOpenDiscussionsCount(userId);
         const liveClassesMetrics =
-          await this.analyticsService.getLiveClassesMetrics(user_id);
+          await this.analyticsService.getLiveClassesMetrics(userId);
 
         analyticsData = {
           userMetrics: {
@@ -515,12 +515,12 @@ export class AppController {
             activeUsers,
             topStudents: topStudentsCount,
             newUsersTrend: await this.usersService.getNewInstituteUsersByMonth(
-              user_id,
+              userId,
               6,
             ),
             engagementTrend:
               await this.usersService.getInstituteUserEngagementByDay(
-                user_id,
+                userId,
                 30,
               ),
             growthTrend: userGrowthTrend,
@@ -530,7 +530,7 @@ export class AppController {
             totalCourses,
             popularCourses:
               await this.coursesService.getMostPopularInstituteCourses(
-                user_id,
+                userId,
                 5,
               ),
           },
@@ -538,7 +538,7 @@ export class AppController {
             totalTests: await this.coursesService.countAllTests(),
             totalAttempts: await this.coursesService.countAllTestAttempts(),
             testCompletionTrend:
-              await this.coursesService.getTestsCompletedByDay(7, user_id),
+              await this.coursesService.getTestsCompletedByDay(7, userId),
             mostPopularTests: await this.coursesService.getMostPopularTests(5),
             averageScores: await this.coursesService.getAverageTestScores(),
           },
