@@ -7,8 +7,8 @@ export class ExcelReportService {
   async generateReport(data: any, report: Report): Promise<Buffer> {
     // Create a new Excel workbook
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'VRIKSH API';
-    workbook.lastModifiedBy = 'VRIKSH API';
+    workbook.creator = 'LAKSHYA API';
+    workbook.lastModifiedBy = 'LAKSHYA API';
     workbook.created = new Date();
     workbook.modified = new Date();
     

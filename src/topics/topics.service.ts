@@ -124,53 +124,84 @@ export class TopicsService {
         );
       }
 
+      // Create parent topic with code and title only
+      const newParentTopic = new this.topicModel({
+        code: parentTopic.code,
+        title: parentTopic.title,
+        subject: subject._id,
+        package: _package._id,
+        isParent: true,
+      });
+
+      const savedParentTopic = await newParentTopic.save();
+      createdTopics.push(savedParentTopic);
+
+      // Create a subtopic for each parent topic with all the content fields
       const studyNotesIds = await this.saveFiles(parentTopic.studyNotes);
       const studyPlansIds = await this.saveFiles(parentTopic.studyPlans);
       const practiceProblemsIds = await this.saveFiles(
         parentTopic.practiceProblems,
       );
 
-      const newParentTopic = new this.topicModel({
-        code: parentTopic.code,
-        title: parentTopic.title,
+      // Use description as subtopic title or fallback to parent title if not provided
+      const subtopicTitle = parentTopic.description 
+        ? parentTopic.description
+        : `${parentTopic.title}`;
+
+      const newSubTopic = new this.topicModel({
+        code: `-`,
+        title: subtopicTitle,
         subject: subject._id,
         package: _package._id,
         introVideoUrls: parentTopic.introVideoUrls,
         studyNotes: studyNotesIds,
         studyPlans: studyPlansIds,
         practiceProblems: practiceProblemsIds,
+        isParent: false,
       });
 
-      const savedParentTopic = await newParentTopic.save();
-      createdTopics.push(savedParentTopic);
+      const savedSubTopic = await newSubTopic.save();
+      
+      // Link subtopic to parent
+      savedParentTopic.subTopics.push(
+        savedSubTopic._id as MongooseSchema.Types.ObjectId,
+      );
+      await savedParentTopic.save();
+      createdTopics.push(savedSubTopic);
 
+      // Process any additional subtopics from the file (if they exist)
       for (let i = 1; i < topics.length; i++) {
-        const subTopic = topics[i];
+        const additionalSubTopic = topics[i];
 
-        const subStudyNotesIds = await this.saveFiles(subTopic.studyNotes);
-        const subStudyPlansIds = await this.saveFiles(subTopic.studyPlans);
+        const subStudyNotesIds = await this.saveFiles(additionalSubTopic.studyNotes);
+        const subStudyPlansIds = await this.saveFiles(additionalSubTopic.studyPlans);
         const subPracticeProblemsIds = await this.saveFiles(
-          subTopic.practiceProblems,
+          additionalSubTopic.practiceProblems,
         );
 
-        const newSubTopic = new this.topicModel({
-          code: subTopic.code,
-          title: subTopic.title,
+        // Use description as subtopic title or code as fallback
+        const addSubtopicTitle = additionalSubTopic.description 
+          ? additionalSubTopic.description 
+          : `${additionalSubTopic.code}-content`;
+
+        const newAdditionalSubTopic = new this.topicModel({
+          code: additionalSubTopic.code,
+          title: addSubtopicTitle,
           subject: subject._id,
           package: _package._id,
-          introVideoUrls: subTopic.introVideoUrls,
+          introVideoUrls: additionalSubTopic.introVideoUrls,
           studyNotes: subStudyNotesIds,
           studyPlans: subStudyPlansIds,
           practiceProblems: subPracticeProblemsIds,
           isParent: false,
         });
 
-        const savedSubTopic = await newSubTopic.save();
+        const savedAdditionalSubTopic = await newAdditionalSubTopic.save();
         savedParentTopic.subTopics.push(
-          savedSubTopic._id as MongooseSchema.Types.ObjectId,
+          savedAdditionalSubTopic._id as MongooseSchema.Types.ObjectId,
         );
         await savedParentTopic.save();
-        createdTopics.push(savedSubTopic);
+        createdTopics.push(savedAdditionalSubTopic);
       }
     }
 

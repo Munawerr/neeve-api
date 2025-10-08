@@ -371,7 +371,13 @@ export class TopicsController {
 
   @Post('bulk')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB file size limit
+      },
+    }),
+  )
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Bulk create topics from Excel file' })
   @ApiResponse({
@@ -379,13 +385,59 @@ export class TopicsController {
     description: 'Topics created successfully',
   })
   @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'File is missing or invalid',
+  })
+  @ApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create topics',
   })
   async bulkCreateTopics(@UploadedFile() file: Express.Multer.File) {
     try {
+      // Add detailed logging to understand what's being received
+      console.log('Received upload request');
+      console.log('File received:', file ? 'Yes' : 'No');
+      
+      // Check if file exists
+      if (!file) {
+        console.log('No file in request');
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'File is required',
+        };
+      }
+      
+      console.log('File details:', {
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.buffer?.length || 0,
+      });
+
+      // Check if file has buffer
+      if (!file.buffer) {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Invalid file format',
+        };
+      }
+
+      // Create a new workbook
       const workbook = new Workbook();
-      await workbook.xlsx.load(file.buffer);
+      
+      // Use a try-catch specifically for the file parsing
+      try {
+        // Load the workbook directly from buffer (cast as any to avoid type issues)
+        await workbook.xlsx.load(file.buffer as any);
+      } catch (parseError) {
+        console.error('Error parsing Excel file:', parseError);
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Invalid Excel file format',
+          error: parseError.message,
+        };
+      }
+      
       const worksheet = workbook.getWorksheet(1);
 
       const parentTopics: any = {};
@@ -399,17 +451,18 @@ export class TopicsController {
               title: row.getCell(2).value,
               subjectCode: row.getCell(3).value,
               packageCode: row.getCell(4).value,
-              introVideoUrls: row.getCell(5).value
-                ? row.getCell(5).value?.toString().split(',')
-                : [],
-              studyNotes: row.getCell(6).value
+              description: row.getCell(5).value || '', // Added description (subtopic title)
+              introVideoUrls: row.getCell(6).value
                 ? row.getCell(6).value?.toString().split(',')
                 : [],
-              studyPlans: row.getCell(7).value
+              studyNotes: row.getCell(7).value
                 ? row.getCell(7).value?.toString().split(',')
                 : [],
-              practiceProblems: row.getCell(8).value
+              studyPlans: row.getCell(8).value
                 ? row.getCell(8).value?.toString().split(',')
+                : [],
+              practiceProblems: row.getCell(9).value
+                ? row.getCell(9).value?.toString().split(',')
                 : [],
             };
 
@@ -440,7 +493,7 @@ export class TopicsController {
     }
   }
 
-  @Get('template')
+  @Get('download/template')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download template for bulk topic creation' })
@@ -457,6 +510,7 @@ export class TopicsController {
       { header: 'Title', key: 'title', width: 30 },
       { header: 'Subject Code', key: 'subjectCode', width: 20 },
       { header: 'Package Code', key: 'packageCode', width: 20 },
+      { header: 'Description (Subtopic Title)', key: 'description', width: 30 },
       {
         header: 'Intro Video URLs (comma separated)',
         key: 'introVideoUrls',
