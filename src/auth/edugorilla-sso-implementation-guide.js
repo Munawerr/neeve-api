@@ -58,8 +58,8 @@ export class SSOClientController {
 /**
  * Testing the Integration
  * 
- * 1. Make sure the cookie domain is properly set with leading dot (.vriksh.com)
- * 2. Ensure both VRIKSH and EduGorilla are using the same domain or subdomains
- * 3. Test login flow in VRIKSH and then navigate to EduGorilla
+ * 1. Make sure the cookie domain is properly set with leading dot (.lakshya.io)
+ * 2. Ensure both LAKSHYA and EduGorilla are using the same domain or subdomains
+ * 3. Test login flow in LAKSHYA and then navigate to EduGorilla
  * 4. Enable cookie debugging in browser to ensure proper creation and sharing
  */
