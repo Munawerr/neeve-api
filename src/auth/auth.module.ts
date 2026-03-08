@@ -39,6 +39,6 @@ import { SmsService } from 'src/sms/sms.service';
     MailService,
     SmsService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

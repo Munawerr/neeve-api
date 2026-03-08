@@ -15,11 +15,14 @@ import { QuestionResultsModule } from './question-results/question-results.modul
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
 import { ThreadsModule } from './threads/threads.module';
 import { DiscussionsModule } from './discussions/discussions.module';
+import * as cookieParser from 'cookie-parser';
+import { SsoModule } from './sso/sso.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors(); // Enable CORS
+  app.use(cookieParser()); // Use cookie-parser middleware
 
   const config = new DocumentBuilder()
     .setTitle('Neeve API')
@@ -43,6 +46,7 @@ async function bootstrap() {
       LiveClassesModule,
       ThreadsModule,
       DiscussionsModule,
+      SsoModule,
     ],
   });
   SwaggerModule.setup('docs', app, document);

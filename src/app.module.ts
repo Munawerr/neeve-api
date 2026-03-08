@@ -17,6 +17,7 @@ import { QuestionResultsModule } from './question-results/question-results.modul
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
 import { ReportsModule } from './reports/reports.module'; // Import the new ReportsModule
 import { AnalyticsModule } from './analytics/analytics.module'; // Import AnalyticsModule
+import { SsoModule } from './sso/sso.module'; // Import SSO Module
 
 import { Role, RoleSchema } from './roles/schemas/role.schema';
 import { User, UserSchema } from './users/schemas/user.schema'; // Import User schema
@@ -116,6 +117,7 @@ const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
     ReportsModule, // Add the new ReportsModule
     NotificationsModule, // Add NotificationsModule
     AnalyticsModule, // Add AnalyticsModule
+    SsoModule, // Add SSO Module
   ],
   controllers: [AppController],
   providers: [AppService, AuthService, SmsService],
