@@ -1,5 +1,4 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Types } from 'mongoose';
 
 class OptionDto {
   @ApiPropertyOptional({ example: 'Option 1' })

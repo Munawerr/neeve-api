@@ -5,7 +5,9 @@ import { ClassesController } from './classes.controller';
 import { Class, ClassSchema } from './schemas/class.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Class.name, schema: ClassSchema }])],
+  imports: [
+    MongooseModule.forFeature([{ name: Class.name, schema: ClassSchema }]),
+  ],
   controllers: [ClassesController],
   providers: [ClassesService],
 })

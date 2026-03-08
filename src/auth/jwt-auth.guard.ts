@@ -31,10 +31,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     const token = authHeader.split(' ')[1];
-    let decodedToken;
-    try {
-      decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
-    } catch (err) {
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+
+    if (typeof decodedToken === 'string') {
       throw new ForbiddenException('Invalid token');
     }
 
