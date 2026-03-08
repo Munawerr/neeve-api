@@ -11,7 +11,7 @@ import { Schema as MongooseSchema } from 'mongoose';
 export class CreateLoginHistoryDto {
   @ApiProperty({ description: 'User ID' })
   @IsNotEmpty()
-  userId: MongooseSchema.Types.ObjectId | String;
+  userId: MongooseSchema.Types.ObjectId | string;
 
   @ApiPropertyOptional({ description: 'User email' })
   @IsOptional()

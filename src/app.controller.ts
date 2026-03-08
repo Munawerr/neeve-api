@@ -77,7 +77,7 @@ export class AppController {
     token?: string;
     expiresIn?: number;
     permissions?: string[];
-    profile_info?: Object;
+    profile_info?: object;
     role?: any;
     courses?: Course[];
   }> {
@@ -99,15 +99,12 @@ export class AppController {
     const distinctCourseIds = [...new Set(courseIds)];
     const courses = await this.coursesService.findByIds(distinctCourseIds);
 
-    const {
-      password: _,
-      packages,
-      role,
-      ...userWithoutSensitiveInfo
-    } = user.toObject();
+    const userObject = user.toObject();
+    delete userObject.password;
+    delete userObject.packages;
+    const { role, ...userWithoutSensitiveInfo } = userObject;
 
-    const { token, expiresIn, permissions } =
-      await this.authService.login(user);
+    const { token } = this.authService.login(user);
 
     return {
       token,
@@ -159,14 +156,20 @@ export class AppController {
       let decodedToken;
       try {
         decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
-      } catch (err) {
+      } catch {
         return {
           status: HttpStatus.UNAUTHORIZED,
           message: 'Invalid token',
         };
       }
 
-      const userId = decodedToken.sub;
+      const userId = (decodedToken as any).sub as string;
+      if (!userId) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Invalid token claims',
+        };
+      }
       const user = await this.usersService.getInstituteUser(userId, true);
 
       if (!user) {
@@ -181,18 +184,12 @@ export class AppController {
       const distinctCourseIds = [...new Set(courseIds)];
       const courses = await this.coursesService.findByIds(distinctCourseIds);
 
-      const {
-        password: _,
-        packages,
-        role,
-        ...userWithoutSensitiveInfo
-      } = user.toObject();
+      const userObject = user.toObject();
+      delete userObject.password;
+      delete userObject.packages;
+      const { role, ...userWithoutSensitiveInfo } = userObject;
 
-      const {
-        token: authToken,
-        expiresIn,
-        permissions,
-      } = await this.authService.login(user);
+      const { token: authToken } = this.authService.login(user);
 
       return {
         status: HttpStatus.OK,
@@ -324,9 +321,14 @@ export class AppController {
   ) {
     const { currentPassword, newPassword } = changePasswordDto;
     const token = authHeader.split(' ')[1];
-    let decodedToken;
-    decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
-    const userId: string = decodedToken.sub;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
+    const userId: string = (decodedToken as any).sub as string;
+    if (!userId) {
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        message: 'Invalid token claims',
+      };
+    }
 
     const isChanged = await this.authService.changePassword(
       userId,
@@ -382,14 +384,20 @@ export class AppController {
       let decodedToken;
       try {
         decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
-      } catch (err) {
+      } catch {
         return {
           status: HttpStatus.UNAUTHORIZED,
           message: 'Invalid token',
         };
       }
 
-      const userId = decodedToken.sub;
+      const userId = (decodedToken as any).sub as string;
+      if (!userId) {
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          message: 'Invalid token claims',
+        };
+      }
 
       // Try to get data from cache
       const cacheKey = `dashboard_analytics_${userId}`;

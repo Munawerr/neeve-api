@@ -144,7 +144,7 @@ export class AppService implements OnModuleInit {
       return;
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     const adminUser = new this.userModel({

@@ -112,7 +112,9 @@ export class ReportGeneratorService {
       case ReportType.OVERALL:
         return this.getOverallReportData(report);
       default:
-        throw new Error(`Unsupported report type: ${report.reportType}`);
+        throw new Error(
+          `Unsupported report type: ${String(report.reportType)}`,
+        );
     }
   }
 
@@ -123,7 +125,7 @@ export class ReportGeneratorService {
 
     if (!student) {
       throw new NotFoundException(
-        `Student with ID ${report.student} not found`,
+        `Student with ID ${String(report.student)} not found`,
       );
     }
 
@@ -249,7 +251,7 @@ export class ReportGeneratorService {
 
     if (!subject) {
       throw new NotFoundException(
-        `Subject with ID ${report.subject} not found`,
+        `Subject with ID ${String(report.subject)} not found`,
       );
     }
 
@@ -374,7 +376,9 @@ export class ReportGeneratorService {
     const course = await this.courseModel.findById(report.course);
 
     if (!course) {
-      throw new NotFoundException(`Course with ID ${report.course} not found`);
+      throw new NotFoundException(
+        `Course with ID ${String(report.course)} not found`,
+      );
     }
 
     const user: any = await this.userModel
@@ -589,7 +593,7 @@ export class ReportGeneratorService {
 
     if (!pkg) {
       throw new NotFoundException(
-        `Package with ID ${report.package} not found`,
+        `Package with ID ${String(report.package)} not found`,
       );
     }
 
@@ -777,7 +781,9 @@ export class ReportGeneratorService {
     const test = await this.testModel.findById(report.test).lean();
 
     if (!test) {
-      throw new NotFoundException(`Test with ID ${report.test} not found`);
+      throw new NotFoundException(
+        `Test with ID ${String(report.test)} not found`,
+      );
     }
 
     // Build query to filter results
@@ -950,7 +956,7 @@ export class ReportGeneratorService {
 
     if (!institute) {
       throw new NotFoundException(
-        `Institute with ID ${report.institute} not found`,
+        `Institute with ID ${String(report.institute)} not found`,
       );
     }
 
@@ -993,9 +999,6 @@ export class ReportGeneratorService {
 
     // Calculate overall metrics
     const totalAttempts = results.length;
-    const completedAttempts = results.filter(
-      (r) => r.status === ResultStatus.FINISHED,
-    ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
 
@@ -1207,9 +1210,6 @@ export class ReportGeneratorService {
 
     // Calculate overall metrics
     const totalAttempts = results.length;
-    const completedAttempts = results.filter(
-      (r) => r.status === ResultStatus.FINISHED,
-    ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
 

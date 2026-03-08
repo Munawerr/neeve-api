@@ -3,7 +3,8 @@ import axios from 'axios';
 
 @Injectable()
 export class ChatService {
-  private readonly apiUrl = 'https://api.openai.com/v1/engines/davinci-codex/completions';
+  private readonly apiUrl =
+    'https://api.openai.com/v1/engines/davinci-codex/completions';
   private readonly apiKey = process.env.OPENAI_API_KEY;
 
   async getResponse(query: string): Promise<string> {
@@ -20,9 +21,9 @@ export class ChatService {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
-      }
+      },
     );
     return response.data.choices[0].text.trim();
   }

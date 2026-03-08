@@ -114,7 +114,6 @@ export class CoursesService {
 
   async getMostPopularCourses(
     limit: number,
-    institute: string | null = null,
     courseIds: string[] = [],
   ): Promise<any[]> {
     let courses: any[] = [];
@@ -158,7 +157,7 @@ export class CoursesService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    let aggregateMatch = {
+    const aggregateMatch: any = {
       status: ResultStatus.FINISHED,
       finishedAt: { $gte: startDate },
     };
@@ -342,7 +341,7 @@ export class CoursesService {
           test: {
             id: test._id,
             name: test.title,
-            // @ts-ignore
+            // @ts-expect-error - subject might be populated or not
             subject: test.subject?.title || 'Unknown',
           },
           attemptCount: item.attemptCount,
@@ -499,7 +498,7 @@ export class CoursesService {
           test: {
             id: test._id,
             name: test.title,
-            // @ts-ignore
+            // @ts-expect-error - subject might be populated or not
             subject: test.subject?.title || 'Unknown',
           },
           averageScore: parseFloat(averageScore.toFixed(2)),

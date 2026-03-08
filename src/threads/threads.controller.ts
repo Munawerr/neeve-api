@@ -39,7 +39,7 @@ export class ThreadsController {
     description: 'Thread created successfully',
   })
   @SetMetadata('permissions', ['create_threads'])
-  async create(@Body() createThreadDto: CreateThreadDto, @Request() req) {
+  async create(@Body() createThreadDto: CreateThreadDto, @Request() req: any) {
     const userId = req.user.userId;
     createThreadDto.user = userId;
 
@@ -63,7 +63,7 @@ export class ThreadsController {
   @SetMetadata('permissions', ['create_threads'])
   async createInstituteThread(
     @Body() createThreadDto: CreateThreadDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     const userId = req.user.userId;
     createThreadDto.user = userId;
@@ -91,7 +91,6 @@ export class ThreadsController {
   async findOrCreateGlobalThread(
     @Query('instituteId') instituteId: string,
     @Query('classId') classId: string,
-    @Request() req,
   ) {
     const thread = await this.threadsService.findOrCreateGlobalThread(
       instituteId,
@@ -146,7 +145,7 @@ export class ThreadsController {
     @Query('isGlobal') isGlobal: boolean,
     @Query('isInstituteOnly') isInstituteOnly: boolean,
     @Query('institute') institute: string,
-    @Request() req,
+    @Request() req: any,
   ) {
     const userId = req.user.userId;
 
@@ -196,7 +195,7 @@ export class ThreadsController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
-    @Request() req,
+    @Request() req: any,
   ) {
     const userId = req.user.userId;
     const { threads, total } = await this.threadsService.findAllByTopicId(
@@ -225,7 +224,7 @@ export class ThreadsController {
     description: 'Thread not found',
   })
   @SetMetadata('permissions', ['view_threads'])
-  async findOne(@Param('id') id: string, @Request() req) {
+  async findOne(@Param('id') id: string, @Request() req: any) {
     const userId = req.user.userId;
     const thread = await this.threadsService.findOne(id, userId);
     if (!thread) {
@@ -253,7 +252,7 @@ export class ThreadsController {
   async update(
     @Param('id') id: string,
     @Body() updateThreadDto: UpdateThreadDto,
-    @Request() req,
+    @Request() req: any,
   ) {
     const userId = req.user.userId;
     const updatedThread = await this.threadsService.update(
@@ -276,7 +275,7 @@ export class ThreadsController {
     description: 'Thread deleted successfully',
   })
   @SetMetadata('permissions', ['delete_threads'])
-  async remove(@Param('id') id: string, @Request() req) {
+  async remove(@Param('id') id: string, @Request() req: any) {
     const userId = req.user.userId;
     await this.threadsService.remove(id, userId);
     return {

@@ -39,7 +39,9 @@ export class NotificationsController {
   })
   @SetMetadata('permissions', ['create_notifications'])
   async create(@Body() createNotificationDto: CreateNotificationDto) {
-    const notification = await this.notificationsService.create(createNotificationDto);
+    const notification = await this.notificationsService.create(
+      createNotificationDto,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Notification created successfully',

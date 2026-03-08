@@ -3,8 +3,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
 import { Analytics, AnalyticsSchema } from './schemas/analytics.schema';
-import { Discussion, DiscussionSchema } from '../discussions/schemas/discussion.schema';
-import { LiveClass, LiveClassSchema } from '../liveClasses/schemas/liveClass.schema';
+import {
+  Discussion,
+  DiscussionSchema,
+} from '../discussions/schemas/discussion.schema';
+import {
+  LiveClass,
+  LiveClassSchema,
+} from '../liveClasses/schemas/liveClass.schema';
 
 @Module({
   imports: [
