@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { NotificationType, RecipientType } from '../schemas/notification.schema';
+import {
+  IsEnum,
+  IsMongoId,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import {
+  NotificationType,
+  RecipientType,
+} from '../schemas/notification.schema';
 
 export class CreateNotificationDto {
   @ApiProperty({

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as os from 'os';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/schemas/user.schema';
 import { MailService } from '../mail/mail.service';
@@ -98,9 +99,11 @@ export class AuthService {
     return user;
   }
 
-  async login(
-    user: User,
-  ): Promise<{ token: string; expiresIn: number; permissions: string[] }> {
+  login(user: User): {
+    token: string;
+    expiresIn: number;
+    permissions: string[];
+  } {
     // Extract permissions if role exists and has permissions property
     const permissions =
       user.role && user.toObject().role.permissions
@@ -141,7 +144,7 @@ export class AuthService {
       await user.save();
 
       if (user.email) {
-        if (!['Munawer-PC'].includes(require('os').hostname())) {
+        if (!['Munawer-PC'].includes(os.hostname())) {
           await this.mailService.sendOtp(user.email, otp);
         }
       }
@@ -152,12 +155,12 @@ export class AuthService {
     }
   }
 
-  async verifyOtp(otp: string, token: string): Promise<boolean | unknown> {
+  async verifyOtp(otp: string, token: string): Promise<string | boolean> {
     const user = await this.usersService.findByTokenAndOTP(token, otp);
     if (user) {
       user.verificationOtp = '';
       await user.save();
-      return user._id;
+      return (user._id as any).toString();
     }
     return false;
   }

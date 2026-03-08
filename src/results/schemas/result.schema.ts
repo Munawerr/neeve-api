@@ -90,7 +90,7 @@ export class QuestionResult {
 
   @Prop()
   corAnsExp: string;
-  
+
   @Prop({ default: false })
   skipped: boolean; // Add a property to track if the question was skipped
 }

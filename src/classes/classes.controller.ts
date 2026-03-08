@@ -10,7 +10,15 @@ import {
   HttpStatus,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
@@ -26,7 +34,10 @@ export class ClassesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new class' })
   @ApiBody({ type: CreateClassDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Class created successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class created successfully',
+  })
   async create(@Body() createClassDto: CreateClassDto) {
     const classEntity = await this.classesService.create(createClassDto);
     return {
@@ -80,8 +91,16 @@ export class ClassesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all classes for dropdown' })
-  @ApiQuery({ name: 'courseId', required: false, description: 'Filter classes by course' })
-  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter classes by institute' })
+  @ApiQuery({
+    name: 'courseId',
+    required: false,
+    description: 'Filter classes by course',
+  })
+  @ApiQuery({
+    name: 'instituteId',
+    required: false,
+    description: 'Filter classes by institute',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Classes retrieved successfully for dropdown',
@@ -92,10 +111,13 @@ export class ClassesController {
   })
   async getAllClassesForDropdown(
     @Query('courseId') courseId?: string,
-    @Query('instituteId') instituteId?: string
+    @Query('instituteId') instituteId?: string,
   ) {
     try {
-      const classes = await this.classesService.getAllClassesForDropdown(courseId, instituteId);
+      const classes = await this.classesService.getAllClassesForDropdown(
+        courseId,
+        instituteId,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Classes retrieved successfully for dropdown',
@@ -115,8 +137,14 @@ export class ClassesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a class by ID' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Class retrieved successfully' })
-  @ApiResponse({ status: HttpStatus.EXPECTATION_FAILED, description: 'Class not found' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.EXPECTATION_FAILED,
+    description: 'Class not found',
+  })
   async findOne(@Param('id') id: string) {
     const classEntity = await this.classesService.findOne(id);
     if (!classEntity) {
@@ -138,7 +166,10 @@ export class ClassesController {
   @ApiOperation({ summary: 'Update a class' })
   @ApiParam({ name: 'id', required: true })
   @ApiBody({ type: UpdateClassDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Class updated successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class updated successfully',
+  })
   async update(
     @Param('id') id: string,
     @Body() updateClassDto: UpdateClassDto,
@@ -156,7 +187,10 @@ export class ClassesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a class' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Class deleted successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Class deleted successfully',
+  })
   async remove(@Param('id') id: string) {
     await this.classesService.remove(id);
     return {

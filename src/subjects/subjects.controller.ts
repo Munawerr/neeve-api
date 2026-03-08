@@ -91,8 +91,16 @@ export class SubjectsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all subjects for dropdown' })
-  @ApiQuery({ name: 'courseId', required: false, description: 'Filter subjects by course' })
-  @ApiQuery({ name: 'instituteId', required: false, description: 'Filter subjects by institute' })
+  @ApiQuery({
+    name: 'courseId',
+    required: false,
+    description: 'Filter subjects by course',
+  })
+  @ApiQuery({
+    name: 'instituteId',
+    required: false,
+    description: 'Filter subjects by institute',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Subjects retrieved successfully for dropdown',
@@ -103,10 +111,13 @@ export class SubjectsController {
   })
   async getAllSubjectsForDropdown(
     @Query('courseId') courseId?: string,
-    @Query('instituteId') instituteId?: string
+    @Query('instituteId') instituteId?: string,
   ) {
     try {
-      const subjects = await this.subjectsService.getAllSubjectsForDropdown(courseId, instituteId);
+      const subjects = await this.subjectsService.getAllSubjectsForDropdown(
+        courseId,
+        instituteId,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Subjects retrieved successfully for dropdown',

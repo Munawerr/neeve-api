@@ -1,5 +1,4 @@
 import { IsString, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
-import { Schema as MongooseSchema } from 'mongoose';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateStudentUserDto {

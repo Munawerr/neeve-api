@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -28,13 +33,16 @@ export class ReportAccessGuard implements CanActivate {
       const token = request.headers.authorization
         ? request.headers.authorization.split(' ')[1]
         : null;
-      
+
       if (!token) {
         throw new ForbiddenException('Authentication required');
       }
 
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET as string,
+        ) as any;
         const userId = decoded.sub;
         const isAdmin = decoded.role === 'admin';
 
@@ -54,18 +62,22 @@ export class ReportAccessGuard implements CanActivate {
 
         // User can access if they created the report or if they belong to the same institute
         const isCreator = report.createdBy.toString() === userId;
-        const sameInstitute = 
-          report.institute && 
-          user.institute && 
+        const sameInstitute =
+          report.institute &&
+          user.institute &&
           report.institute.toString() === user.institute.toString();
 
         if (isCreator || sameInstitute) {
           return true;
         }
 
-        throw new ForbiddenException('You do not have permission to access this report');
-      } catch (error) {
-        throw new ForbiddenException('Invalid authentication token or insufficient permissions');
+        throw new ForbiddenException(
+          'You do not have permission to access this report',
+        );
+      } catch {
+        throw new ForbiddenException(
+          'Invalid authentication token or insufficient permissions',
+        );
       }
     }
 
