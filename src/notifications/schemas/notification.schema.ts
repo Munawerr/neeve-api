@@ -13,39 +13,27 @@ export enum RecipientType {
 
 @Schema()
 export class Notification extends Document {
-  @Prop({
-    type: String,
-    enum: Object.values(NotificationType),
-    required: true,
+  @Prop({ 
+    type: String, 
+    enum: Object.values(NotificationType), 
+    required: true 
   })
   type: NotificationType;
 
-  @Prop({
-    type: String,
-    enum: Object.values(RecipientType),
-    required: true,
+  @Prop({ 
+    type: String, 
+    enum: Object.values(RecipientType), 
+    required: true 
   })
   recipientType: RecipientType;
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: 'recipientType',
-    required: true,
-  })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, refPath: 'recipientType', required: true })
   recipient: mongoose.Schema.Types.ObjectId;
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Thread',
-    required: false,
-  })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Thread', required: false })
   thread: mongoose.Schema.Types.ObjectId;
 
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Discussion',
-    required: false,
-  })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Discussion', required: false })
   discussion: mongoose.Schema.Types.ObjectId;
 
   @Prop({ required: true })

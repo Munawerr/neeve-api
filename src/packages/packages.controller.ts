@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpStatus,
   SetMetadata,
+  Request,
   Headers,
   Query,
 } from '@nestjs/common';
@@ -53,7 +54,7 @@ export class PackagesController {
   })
   @SetMetadata('permissions', ['edit_packages'])
   async create(@Body() createPackageDto: CreatePackageDto) {
-    const { course, class: classId, subjects } = createPackageDto;
+    const { course, class: classId, subjects, ...rest } = createPackageDto;
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);
@@ -98,17 +99,10 @@ export class PackagesController {
     @Query('search') search: string = '',
   ) {
     const token = authHeader.split(' ')[1];
-    let decodedToken: any;
+    let decodedToken;
     try {
       decodedToken = jwt.verify(token, process.env.JWT_SECRET as string);
-    } catch {
-      return {
-        status: HttpStatus.UNAUTHORIZED,
-        message: 'Invalid token',
-      };
-    }
-
-    if (typeof decodedToken === 'string' || !decodedToken.role) {
+    } catch (err) {
       return {
         status: HttpStatus.UNAUTHORIZED,
         message: 'Invalid token',
@@ -116,10 +110,7 @@ export class PackagesController {
     }
 
     if (decodedToken.role === 'institute') {
-      const user = await this.usersService.findOne(
-        decodedToken.sub || '',
-        true,
-      );
+      const user = await this.usersService.findOne(decodedToken.sub, true);
       return {
         status: HttpStatus.OK,
         message: 'Packages retrieved successfully',
@@ -220,7 +211,7 @@ export class PackagesController {
     @Param('id') id: string,
     @Body() updatePackageDto: UpdatePackageDto,
   ) {
-    const { course, class: classId, subjects } = updatePackageDto;
+    const { course, class: classId, subjects, ...rest } = updatePackageDto;
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);

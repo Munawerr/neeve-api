@@ -21,10 +21,7 @@ export class CreateQuestionResultDto {
   @ApiProperty({ type: [OptionDto] })
   readonly options: OptionDto[];
 
-  @ApiPropertyOptional({
-    example: 'The capital of France is Paris.',
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'The capital of France is Paris.', required: false })
   readonly corAnsExp?: string;
 
   @ApiProperty({ required: false })

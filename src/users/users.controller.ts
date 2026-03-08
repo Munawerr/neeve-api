@@ -822,13 +822,12 @@ export class UsersController {
     try {
       const user = await this.usersService.findOne(id, true);
       if (user) {
-        const userObject = user.toObject();
-        delete userObject.password;
+        const { password, ...userWithoutPassword } = user.toObject();
         const analytics = await this.usersService.getUserAnalytics(user);
         return {
           status: HttpStatus.OK,
           message: 'User retrieved successfully',
-          data: { ...userObject, analytics },
+          data: { ...userWithoutPassword, analytics },
         };
       }
       return {

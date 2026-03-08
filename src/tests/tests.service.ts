@@ -4,12 +4,12 @@ import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Test, TestType } from './schemas/test.schema';
 import { CreateTestDto } from './dto/create-test.dto';
 import { UpdateTestDto } from './dto/update-test.dto';
-// @ts-expect-error missing type definitions
 import * as pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth'; // Replace docx4js with mammoth
 import { OpenAI } from 'openai'; // Corrected import
 import { QuestionsService } from 'src/questions/questions.service'; // Import QuestionsService
 import { OptionDto } from 'src/questions/dto/create-question.dto';
+import { MathMLToLaTeX } from 'mathml-to-latex'; // Library to convert MathML to LaTeX
 
 @Injectable()
 export class TestsService {
@@ -155,7 +155,7 @@ export class TestsService {
       } else {
         throw new BadRequestException('Unsupported file type');
       }
-    } catch {
+    } catch (error) {
       throw new BadRequestException('Failed to extract text from file');
     }
 
@@ -177,7 +177,7 @@ export class TestsService {
 
       const options: OptionDto[] = mcq.options
         // .filter((opt) => opt.text && opt.isCorrect !== undefined) // Ensure options have text and isCorrect
-        .map((option: any) => ({
+        .map((option) => ({
           text: this.wrapLatexInDollarSigns(option.text),
           isCorrect: false,
           // isCorrect: option.isCorrect,

@@ -15,7 +15,7 @@ export class CreateGlobalThreadDto {
 
   @ApiProperty({ example: 'This is the content of the thread.' })
   readonly content: string;
-
+  
   @ApiProperty({ example: true, default: true })
   readonly isGlobal: boolean = true;
 }

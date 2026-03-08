@@ -184,7 +184,7 @@ export class ResultsController {
     @Query('testIds') testIds: string,
   ) {
     const testIdArray = testIds.split(',');
-    const attemptedTests: any = {};
+    const attemptedTests = {};
 
     // Check each test if the student has attempted it
     for (const testId of testIdArray) {
@@ -358,10 +358,10 @@ export class ResultsController {
         let obtainedMarks = updatedResult1.questionResults.reduce(
           (sum, questionResult: any) => {
             const correctOptions = questionResult.options.filter(
-              (option: any) => option.isCorrect,
+              (option) => option.isCorrect,
             );
             const checkedOptions = questionResult.options.filter(
-              (option: any) => option.isChecked,
+              (option) => option.isChecked,
             );
 
             // If skipped, no marks added or deducted
@@ -372,8 +372,8 @@ export class ResultsController {
             // If the answer is correct (all correct options selected and only correct options selected)
             if (
               correctOptions.length === checkedOptions.length &&
-              correctOptions.every((option: any) => option.isChecked) &&
-              checkedOptions.every((option: any) => option.isCorrect)
+              correctOptions.every((option) => option.isChecked) &&
+              checkedOptions.every((option) => option.isCorrect)
             ) {
               return sum + updatedResult1.marksPerQuestion;
             }
@@ -399,16 +399,16 @@ export class ResultsController {
             }
 
             const correctOptions = questionResult.options.filter(
-              (option: any) => option.isCorrect,
+              (option) => option.isCorrect,
             );
             const checkedOptions = questionResult.options.filter(
-              (option: any) => option.isChecked,
+              (option) => option.isChecked,
             );
 
             return (
               correctOptions.length === checkedOptions.length &&
-              correctOptions.every((option: any) => option.isChecked) &&
-              checkedOptions.every((option: any) => option.isCorrect)
+              correctOptions.every((option) => option.isChecked) &&
+              checkedOptions.every((option) => option.isCorrect)
             );
           },
         ).length;
@@ -538,7 +538,7 @@ export class ResultsController {
           averageMarks,
         );
 
-        const _reportCard: any = {
+        let _reportCard = {
           title: test.title,
           totalMarks,
           obtainedMarks,
@@ -590,26 +590,23 @@ export class ResultsController {
       testType,
     );
 
-    const uniqueResults = results.reduce<Record<string, Result>>(
-      (acc, result) => {
-        const testId = result.toObject().test._id;
-        if (
-          !acc[testId] ||
-          acc[testId].marksSummary.obtainedMarks <
-            result.marksSummary.obtainedMarks
-        ) {
-          acc[testId] = result;
-        }
-        return acc;
-      },
-      {},
-    );
+    const uniqueResults = results.reduce((acc, result) => {
+      const testId = result.toObject().test._id;
+      if (
+        !acc[testId] ||
+        acc[testId].marksSummary.obtainedMarks <
+          result.marksSummary.obtainedMarks
+      ) {
+        acc[testId] = result;
+      }
+      return acc;
+    }, {});
 
-    const uniqueResultsArray = Object.values(uniqueResults);
+    const uniqueResultsArray = Object.values(uniqueResults) as Result[];
 
     // Recalculate total marks accounting for skippable questions
     const totalMarks = await uniqueResultsArray.reduce(
-      async (sumPromise: Promise<number>, result) => {
+      async (sumPromise, result) => {
         const sum = await sumPromise;
         const test = await this.testsService.findOne(result.test.toString());
         const skipableQuestionsCount = test?.skipableQuestionsCount || 0;
@@ -716,7 +713,7 @@ export class ResultsController {
           averageMarks,
         );
 
-        const _reportCard: any = {
+        let _reportCard = {
           title: test.title,
           subject_title: subject.title,
           totalMarks,
@@ -768,7 +765,7 @@ export class ResultsController {
     const results =
       await this.resultsService.findFinishedResultsByStudent(studentId);
 
-    const uniqueResults = results.reduce((acc: any, result) => {
+    const uniqueResults = results.reduce((acc, result) => {
       const testId = result.toObject().test._id;
       if (
         !acc[testId] ||
@@ -789,7 +786,7 @@ export class ResultsController {
     );
 
     // Create a map of test IDs to their skipableQuestionsCount for quick lookup
-    const testSkipableCountMap: any = tests.reduce((map: any, test) => {
+    const testSkipableCountMap = tests.reduce((map, test) => {
       if (test) {
         map[test._id as string] = test.skipableQuestionsCount || 0;
       }
@@ -837,7 +834,7 @@ export class ResultsController {
             );
           },
         );
-      return sum + questionTimes.reduce((acc: any, time: any) => acc + time, 0);
+      return sum + questionTimes.reduce((acc, time) => acc + time, 0);
     }, 0);
 
     const averageTimePerQuestion = totalTimeInMinutes / totalQuestions;
@@ -854,7 +851,7 @@ export class ResultsController {
     // Calculate test summary
     const packages = student.packages;
     let totalTestsInCourse = 0;
-    const testsTakenByStudent = uniqueResultsArray.length;
+    let testsTakenByStudent = uniqueResultsArray.length;
     let remainingTests = 0;
 
     for (const pkg of packages) {

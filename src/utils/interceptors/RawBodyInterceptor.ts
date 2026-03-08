@@ -24,7 +24,7 @@ export class RawBodyInterceptor implements NestInterceptor {
         observer.complete();
       });
 
-      request.on('error', (error: any) => {
+      request.on('error', (error) => {
         observer.error(error);
       });
     }).pipe(() => next.handle());

@@ -80,13 +80,12 @@ export class TopicsController {
 
     const _topics: any[] = [];
     topics.forEach((topic) => {
-      topic.toObject().subTopics.forEach((subTopic: any) => {
+      topic.toObject().subTopics.forEach((subTopic) => {
         topic.tests = [...topic.tests, ...subTopic.tests];
       });
 
-      const topicObject = topic.toObject();
-      delete topicObject.subTopics;
-      _topics.push(topicObject);
+      const { subTopics, ...rest } = topic.toObject();
+      _topics.push(rest);
     });
 
     return {
@@ -196,29 +195,27 @@ export class TopicsController {
 
     // Extract the original topic data
     const topicData = originalTopic.toObject();
-
+    
     // Create new topic object with the original topic data
     const duplicateTopicDto = new CreateTopicDto();
     duplicateTopicDto.title = `${topicData.title}`;
     duplicateTopicDto.code = `${topicData.code}`;
-
+    
     // Ensure we're using string IDs, not object references, with proper null checks
-    duplicateTopicDto.subject =
-      body.subjectId ||
-      (topicData.subject
-        ? typeof topicData.subject === 'object' && topicData.subject._id
-          ? topicData.subject._id.toString()
-          : String(topicData.subject)
-        : null);
-
-    duplicateTopicDto.package =
-      body.packageId ||
-      (topicData.package
-        ? typeof topicData.package === 'object' && topicData.package._id
-          ? topicData.package._id.toString()
-          : String(topicData.package)
-        : null);
-
+    duplicateTopicDto.subject = body.subjectId || 
+      (topicData.subject ? 
+        (typeof topicData.subject === 'object' && topicData.subject._id ? 
+          topicData.subject._id.toString() : 
+          String(topicData.subject)) : 
+        null);
+        
+    duplicateTopicDto.package = body.packageId || 
+      (topicData.package ? 
+        (typeof topicData.package === 'object' && topicData.package._id ? 
+          topicData.package._id.toString() : 
+          String(topicData.package)) : 
+        null);
+        
     duplicateTopicDto.introVideoUrls = topicData.introVideoUrls || [];
     duplicateTopicDto.studyNotes = topicData.studyNotes || [];
     duplicateTopicDto.studyPlans = topicData.studyPlans || [];
@@ -234,57 +231,48 @@ export class TopicsController {
     if (topicData.subTopics && topicData.subTopics.length > 0) {
       for (const subTopicId of topicData.subTopics) {
         if (!subTopicId) continue; // Skip if subTopicId is null or undefined
-
+        
         // Convert the subTopicId to string safely
         let subTopicIdStr;
         try {
-          subTopicIdStr =
-            typeof subTopicId === 'object'
-              ? subTopicId._id
-                ? subTopicId._id.toString()
-                : null
-              : String(subTopicId);
+          subTopicIdStr = typeof subTopicId === 'object' ? 
+            (subTopicId._id ? subTopicId._id.toString() : null) : 
+            String(subTopicId);
         } catch (error) {
           console.error('Error converting subTopic ID:', error);
           continue; // Skip this subtopic if ID conversion fails
         }
-
+        
         if (!subTopicIdStr) continue; // Skip if ID conversion resulted in null
-
+          
         const subTopic = await this.topicsService.findOne(subTopicIdStr);
         if (subTopic) {
           const subTopicData = subTopic.toObject();
-
+          
           // Create duplicate subtopic
           const duplicateSubTopicDto = new CreateTopicDto();
           duplicateSubTopicDto.title = subTopicData.title;
           duplicateSubTopicDto.code = `${subTopicData.code}`;
-
+          
           // Ensure we're using string IDs for subjects and packages with proper null checks
-          duplicateSubTopicDto.subject =
-            body.subjectId ||
-            (subTopicData.subject
-              ? typeof subTopicData.subject === 'object' &&
-                subTopicData.subject._id
-                ? subTopicData.subject._id.toString()
-                : String(subTopicData.subject)
-              : null);
-
-          duplicateSubTopicDto.package =
-            body.packageId ||
-            (subTopicData.package
-              ? typeof subTopicData.package === 'object' &&
-                subTopicData.package._id
-                ? subTopicData.package._id.toString()
-                : String(subTopicData.package)
-              : null);
-
-          duplicateSubTopicDto.introVideoUrls =
-            subTopicData.introVideoUrls || [];
+          duplicateSubTopicDto.subject = body.subjectId || 
+            (subTopicData.subject ? 
+              (typeof subTopicData.subject === 'object' && subTopicData.subject._id ? 
+                subTopicData.subject._id.toString() : 
+                String(subTopicData.subject)) : 
+              null);
+              
+          duplicateSubTopicDto.package = body.packageId || 
+            (subTopicData.package ? 
+              (typeof subTopicData.package === 'object' && subTopicData.package._id ? 
+                subTopicData.package._id.toString() : 
+                String(subTopicData.package)) : 
+              null);
+              
+          duplicateSubTopicDto.introVideoUrls = subTopicData.introVideoUrls || [];
           duplicateSubTopicDto.studyNotes = subTopicData.studyNotes || [];
           duplicateSubTopicDto.studyPlans = subTopicData.studyPlans || [];
-          duplicateSubTopicDto.practiceProblems =
-            subTopicData.practiceProblems || [];
+          duplicateSubTopicDto.practiceProblems = subTopicData.practiceProblems || [];
 
           const duplicatedSubTopic = await this.topicsService.create({
             ...duplicateSubTopicDto,
@@ -292,12 +280,10 @@ export class TopicsController {
           });
 
           // Add subtopic to duplicated parent topic
-          duplicatedTopic.subTopics.push(
-            duplicatedSubTopic._id as MongooseSchema.Types.ObjectId,
-          );
+          duplicatedTopic.subTopics.push(duplicatedSubTopic._id as MongooseSchema.Types.ObjectId);
         }
       }
-
+      
       // Save the updated parent topic with subtopics
       await duplicatedTopic.save();
     }
@@ -398,55 +384,8 @@ export class TopicsController {
   })
   async bulkCreateTopics(@UploadedFile() file: Express.Multer.File) {
     try {
-<<<<<<< Updated upstream
       const workbook = new Workbook();
       await workbook.xlsx.load(file.buffer);
-=======
-      // Add detailed logging to understand what's being received
-      console.log('Received upload request');
-      console.log('File received:', file ? 'Yes' : 'No');
-
-      // Check if file exists
-      if (!file) {
-        console.log('No file in request');
-        return {
-          status: HttpStatus.BAD_REQUEST,
-          message: 'File is required',
-        };
-      }
-
-      console.log('File details:', {
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        size: file.buffer?.length || 0,
-      });
-
-      // Check if file has buffer
-      if (!file.buffer) {
-        return {
-          status: HttpStatus.BAD_REQUEST,
-          message: 'Invalid file format',
-        };
-      }
-
-      // Create a new workbook
-      const workbook = new Workbook();
-
-      // Use a try-catch specifically for the file parsing
-      try {
-        // Load the workbook directly from buffer (cast as any to avoid type issues)
-        await workbook.xlsx.load(file.buffer as any);
-      } catch (parseError) {
-        console.error('Error parsing Excel file:', parseError);
-        return {
-          status: HttpStatus.BAD_REQUEST,
-          message: 'Invalid Excel file format',
-          error: parseError.message,
-        };
-      }
-
->>>>>>> Stashed changes
       const worksheet = workbook.getWorksheet(1);
 
       const parentTopics: any = {};

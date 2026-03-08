@@ -130,20 +130,9 @@ export class TopicsService {
         parentTopic.practiceProblems,
       );
 
-<<<<<<< Updated upstream
       const newParentTopic = new this.topicModel({
         code: parentTopic.code,
         title: parentTopic.title,
-=======
-      // Use description as subtopic title or fallback to parent title if not provided
-      const subtopicTitle = parentTopic.description
-        ? parentTopic.description
-        : `${parentTopic.title}`;
-
-      const newSubTopic = new this.topicModel({
-        code: `-`,
-        title: subtopicTitle,
->>>>>>> Stashed changes
         subject: subject._id,
         package: _package._id,
         introVideoUrls: parentTopic.introVideoUrls,
@@ -152,52 +141,21 @@ export class TopicsService {
         practiceProblems: practiceProblemsIds,
       });
 
-<<<<<<< Updated upstream
       const savedParentTopic = await newParentTopic.save();
       createdTopics.push(savedParentTopic);
-=======
-      const savedSubTopic = await newSubTopic.save();
-
-      // Link subtopic to parent
-      savedParentTopic.subTopics.push(
-        savedSubTopic._id as MongooseSchema.Types.ObjectId,
-      );
-      await savedParentTopic.save();
-      createdTopics.push(savedSubTopic);
->>>>>>> Stashed changes
 
       for (let i = 1; i < topics.length; i++) {
         const subTopic = topics[i];
 
-<<<<<<< Updated upstream
         const subStudyNotesIds = await this.saveFiles(subTopic.studyNotes);
         const subStudyPlansIds = await this.saveFiles(subTopic.studyPlans);
-=======
-        const subStudyNotesIds = await this.saveFiles(
-          additionalSubTopic.studyNotes,
-        );
-        const subStudyPlansIds = await this.saveFiles(
-          additionalSubTopic.studyPlans,
-        );
->>>>>>> Stashed changes
         const subPracticeProblemsIds = await this.saveFiles(
           subTopic.practiceProblems,
         );
 
-<<<<<<< Updated upstream
         const newSubTopic = new this.topicModel({
           code: subTopic.code,
           title: subTopic.title,
-=======
-        // Use description as subtopic title or code as fallback
-        const addSubtopicTitle = additionalSubTopic.description
-          ? additionalSubTopic.description
-          : `${additionalSubTopic.code}-content`;
-
-        const newAdditionalSubTopic = new this.topicModel({
-          code: additionalSubTopic.code,
-          title: addSubtopicTitle,
->>>>>>> Stashed changes
           subject: subject._id,
           package: _package._id,
           introVideoUrls: subTopic.introVideoUrls,

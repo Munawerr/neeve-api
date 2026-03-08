@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Result, ResultStatus } from './schemas/result.schema';
 import { CreateResultServiceDto } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
+import { TestType } from 'src/tests/schemas/test.schema';
 
 @Injectable()
 export class ResultsService {
@@ -207,7 +208,7 @@ export class ResultsService {
     // Find index of current score (0-based index)
     const index = scores.indexOf(score);
 
-    // Calculate percentile: (Position from top / total number of scores)
+    // Calculate percentile: (Position from top / total number of scores) 
     // Add 1 to index to get 1-based position
     const percentile = ((index + 1) / scores.length) * 100;
 
@@ -232,17 +233,14 @@ export class ResultsService {
       .exec();
 
     // Group results by student
-    const studentResults = allResults.reduce<Record<string, Result[]>>(
-      (acc, result) => {
-        const studentId = result.student.toString();
-        if (!acc[studentId]) {
-          acc[studentId] = [];
-        }
-        acc[studentId].push(result);
-        return acc;
-      },
-      {},
-    );
+    const studentResults = allResults.reduce((acc, result) => {
+      const studentId = result.student.toString();
+      if (!acc[studentId]) {
+        acc[studentId] = [];
+      }
+      acc[studentId].push(result);
+      return acc;
+    }, {});
 
     // Calculate average score for each student
     const studentScores = Object.values(studentResults).map(
@@ -289,17 +287,14 @@ export class ResultsService {
       .exec();
 
     // Group results by student
-    const studentResults = allResults.reduce<Record<string, Result[]>>(
-      (acc, result) => {
-        const studentId = result.student.toString();
-        if (!acc[studentId]) {
-          acc[studentId] = [];
-        }
-        acc[studentId].push(result);
-        return acc;
-      },
-      {},
-    );
+    const studentResults = allResults.reduce((acc, result) => {
+      const studentId = result.student.toString();
+      if (!acc[studentId]) {
+        acc[studentId] = [];
+      }
+      acc[studentId].push(result);
+      return acc;
+    }, {});
 
     // Calculate average score for each student
     const studentScores = Object.values(studentResults).map(
@@ -347,13 +342,11 @@ export class ResultsService {
 
     // Get all scores for this test
     const scores = allResults.map((result) => ({
-      score:
-        (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) *
-        100,
+      score: (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100,
     }));
 
     // Add current score if not already in the list
-    if (!scores.some((s) => Math.abs(s.score - studentScore) < 0.001)) {
+    if (!scores.some(s => Math.abs(s.score - studentScore) < 0.001)) {
       scores.push({ score: studentScore });
     }
 
@@ -361,8 +354,7 @@ export class ResultsService {
     scores.sort((a, b) => b.score - a.score);
 
     // Find position of current score (0-based index)
-    const rank =
-      scores.findIndex((s) => Math.abs(s.score - studentScore) < 0.001) + 1;
+    const rank = scores.findIndex(s => Math.abs(s.score - studentScore) < 0.001) + 1;
     const totalStudents = scores.length;
 
     // Calculate percentile (rank based)

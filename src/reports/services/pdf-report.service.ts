@@ -62,7 +62,6 @@ export class PdfReportService {
   }
 
   private async buildStudentReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -149,7 +148,6 @@ export class PdfReportService {
   }
 
   private async buildSubjectReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -213,7 +211,6 @@ export class PdfReportService {
   }
 
   private async buildCourseReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -285,7 +282,6 @@ export class PdfReportService {
   }
 
   private async buildPackageReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -354,7 +350,6 @@ export class PdfReportService {
   }
 
   private async buildTestReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -466,7 +461,6 @@ export class PdfReportService {
   }
 
   private async buildInstituteReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;
@@ -571,7 +565,6 @@ export class PdfReportService {
   }
 
   private async buildOverallReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
     let yPos = 60;
     const margin = 20;
     const pageWidth = doc.internal.pageSize.width;

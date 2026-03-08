@@ -100,8 +100,7 @@ export class LiveClassesController {
   @SetMetadata('permissions', ['view_live_classes'])
   async getUpcomingLiveClassesCount(@Query('institute') institute: string) {
     try {
-      const count =
-        await this.liveClassesService.countUpcomingLiveClasses(institute);
+      const count = await this.liveClassesService.countUpcomingLiveClasses(institute);
       return {
         status: HttpStatus.OK,
         message: 'Count of upcoming live classes retrieved successfully',

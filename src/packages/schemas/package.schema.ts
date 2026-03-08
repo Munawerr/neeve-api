@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Document } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 
 @Schema()
 export class Package extends Document {
@@ -22,7 +22,7 @@ export class Package extends Document {
   description: string;
 }
 
-function arrayLimit(val: any[]): boolean {
+function arrayLimit(val) {
   return val.length <= 6;
 }
 

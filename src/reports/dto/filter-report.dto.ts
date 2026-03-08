@@ -1,16 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsEnum,
-  IsOptional,
-  IsString,
-  IsMongoId,
-  IsDateString,
-} from 'class-validator';
-import {
-  ReportFormat,
-  ReportStatus,
-  ReportType,
-} from '../schemas/report.schema';
+import { IsEnum, IsOptional, IsString, IsMongoId, IsDateString } from 'class-validator';
+import { ReportFormat, ReportStatus, ReportType } from '../schemas/report.schema';
 
 export class FilterReportDto {
   @ApiPropertyOptional({ description: 'Report name' })
@@ -23,39 +13,27 @@ export class FilterReportDto {
   @IsEnum(ReportType)
   reportType?: ReportType;
 
-  @ApiPropertyOptional({
-    description: 'Format of the report',
-    enum: ReportFormat,
-  })
+  @ApiPropertyOptional({ description: 'Format of the report', enum: ReportFormat })
   @IsOptional()
   @IsEnum(ReportFormat)
   format?: ReportFormat;
 
-  @ApiPropertyOptional({
-    description: 'Status of the report',
-    enum: ReportStatus,
-  })
+  @ApiPropertyOptional({ description: 'Status of the report', enum: ReportStatus })
   @IsOptional()
   @IsEnum(ReportStatus)
   status?: ReportStatus;
 
-  @ApiPropertyOptional({
-    description: 'Institute ID for institute-specific reports',
-  })
+  @ApiPropertyOptional({ description: 'Institute ID for institute-specific reports' })
   @IsOptional()
   @IsMongoId()
   institute?: string;
 
-  @ApiPropertyOptional({
-    description: 'Student ID for student-specific reports',
-  })
+  @ApiPropertyOptional({ description: 'Student ID for student-specific reports' })
   @IsOptional()
   @IsMongoId()
   student?: string;
 
-  @ApiPropertyOptional({
-    description: 'Subject ID for subject-specific reports',
-  })
+  @ApiPropertyOptional({ description: 'Subject ID for subject-specific reports' })
   @IsOptional()
   @IsMongoId()
   subject?: string;
@@ -65,9 +43,7 @@ export class FilterReportDto {
   @IsMongoId()
   course?: string;
 
-  @ApiPropertyOptional({
-    description: 'Package ID for package-specific reports',
-  })
+  @ApiPropertyOptional({ description: 'Package ID for package-specific reports' })
   @IsOptional()
   @IsMongoId()
   package?: string;

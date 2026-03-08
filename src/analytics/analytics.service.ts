@@ -76,7 +76,7 @@ export class AnalyticsService {
     startDate.setDate(startDate.getDate() - days + 1);
     startDate.setHours(0, 0, 0, 0);
 
-    const aggregateMatch: any = {
+    let aggregateMatch = {
       timestamp: { $gte: startDate },
     };
 

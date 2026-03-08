@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
+import { model, Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
-import { Result, ResultStatus } from './../results/schemas/result.schema'; // Import Result schema
-import { Package } from '../packages/schemas/package.schema';
+import {
+  Result,
+  ResultStatus,
+  TestType,
+} from './../results/schemas/result.schema'; // Import Result schema
+import { Package } from 'src/packages/schemas/package.schema';
 import { LoginHistory } from '../auth/schemas/login-history.schema'; // Import LoginHistory model
 
 import { User } from './schemas/user.schema';
@@ -16,8 +20,8 @@ import { UpdateInstituteUserDto } from './dto/update-institute-user.dto';
 import { UpdateStudentUserDto } from './dto/update-student-user.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
-import { CreateRoleDto } from '../roles/dto/create-role.dto';
-import { UpdateRoleDto } from '../roles/dto/update-role.dto';
+import { CreateRoleDto } from 'src/roles/dto/create-role.dto';
+import { UpdateRoleDto } from 'src/roles/dto/update-role.dto';
 
 @Injectable()
 export class UsersService {
@@ -180,12 +184,12 @@ export class UsersService {
     return this.userModel.findByIdAndDelete(id).exec();
   }
 
-  async getInstituteRoleId(): Promise<MongooseSchema.Types.ObjectId> {
+  async getInstituteRoleId(): Promise<MongooseSchema.Types.ObjectId | unknown> {
     const instituteRole = await this.roleModel.findOne({ slug: 'institute' });
     if (!instituteRole) {
       throw new Error('Institute role not found');
     }
-    return instituteRole._id as MongooseSchema.Types.ObjectId;
+    return instituteRole._id;
   }
 
   async createStudentUser(
@@ -260,12 +264,12 @@ export class UsersService {
     return this.userModel.findByIdAndDelete(id).exec();
   }
 
-  async getStudentRoleId(): Promise<MongooseSchema.Types.ObjectId> {
+  async getStudentRoleId(): Promise<MongooseSchema.Types.ObjectId | unknown> {
     const studentRole = await this.roleModel.findOne({ slug: 'student' });
     if (!studentRole) {
       throw new Error('Student role not found');
     }
-    return studentRole._id as MongooseSchema.Types.ObjectId;
+    return studentRole._id;
   }
 
   async getUserAnalytics(user: User): Promise<any> {
@@ -290,20 +294,17 @@ export class UsersService {
         .exec();
 
       // Get unique test results (best attempt for each test)
-      const uniqueResults = testResults.reduce(
-        (acc: Record<string, any>, result: any) => {
-          const testId = result.test._id.toString();
-          if (
-            !acc[testId] ||
-            acc[testId].marksSummary.obtainedMarks <
-              result.marksSummary.obtainedMarks
-          ) {
-            acc[testId] = result;
-          }
-          return acc;
-        },
-        {},
-      );
+      const uniqueResults = testResults.reduce((acc, result: any) => {
+        const testId = result.test._id.toString();
+        if (
+          !acc[testId] ||
+          acc[testId].marksSummary.obtainedMarks <
+            result.marksSummary.obtainedMarks
+        ) {
+          acc[testId] = result;
+        }
+        return acc;
+      }, {});
 
       const uniqueResultsArray: any[] = Object.values(uniqueResults);
       const testsTaken = uniqueResultsArray.length;
@@ -337,24 +338,21 @@ export class UsersService {
         .exec();
 
       // Group results by student
-      const studentResults = allStudentResults.reduce(
-        (acc: Record<string, Record<string, any>>, result: any) => {
-          const studentId = result.student.toString();
-          if (!acc[studentId]) {
-            acc[studentId] = {};
-          }
-          const testId = result.test._id.toString();
-          if (
-            !acc[studentId][testId] ||
-            acc[studentId][testId].marksSummary.obtainedMarks <
-              result.marksSummary.obtainedMarks
-          ) {
-            acc[studentId][testId] = result;
-          }
-          return acc;
-        },
-        {},
-      );
+      const studentResults = allStudentResults.reduce((acc, result: any) => {
+        const studentId = result.student.toString();
+        if (!acc[studentId]) {
+          acc[studentId] = {};
+        }
+        const testId = result.test._id.toString();
+        if (
+          !acc[studentId][testId] ||
+          acc[studentId][testId].marksSummary.obtainedMarks <
+            result.marksSummary.obtainedMarks
+        ) {
+          acc[studentId][testId] = result;
+        }
+        return acc;
+      }, {});
 
       // Calculate average score for each student
       const studentScores = Object.values(studentResults).map((tests: any) => {
@@ -1124,7 +1122,7 @@ export class UsersService {
   }
 
   async getHourlyEngagement(institute: string | null = null): Promise<any[]> {
-    const aggregateQuery: any[] = [
+    let aggregateQuery: any[] = [
       {
         $lookup: {
           from: 'results',

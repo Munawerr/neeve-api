@@ -17,7 +17,7 @@ export class User extends Document {
     required: false,
     validate: {
       // Only check uniqueness if email has a value
-      validator: async function (email: string | undefined) {
+      validator: async function (email) {
         if (!email) return true; // Skip validation if email is empty
         const user = await this.constructor.findOne({ email });
         return !user || user._id.equals(this._id);

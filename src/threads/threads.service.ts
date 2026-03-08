@@ -331,6 +331,6 @@ export class ThreadsService {
       return false;
     }
 
-    return (user.role as any)['slug'] === 'admin';
+    return user.role['slug'] === 'admin';
   }
 }

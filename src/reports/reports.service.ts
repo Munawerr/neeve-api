@@ -88,35 +88,30 @@ export class ReportsService {
       : '';
 
     switch (reportDto.reportType) {
-      case ReportType.STUDENT: {
+      case ReportType.STUDENT:
         const student = await this.userModel.findById(reportDto.student);
         name = `${student?.full_name || 'Student'}${dateRange} - Performance Report`;
         break;
-      }
 
-      case ReportType.SUBJECT: {
+      case ReportType.SUBJECT:
         const subject = await this.subjectModel.findById(reportDto.subject);
         name = `${subject?.title || 'Subject'}${dateRange} - Subject Report`;
         break;
-      }
 
-      case ReportType.COURSE: {
+      case ReportType.COURSE:
         const course = await this.courseModel.findById(reportDto.course);
         name = `${course?.title || 'Course'}${dateRange} - Course Report`;
         break;
-      }
 
-      case ReportType.TEST: {
+      case ReportType.TEST:
         const test = await this.testModel.findById(reportDto.test);
         name = `${test?.title || 'Test'}${dateRange} - Test Report`;
         break;
-      }
 
-      case ReportType.INSTITUTE: {
+      case ReportType.INSTITUTE:
         const institute = await this.userModel.findById(reportDto.institute);
         name = `${institute?.full_name || 'Institute'}${dateRange} - Institute Report`;
         break;
-      }
 
       case ReportType.OVERALL:
         name = `Overall Performance Report${dateRange}`;

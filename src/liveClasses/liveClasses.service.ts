@@ -70,12 +70,10 @@ export class LiveClassesService {
 
   async countUpcomingLiveClasses(institute: string): Promise<number> {
     const today = new Date();
-    const count = await this.liveClassModel
-      .countDocuments({
-        institute,
-        date: { $gte: today },
-      })
-      .exec();
+    const count = await this.liveClassModel.countDocuments({
+      institute,
+      date: { $gte: today },
+    }).exec();
     return count;
   }
 }

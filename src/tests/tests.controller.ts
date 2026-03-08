@@ -390,23 +390,25 @@ export class TestsController {
       }
 
       // Process options for LaTeX expressions
-      const processedOptions = question.options.map((option) => {
-        const optionText = option.text;
-        const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
+      const processedOptions = await Promise.all(
+        question.options.map(async (option) => {
+          let optionText = option.text;
+          const optionLatexExpressions = optionText.match(/\$(.*?)\$/g);
 
-        if (optionLatexExpressions) {
-          let processedOptionText = optionText;
-          for (const latexExpr of optionLatexExpressions) {
-            processedOptionText = processedOptionText.replace(
-              latexExpr,
-              latexExpr.slice(1, -1), // Simply remove $ symbols for display in Excel
-            );
+          if (optionLatexExpressions) {
+            let processedOptionText = optionText;
+            for (const latexExpr of optionLatexExpressions) {
+              processedOptionText = processedOptionText.replace(
+                latexExpr,
+                latexExpr.slice(1, -1), // Simply remove $ symbols for display in Excel
+              );
+            }
+            return `${htmlToText.convert(processedOptionText)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
           }
-          return `${htmlToText.convert(processedOptionText)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
-        }
 
-        return `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
-      });
+          return `${htmlToText.convert(option.text)} (${option.isCorrect ? 'Correct' : 'Incorrect'})`;
+        }),
+      );
 
       const row = worksheet.addRow({
         question: htmlToText.convert(questionText),
@@ -414,7 +416,7 @@ export class TestsController {
       });
 
       // Add the LaTeX images to the cell
-      latexImages.forEach(({ imageId }) => {
+      latexImages.forEach(({ latexMarker, imageId }) => {
         const cell = worksheet.getCell(`A${row.number}`);
         if (typeof cell.value === 'string') {
           cell.value = cell.value.replace(`{latex-${imageId}}`, '');
@@ -465,17 +467,13 @@ export class TestsController {
 
     // Title
     doc.setFontSize(20);
-    doc.text(htmlToText.convert(test.title), pageWidth / 2, yPosition, {
-      align: 'center',
-    });
+    doc.text(htmlToText.convert(test.title), pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 20;
 
     let questionNumber = 1;
     for (const questionId of test.questions) {
       const _quest: any = questionId;
-      const question = await this.questionsService.findOne(
-        _quest._id.toString(),
-      );
+      const question = await this.questionsService.findOne(_quest._id.toString());
 
       if (!question) continue;
 
@@ -500,7 +498,7 @@ export class TestsController {
 
             // Convert image to base64
             const base64Image = Buffer.from(response.data).toString('base64');
-
+            
             // Add image to PDF
             doc.addImage(
               `data:image/png;base64,${base64Image}`,
@@ -508,7 +506,7 @@ export class TestsController {
               margin,
               yPosition,
               50,
-              20,
+              20
             );
             yPosition += 25;
 
@@ -522,11 +520,7 @@ export class TestsController {
 
       // Add question text
       doc.setFontSize(12);
-      doc.text(
-        `${questionNumber}. ${htmlToText.convert(questionText)}`,
-        margin,
-        yPosition,
-      );
+      doc.text(`${questionNumber}. ${htmlToText.convert(questionText)}`, margin, yPosition);
       yPosition += 10;
 
       // Process options
@@ -549,14 +543,14 @@ export class TestsController {
               );
 
               const base64Image = Buffer.from(response.data).toString('base64');
-
+              
               doc.addImage(
                 `data:image/png;base64,${base64Image}`,
                 'PNG',
                 margin + 10,
                 yPosition,
                 40,
-                15,
+                15
               );
               yPosition += 20;
 
@@ -572,7 +566,7 @@ export class TestsController {
         doc.text(
           `${option.isCorrect ? '✓' : '○'} ${htmlToText.convert(optionText)}`,
           margin + 5,
-          yPosition,
+          yPosition
         );
         yPosition += 8;
       }
@@ -582,7 +576,7 @@ export class TestsController {
     }
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-
+    
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=test-${id}.pdf`);
     res.send(pdfBuffer);
