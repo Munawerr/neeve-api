@@ -15,7 +15,9 @@ export class SsoClientController {
   ) {}
 
   @Post('user_details_from_cookie')
-  @ApiOperation({ summary: 'Validate EduGorilla SSO cookie and return user details' })
+  @ApiOperation({
+    summary: 'Validate EduGorilla SSO cookie and return user details',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'User authenticated successfully',

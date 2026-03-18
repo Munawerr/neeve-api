@@ -144,7 +144,7 @@ export class TopicsService {
       );
 
       // Use description as subtopic title or fallback to parent title if not provided
-      const subtopicTitle = parentTopic.description 
+      const subtopicTitle = parentTopic.description
         ? parentTopic.description
         : `${parentTopic.title}`;
 
@@ -161,7 +161,7 @@ export class TopicsService {
       });
 
       const savedSubTopic = await newSubTopic.save();
-      
+
       // Link subtopic to parent
       savedParentTopic.subTopics.push(
         savedSubTopic._id as MongooseSchema.Types.ObjectId,
@@ -173,15 +173,19 @@ export class TopicsService {
       for (let i = 1; i < topics.length; i++) {
         const additionalSubTopic = topics[i];
 
-        const subStudyNotesIds = await this.saveFiles(additionalSubTopic.studyNotes);
-        const subStudyPlansIds = await this.saveFiles(additionalSubTopic.studyPlans);
+        const subStudyNotesIds = await this.saveFiles(
+          additionalSubTopic.studyNotes,
+        );
+        const subStudyPlansIds = await this.saveFiles(
+          additionalSubTopic.studyPlans,
+        );
         const subPracticeProblemsIds = await this.saveFiles(
           additionalSubTopic.practiceProblems,
         );
 
         // Use description as subtopic title or code as fallback
-        const addSubtopicTitle = additionalSubTopic.description 
-          ? additionalSubTopic.description 
+        const addSubtopicTitle = additionalSubTopic.description
+          ? additionalSubTopic.description
           : `${additionalSubTopic.code}-content`;
 
         const newAdditionalSubTopic = new this.topicModel({
