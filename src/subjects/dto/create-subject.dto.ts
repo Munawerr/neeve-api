@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSubjectDto {
   @ApiProperty({ example: 'CS101' })
@@ -13,6 +13,6 @@ export class CreateSubjectDto {
     accent: string;
   };
 
-  @ApiProperty({ example: 'https://pngs.flaticons.com/asdf.png' })
-  readonly iconUrl: string;
+  @ApiPropertyOptional({ example: 'https://pngs.flaticons.com/asdf.png' })
+  readonly iconUrl?: string;
 }

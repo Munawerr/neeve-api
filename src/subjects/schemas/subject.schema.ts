@@ -15,8 +15,8 @@ export class Subject extends Document {
     accent: string;
   };
 
-  @Prop({ type: String, required: true })
-  iconUrl: string;
+  @Prop({ type: String })
+  iconUrl?: string;
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);
