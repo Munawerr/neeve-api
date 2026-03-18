@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCourseDto {
   @ApiProperty({ example: 'CRS001' })
@@ -13,6 +13,6 @@ export class CreateCourseDto {
     accent: string;
   };
 
-  @ApiProperty({ example: 'http://example.com/icon.png' })
-  iconUrl: string;
+  @ApiPropertyOptional({ example: 'http://example.com/icon.png' })
+  iconUrl?: string;
 }

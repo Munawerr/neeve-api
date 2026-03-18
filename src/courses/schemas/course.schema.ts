@@ -15,8 +15,8 @@ export class Course extends Document {
     accent: string;
   };
 
-  @Prop({ required: true })
-  iconUrl: string;
+  @Prop()
+  iconUrl?: string;
 
   @Prop({ type: String, default: 'active' })
   status: string;
