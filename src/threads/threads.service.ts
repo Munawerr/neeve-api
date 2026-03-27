@@ -326,7 +326,7 @@ export class ThreadsService {
   }
 
   private async isUserAdmin(userId: string): Promise<boolean> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findOneWithRole(userId);
     if (!user || !user.role) {
       return false;
     }

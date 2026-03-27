@@ -31,13 +31,13 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { PackagesService } from 'src/packages/packages.service';
+import { PackagesService } from '../packages/packages.service';
 import { Workbook } from 'exceljs';
 import { Response, Express } from 'express';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
-import { CreateRoleDto } from 'src/roles/dto/create-role.dto';
-import { UpdateRoleDto } from 'src/roles/dto/update-role.dto';
+import { CreateRoleDto } from '../roles/dto/create-role.dto';
+import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -635,7 +635,9 @@ export class UsersController {
   async bulkCreateStudents(@UploadedFile() file: Express.Multer.File) {
     try {
       const workbook = new Workbook();
-      await workbook.xlsx.load(file.buffer);
+      await workbook.xlsx.load(
+        file.buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+      );
       const worksheet = workbook.getWorksheet(1);
 
       const students: any = [];
@@ -729,7 +731,9 @@ export class UsersController {
   async bulkCreateInstituteUsers(@UploadedFile() file: Express.Multer.File) {
     try {
       const workbook = new Workbook();
-      await workbook.xlsx.load(file.buffer);
+      await workbook.xlsx.load(
+        file.buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
+      );
       const worksheet = workbook.getWorksheet(1);
 
       const institutes: any[] = [];

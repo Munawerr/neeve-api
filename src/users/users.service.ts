@@ -51,6 +51,10 @@ export class UsersService {
     return this.userModel.findById(id).exec();
   }
 
+  async findOneWithRole(id: string): Promise<User | undefined | null> {
+    return this.userModel.findById(id).populate('role').exec();
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel
       .findOne({ email })
@@ -101,8 +105,20 @@ export class UsersService {
     const { password, ...userData } = createInstituteUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+
+    const normalizedEmail = userData.email?.trim();
+    const normalizedRegNo = userData.regNo?.trim();
+    const safeRegNo =
+      normalizedRegNo && normalizedRegNo.length > 0
+        ? normalizedRegNo
+        : await this.generateUniqueFieldValue('regNo', 'INS');
+    const safePhone = await this.generateUniqueFieldValue('phone', 'INS-PHONE');
+
     const newUser = new this.userModel({
       ...userData,
+      email: normalizedEmail,
+      regNo: safeRegNo,
+      phone: safePhone,
       password: hashedPassword,
       role: await this.getInstituteRoleId(), // Get institute role ID
       imageUrl,
@@ -116,9 +132,16 @@ export class UsersService {
     file?: Express.Multer.File,
   ): Promise<User | null> {
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+
+    const normalizedRegNo = UpdateInstituteUserDto.regNo?.trim();
+    const safeRegNo =
+      normalizedRegNo && normalizedRegNo.length > 0
+        ? normalizedRegNo
+        : await this.generateUniqueFieldValue('regNo', 'INS');
+
     const updateData = imageUrl
-      ? { ...UpdateInstituteUserDto, imageUrl }
-      : UpdateInstituteUserDto;
+      ? { ...UpdateInstituteUserDto, regNo: safeRegNo, imageUrl }
+      : { ...UpdateInstituteUserDto, regNo: safeRegNo };
     return this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
@@ -196,6 +219,19 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
 
+    const normalizedEmail = userData.email?.trim();
+    const normalizedPhone = userData.phone?.trim();
+    const normalizedRegNo = userData.regNo?.trim();
+
+    const safePhone =
+      normalizedPhone && normalizedPhone.length > 0
+        ? normalizedPhone
+        : await this.generateUniqueFieldValue('phone', 'STD-PHONE');
+    const safeRegNo =
+      normalizedRegNo && normalizedRegNo.length > 0
+        ? normalizedRegNo
+        : await this.generateUniqueFieldValue('regNo', 'STD');
+
     const institute = await this.userModel.findById(userData.institute);
 
     if (!institute) {
@@ -204,6 +240,9 @@ export class UsersService {
 
     const newUser = new this.userModel({
       ...userData,
+      email: normalizedEmail,
+      phone: safePhone,
+      regNo: safeRegNo,
       password: hashedPassword,
       role: await this.getStudentRoleId(),
       institute: institute._id,
@@ -218,9 +257,16 @@ export class UsersService {
     file?: Express.Multer.File,
   ): Promise<User | null> {
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+
+    const normalizedRegNo = UpdateStudentUserDto.regNo?.trim();
+    const safeRegNo =
+      normalizedRegNo && normalizedRegNo.length > 0
+        ? normalizedRegNo
+        : await this.generateUniqueFieldValue('regNo', 'STD');
+
     const updateData = imageUrl
-      ? { ...UpdateStudentUserDto, imageUrl }
-      : UpdateStudentUserDto;
+      ? { ...UpdateStudentUserDto, regNo: safeRegNo, imageUrl }
+      : { ...UpdateStudentUserDto, regNo: safeRegNo };
     return this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
@@ -604,6 +650,14 @@ export class UsersService {
 
       const newStudent = new this.userModel({
         ...student,
+        regNo:
+          student.regNo && String(student.regNo).trim().length > 0
+            ? String(student.regNo).trim()
+            : await this.generateUniqueFieldValue('regNo', 'STD'),
+        phone:
+          student.phone && String(student.phone).trim().length > 0
+            ? String(student.phone).trim()
+            : await this.generateUniqueFieldValue('phone', 'STD-PHONE'),
         institute: institute._id,
         packages: packageIds,
       });
@@ -629,6 +683,14 @@ export class UsersService {
 
       const newInstitute = new this.userModel({
         ...institute,
+        regNo:
+          institute.regNo && String(institute.regNo).trim().length > 0
+            ? String(institute.regNo).trim()
+            : await this.generateUniqueFieldValue('regNo', 'INS'),
+        phone:
+          institute.phone && String(institute.phone).trim().length > 0
+            ? String(institute.phone).trim()
+            : await this.generateUniqueFieldValue('phone', 'INS-PHONE'),
         role: await this.getInstituteRoleId(),
         packages: packageIds,
       });
@@ -673,8 +735,22 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
 
+    const normalizedEmail = userData.email?.trim();
+    const normalizedPhone = userData.phone?.trim();
+
+    // The users collection has unique indexes on regNo/phone.
+    // Staff form does not send regNo and phone is optional, so generate unique fallback values.
+    const generatedRegNo = await this.generateUniqueFieldValue('regNo', 'STF');
+    const safePhone =
+      normalizedPhone && normalizedPhone.length > 0
+        ? normalizedPhone
+        : await this.generateUniqueFieldValue('phone', 'STF-PHONE');
+
     const newUser = new this.userModel({
       ...userData,
+      email: normalizedEmail,
+      phone: safePhone,
+      regNo: generatedRegNo,
       password: hashedPassword,
       imageUrl,
       status: 'active',
@@ -689,13 +765,34 @@ export class UsersService {
     file?: Express.Multer.File,
   ): Promise<User | null> {
     const imageUrl = file ? await this.s3Service.uploadFile(file) : null;
+    const normalizedPhone = updateStaffUserDto.phone?.trim();
+
+    const safePhone =
+      normalizedPhone && normalizedPhone.length > 0
+        ? normalizedPhone
+        : await this.generateUniqueFieldValue('phone', 'STF-PHONE');
+
     const updateData = imageUrl
-      ? { ...updateStaffUserDto, imageUrl }
-      : updateStaffUserDto;
+      ? { ...updateStaffUserDto, phone: safePhone, imageUrl }
+      : { ...updateStaffUserDto, phone: safePhone };
 
     return this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .exec();
+  }
+
+  private async generateUniqueFieldValue(
+    field: 'regNo' | 'phone',
+    prefix: string,
+  ): Promise<string> {
+    let value = '';
+
+    do {
+      const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+      value = `${prefix}-${Date.now()}-${randomPart}`;
+    } while (await this.userModel.exists({ [field]: value }));
+
+    return value;
   }
 
   async deleteStaffUser(id: string): Promise<User | null> {

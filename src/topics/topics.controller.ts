@@ -411,7 +411,7 @@ export class TopicsController {
       // Add detailed logging to understand what's being received
       console.log('Received upload request');
       console.log('File received:', file ? 'Yes' : 'No');
-      
+
       // Check if file exists
       if (!file) {
         console.log('No file in request');
@@ -420,7 +420,7 @@ export class TopicsController {
           message: 'File is required',
         };
       }
-      
+
       console.log('File details:', {
         fieldname: file.fieldname,
         originalname: file.originalname,
@@ -438,7 +438,7 @@ export class TopicsController {
 
       // Create a new workbook
       const workbook = new Workbook();
-      
+
       // Use a try-catch specifically for the file parsing
       try {
         // Load the workbook directly from buffer (cast as any to avoid type issues)
@@ -451,7 +451,7 @@ export class TopicsController {
           error: parseError.message,
         };
       }
-      
+
       const worksheet = workbook.getWorksheet(1);
 
       const parentTopics: any = {};
