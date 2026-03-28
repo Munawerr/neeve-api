@@ -167,3 +167,11 @@ export class Result extends Document {
 
 // Create the schema for Result
 export const ResultSchema = SchemaFactory.createForClass(Result);
+
+// Supports analytics queries by status/date and institute/test/student dimensions.
+ResultSchema.index({ status: 1, finishedAt: -1 });
+ResultSchema.index({ institute: 1, status: 1, finishedAt: -1 });
+ResultSchema.index({ student: 1, status: 1, finishedAt: -1 });
+ResultSchema.index({ test: 1, status: 1 });
+ResultSchema.index({ institute: 1, test: 1, status: 1 });
+ResultSchema.index({ startedAt: -1 });
