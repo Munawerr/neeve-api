@@ -251,23 +251,23 @@ export class ReportsService {
       }
     }
 
-    // Get total count for pagination
-    const total = await this.reportModel.countDocuments(query);
-
-    // Get paginated reports
-    const reports = await this.reportModel
-      .find(query)
-      .populate('createdBy', 'full_name email')
-      .populate('institute', 'full_name')
-      .populate('student', 'full_name email')
-      .populate('subject', 'title')
-      .populate('course', 'title')
-      .populate('package', 'title')
-      .populate('test', 'title')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .exec();
+    const [total, reports] = await Promise.all([
+      this.reportModel.countDocuments(query),
+      this.reportModel
+        .find(query)
+        .populate('createdBy', 'full_name email')
+        .populate('institute', 'full_name')
+        .populate('student', 'full_name email')
+        .populate('subject', 'title')
+        .populate('course', 'title')
+        .populate('package', 'title')
+        .populate('test', 'title')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+        .exec(),
+    ]);
 
     return { reports, total };
   }
@@ -289,7 +289,7 @@ export class ReportsService {
     }
 
     // Check permissions - only admin, report creator, or institute members can access
-    const user = await this.userModel.findById(userId);
+    const user = await this.userModel.findById(userId).select('institute').lean();
     if (
       !isAdmin &&
       report.createdBy.toString() !== userId &&
