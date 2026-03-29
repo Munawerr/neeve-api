@@ -1,12 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "serverless": false
-      }
-    }
-  ]
+  "buildCommand": "npm run build",
+  "startCommand": "node dist/main.js"
 }
