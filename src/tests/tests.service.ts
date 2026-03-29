@@ -8,8 +8,8 @@ import { UpdateTestDto } from './dto/update-test.dto';
 import * as pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth'; // Replace docx4js with mammoth
 import { OpenAI } from 'openai'; // Corrected import
-import { QuestionsService } from 'src/questions/questions.service'; // Import QuestionsService
-import { OptionDto } from 'src/questions/dto/create-question.dto';
+import { QuestionsService } from '../questions/questions.service'; // Import QuestionsService
+import { OptionDto } from '../questions/dto/create-question.dto';
 
 @Injectable()
 export class TestsService {

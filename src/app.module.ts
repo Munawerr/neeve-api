@@ -60,9 +60,32 @@ import { CacheModule } from '@nestjs/cache-manager'; // Import CacheModule
 
 env.config();
 
-const DB_URL: string = String(process.env.DB_URL);
-const JWT_SECRET: string = String(process.env.JWT_SECRET);
-const JWT_EXPIRES_IN: string = String(process.env.JWT_EXPIRES_IN);
+const stripWrappingQuotes = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+};
+
+const DB_URL: string | undefined =
+  stripWrappingQuotes(process.env.MONGODB_URI) ||
+  stripWrappingQuotes(process.env.DB_URL) ||
+  stripWrappingQuotes(process.env.MONGO_URL);
+
+const JWT_SECRET: string =
+  stripWrappingQuotes(process.env.JWT_SECRET) || 'your-secret-key';
+
+const JWT_EXPIRES_IN: string =
+  stripWrappingQuotes(process.env.JWT_EXPIRES_IN) || '1h';
+
+if (!DB_URL) {
+  throw new Error('MongoDB connection string is missing. Set MONGODB_URI or DB_URL.');
+}
 
 @Module({
   imports: [
