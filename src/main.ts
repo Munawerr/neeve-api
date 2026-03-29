@@ -1,5 +1,7 @@
+import 'tsconfig-paths/register';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { UsersModule } from './users/users.module';
 import { ClassesModule } from './classes/classes.module';
