@@ -18,8 +18,9 @@ import { ThreadsModule } from './threads/threads.module';
 import { DiscussionsModule } from './discussions/discussions.module';
 import cookieParser from 'cookie-parser';
 import { SsoModule } from './sso/sso.module';
+import type { Request, Response } from 'express';
 
-async function bootstrap() {
+async function createApp() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors(); // Enable CORS
@@ -52,6 +53,30 @@ async function bootstrap() {
   });
   SwaggerModule.setup('docs', app, document);
 
+  await app.init();
+  return app;
+}
+
+let cachedHttpHandler: ((req: Request, res: Response) => void) | null = null;
+
+export default async function handler(req: Request, res: Response) {
+  if (!cachedHttpHandler) {
+    const app = await createApp();
+    cachedHttpHandler = app.getHttpAdapter().getInstance();
+  }
+
+  const httpHandler = cachedHttpHandler;
+  if (!httpHandler) {
+    throw new Error('HTTP handler not initialized');
+  }
+  return httpHandler(req, res);
+}
+
+async function bootstrap() {
+  const app = await createApp();
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+
+if (process.env.VERCEL !== '1') {
+  void bootstrap();
+}
