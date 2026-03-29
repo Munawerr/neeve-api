@@ -16,7 +16,7 @@ import { QuestionResultsModule } from './question-results/question-results.modul
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
 import { ThreadsModule } from './threads/threads.module';
 import { DiscussionsModule } from './discussions/discussions.module';
-import cookieParser from 'cookie-parser';
+import cookieParser = require('cookie-parser');
 import { SsoModule } from './sso/sso.module';
 import type { Request, Response } from 'express';
 

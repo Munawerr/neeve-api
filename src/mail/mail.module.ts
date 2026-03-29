@@ -27,7 +27,7 @@ import { join } from 'path';
         if (process.env.NODE_ENV !== 'test') {
           // Load template adapter only outside tests to avoid Jest open-handle issue from css-inline.
           const { HandlebarsAdapter } = await import(
-            '@nestjs-modules/mailer/dist/adapters/handlebars.adapter'
+            '@nestjs-modules/mailer/adapters/handlebars.adapter'
           );
 
           mailerConfig.template = {
