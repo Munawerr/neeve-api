@@ -12,7 +12,6 @@ import {
 } from './schemas/login-history.schema';
 import { LoginHistoryService } from './login-history.service';
 import { LoginHistoryModule } from './login-history.module';
-import { MailService } from 'src/mail/mail.service';
 import { SmsService } from 'src/sms/sms.service';
 
 @Module({
@@ -36,7 +35,6 @@ import { SmsService } from 'src/sms/sms.service';
     AuthService,
     JwtStrategy,
     LoginHistoryService,
-    MailService,
     SmsService,
   ],
   exports: [AuthService, JwtModule],
