@@ -78,6 +78,25 @@ export class User extends Document {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
+// Fast-path lookups and listings used across auth, analytics, and user management.
+UserSchema.index({ role: 1 });
+UserSchema.index({ institute: 1 });
+UserSchema.index({ role: 1, institute: 1 });
+UserSchema.index({ role: 1, createdAt: -1 });
+UserSchema.index({ institute: 1, createdAt: -1 });
+UserSchema.index({ verificationToken: 1, verificationOtp: 1 });
+
+// Keep email optional while enforcing uniqueness for non-empty values.
+UserSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      email: { $exists: true, $type: 'string', $ne: '' },
+    },
+  },
+);
+
 // Remove any previous indexes and create a completely new one
 // This ensures uniqueness only for non-null, non-empty email values
 UserSchema.pre('save', function (next) {

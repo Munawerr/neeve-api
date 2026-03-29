@@ -86,3 +86,11 @@ export class Report extends Document {
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+
+// Optimizes report listing filters and createdAt sort.
+ReportSchema.index({ createdBy: 1, createdAt: -1 });
+ReportSchema.index({ institute: 1, createdAt: -1 });
+ReportSchema.index({ student: 1, createdAt: -1 });
+ReportSchema.index({ status: 1, createdAt: -1 });
+ReportSchema.index({ reportType: 1, createdAt: -1 });
+ReportSchema.index({ test: 1, createdAt: -1 });

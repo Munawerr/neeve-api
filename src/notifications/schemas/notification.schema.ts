@@ -59,3 +59,7 @@ export class Notification extends Document {
 }
 
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
+
+// Optimizes recipient inbox listing, unread counts, and mark-all-as-read updates.
+NotificationSchema.index({ recipientType: 1, recipient: 1, createdAt: -1 });
+NotificationSchema.index({ recipientType: 1, recipient: 1, isRead: 1, createdAt: -1 });

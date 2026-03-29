@@ -29,3 +29,8 @@ export class LoginHistory extends Document {
 }
 
 export const LoginHistorySchema = SchemaFactory.createForClass(LoginHistory);
+
+// Supports per-user history and time-range activity analytics.
+LoginHistorySchema.index({ userId: 1, loginTime: -1 });
+LoginHistorySchema.index({ success: 1, loginTime: -1 });
+LoginHistorySchema.index({ email: 1, loginTime: -1 });

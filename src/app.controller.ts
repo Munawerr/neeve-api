@@ -423,38 +423,56 @@ export class AppController {
       const isAdmin = user.toObject().role.slug === 'admin';
 
       if (isAdmin) {
-        const totalUsers = await this.usersService.countAllUsers();
-        const activeUsers = await this.usersService.countActiveUsers(30);
-        const totalInstitutes = await this.usersService.countInstitutes();
-        const totalCourses = await this.coursesService.countAllCourses();
-
-        const userGrowthTrend = await this.usersService.getUserGrowthTrend(6);
-        const instituteGrowthTrend =
-          await this.usersService.getInstituteGrowthTrend(6);
-        const topInstitutes =
-          await this.usersService.getTopPerformingInstitutes(5);
-        const hourlyEngagement = await this.usersService.getHourlyEngagement();
-
-        // Get resource and video analytics
-        const resourceViewsLast7Days =
-          await this.analyticsService.getResourceViewsLast7Days();
-        const videoViewsLast7Days =
-          await this.analyticsService.getVideoViewsLast7Days();
-        const openDiscussionsCount =
-          await this.analyticsService.getOpenDiscussionsCount();
-        const liveClassesMetrics =
-          await this.analyticsService.getLiveClassesMetrics();
-
-        // Get last 7 days test completion data
-        const testCompletionTrend =
-          await this.coursesService.getTestsCompletedByDay(7);
+        const [
+          totalUsers,
+          activeUsers,
+          totalInstitutes,
+          totalCourses,
+          userGrowthTrend,
+          instituteGrowthTrend,
+          topInstitutes,
+          hourlyEngagement,
+          resourceViewsLast7Days,
+          videoViewsLast7Days,
+          openDiscussionsCount,
+          liveClassesMetrics,
+          testCompletionTrend,
+          newUsersTrend,
+          engagementTrend,
+          popularCourses,
+          totalTests,
+          totalAttempts,
+          mostPopularTests,
+          averageScores,
+        ] = await Promise.all([
+          this.usersService.countAllUsers(),
+          this.usersService.countActiveUsers(30),
+          this.usersService.countInstitutes(),
+          this.coursesService.countAllCourses(),
+          this.usersService.getUserGrowthTrend(6),
+          this.usersService.getInstituteGrowthTrend(6),
+          this.usersService.getTopPerformingInstitutes(5),
+          this.usersService.getHourlyEngagement(),
+          this.analyticsService.getResourceViewsLast7Days(),
+          this.analyticsService.getVideoViewsLast7Days(),
+          this.analyticsService.getOpenDiscussionsCount(),
+          this.analyticsService.getLiveClassesMetrics(),
+          this.coursesService.getTestsCompletedByDay(7),
+          this.usersService.getNewUsersByMonth(6),
+          this.usersService.getUserEngagementByDay(30),
+          this.coursesService.getMostPopularCourses(5),
+          this.coursesService.countAllTests(),
+          this.coursesService.countAllTestAttempts(),
+          this.coursesService.getMostPopularTests(5),
+          this.coursesService.getAverageTestScores(),
+        ]);
 
         analyticsData = {
           userMetrics: {
             totalUsers,
             activeUsers,
-            newUsersTrend: await this.usersService.getNewUsersByMonth(6),
-            engagementTrend: await this.usersService.getUserEngagementByDay(30),
+            newUsersTrend,
+            engagementTrend,
             growthTrend: userGrowthTrend,
             hourlyEngagement,
           },
@@ -465,14 +483,14 @@ export class AppController {
           },
           courseMetrics: {
             totalCourses,
-            popularCourses: await this.coursesService.getMostPopularCourses(5),
+            popularCourses,
           },
           testMetrics: {
-            totalTests: await this.coursesService.countAllTests(),
-            totalAttempts: await this.coursesService.countAllTestAttempts(),
+            totalTests,
+            totalAttempts,
             testCompletionTrend,
-            mostPopularTests: await this.coursesService.getMostPopularTests(5),
-            averageScores: await this.coursesService.getAverageTestScores(),
+            mostPopularTests,
+            averageScores,
           },
           contentMetrics: {
             resourceViewsLast7Days,
@@ -482,73 +500,81 @@ export class AppController {
           },
         };
       } else {
-        const userId = user._id as string;
-        const totalUsers = await this.usersService.countAllUsers(userId);
-        const activeUsers = await this.usersService.countActiveUsers(
-          30,
-          userId,
-        );
-        const userGrowthTrend = await this.usersService.getUserGrowthTrend(
-          6,
-          userId,
-        );
-        const hourlyEngagement =
-          await this.usersService.getHourlyEngagement(userId);
+        const instituteUserId = user._id as string;
+        const [
+          totalUsers,
+          activeUsers,
+          userGrowthTrend,
+          hourlyEngagement,
+          students,
+          resourceViewsLast7Days,
+          videoViewsLast7Days,
+          openDiscussionsCount,
+          liveClassesMetrics,
+          newUsersTrend,
+          engagementTrend,
+          popularCourses,
+          totalTests,
+          totalAttempts,
+          testCompletionTrend,
+          mostPopularTests,
+          averageScores,
+        ] = await Promise.all([
+          this.usersService.countAllUsers(instituteUserId),
+          this.usersService.countActiveUsers(30, instituteUserId),
+          this.usersService.getUserGrowthTrend(6, instituteUserId),
+          this.usersService.getHourlyEngagement(instituteUserId),
+          this.usersService.getInstituteUsers(instituteUserId),
+          this.analyticsService.getResourceViewsLast7Days(instituteUserId),
+          this.analyticsService.getVideoViewsLast7Days(instituteUserId),
+          this.analyticsService.getOpenDiscussionsCount(instituteUserId),
+          this.analyticsService.getLiveClassesMetrics(instituteUserId),
+          this.usersService.getNewInstituteUsersByMonth(instituteUserId, 6),
+          this.usersService.getInstituteUserEngagementByDay(
+            instituteUserId,
+            30,
+          ),
+          this.coursesService.getMostPopularInstituteCourses(instituteUserId, 5),
+          this.coursesService.countAllTests(),
+          this.coursesService.countAllTestAttempts(),
+          this.coursesService.getTestsCompletedByDay(7, instituteUserId),
+          this.coursesService.getMostPopularTests(5),
+          this.coursesService.getAverageTestScores(),
+        ]);
 
         // Get all students for this institute and count those with success chance >= 80%
-        const students = await this.usersService.getInstituteUsers(userId);
         let topStudentsCount = 0;
-        for (const student of students) {
-          const analytics = await this.usersService.getUserAnalytics(student);
-          if (analytics.successChance >= 80) {
-            topStudentsCount++;
-          }
+        if (students.length) {
+          const studentAnalytics = await Promise.all(
+            students.map((student) => this.usersService.getUserAnalytics(student)),
+          );
+          topStudentsCount = studentAnalytics.filter(
+            (analytics) => analytics.successChance >= 80,
+          ).length;
         }
 
         const totalCourses = user.packages.length;
-
-        // Get resource and video analytics
-        const resourceViewsLast7Days =
-          await this.analyticsService.getResourceViewsLast7Days(userId);
-        const videoViewsLast7Days =
-          await this.analyticsService.getVideoViewsLast7Days(userId);
-        const openDiscussionsCount =
-          await this.analyticsService.getOpenDiscussionsCount(userId);
-        const liveClassesMetrics =
-          await this.analyticsService.getLiveClassesMetrics(userId);
 
         analyticsData = {
           userMetrics: {
             totalUsers,
             activeUsers,
             topStudents: topStudentsCount,
-            newUsersTrend: await this.usersService.getNewInstituteUsersByMonth(
-              userId,
-              6,
-            ),
-            engagementTrend:
-              await this.usersService.getInstituteUserEngagementByDay(
-                userId,
-                30,
-              ),
+            newUsersTrend,
+            engagementTrend,
             growthTrend: userGrowthTrend,
             hourlyEngagement,
           },
           courseMetrics: {
             totalCourses,
-            popularCourses:
-              await this.coursesService.getMostPopularInstituteCourses(
-                userId,
-                5,
-              ),
+            popularCourses,
           },
           testMetrics: {
-            totalTests: await this.coursesService.countAllTests(),
-            totalAttempts: await this.coursesService.countAllTestAttempts(),
-            testCompletionTrend:
-              await this.coursesService.getTestsCompletedByDay(7, userId),
-            mostPopularTests: await this.coursesService.getMostPopularTests(5),
-            averageScores: await this.coursesService.getAverageTestScores(),
+            totalTests,
+            totalAttempts,
+            testCompletionTrend,
+            mostPopularTests,
+            averageScores,
           },
           contentMetrics: {
             resourceViewsLast7Days,
