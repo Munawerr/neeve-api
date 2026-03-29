@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
-import { MailModule } from './mail/mail.module';
+
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { SubjectsModule } from './subjects/subjects.module';
@@ -121,7 +121,6 @@ if (!DB_URL) {
     ]), // Add schema
     UsersModule,
     AuthModule,
-    MailModule,
     SubjectsModule,
     CoursesModule,
     ClassesModule,
