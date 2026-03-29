@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import * as os from 'os';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/schemas/user.schema';
-// import { MailService } from '../mail/mail.service';
 import { SmsService } from '../sms/sms.service';
 import { LoginHistoryService } from './login-history.service';
 import { Request } from 'express';
@@ -14,7 +12,6 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    // private readonly mailService: MailService,
     private readonly smsService: SmsService,
     private readonly loginHistoryService: LoginHistoryService,
   ) {}
@@ -142,12 +139,6 @@ export class AuthService {
       user.verificationOtp = otp;
       user.verificationToken = token;
       await user.save();
-
-      if (user.email) {
-        if (!['Munawer-PC'].includes(os.hostname())) {
-          // await this.mailService.sendOtp(user.email, otp);
-        }
-      }
 
       if (user.phone) {
         await this.smsService.sendOtp(user.phone, otp);
