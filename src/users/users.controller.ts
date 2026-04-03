@@ -33,11 +33,21 @@ import {
 } from '@nestjs/swagger';
 import { PackagesService } from '../packages/packages.service';
 import { Workbook } from 'exceljs';
-import { Response, Express } from 'express';
+import { Response } from 'express';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
+
+type UploadedFileType = Parameters<S3Service['uploadFile']>[0];
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
 
 @ApiTags('users')
 @Controller('users')
@@ -80,7 +90,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update profile',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -101,7 +111,7 @@ export class UsersController {
   })
   async uploadImage(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFileType,
   ) {
     try {
       const imageUrl = await this.s3Service.uploadFile(file);
@@ -115,7 +125,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload profile image',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -136,7 +146,7 @@ export class UsersController {
   })
   async uploadCover(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFileType,
   ) {
     try {
       const coverUrl = await this.s3Service.uploadFile(file);
@@ -150,7 +160,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload profile cover',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -171,7 +181,7 @@ export class UsersController {
   })
   async createInstituteUser(
     @Body() createInstituteUserDto: CreateInstituteUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createInstituteUser(
@@ -187,7 +197,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -210,7 +220,7 @@ export class UsersController {
   async updateInstituteUser(
     @Param('id') id: string,
     @Body() UpdateInstituteUserDto: UpdateInstituteUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateInstituteUser(
@@ -227,7 +237,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -256,18 +266,35 @@ export class UsersController {
         true,
       );
 
-      if (instituteUser && instituteUser.toObject().role?.slug == 'student') {
-        return {
-          status: HttpStatus.OK,
-          message: 'Packages retrieved successfully',
-          data: instituteUser.packages,
-        };
-      }
-
       if (instituteUser) {
-        const _packages = instituteUser.packages.filter(
-          (pkg) => pkg.course.toString() === courseId,
-        );
+        const _packages = instituteUser.packages.filter((pkg: any) => {
+          if (!pkg) {
+            return false;
+          }
+
+          const rawCourse = pkg.course;
+
+          if (!rawCourse) {
+            return false;
+          }
+
+          if (typeof rawCourse === 'string') {
+            return rawCourse === courseId;
+          }
+
+          if (typeof rawCourse.toString === 'function') {
+            const courseString = rawCourse.toString();
+            if (courseString && courseString !== '[object Object]') {
+              return courseString === courseId;
+            }
+          }
+
+          if (rawCourse._id) {
+            return rawCourse._id.toString() === courseId;
+          }
+
+          return false;
+        });
 
         const packageIds = _packages.map((pkg) => pkg.toObject()._id);
 
@@ -288,7 +315,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -329,7 +356,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -369,7 +396,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -398,7 +425,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -428,7 +455,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -449,7 +476,7 @@ export class UsersController {
   })
   async createStudentUser(
     @Body() createStudentUserDto: CreateStudentUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createStudentUser(
@@ -465,7 +492,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -488,7 +515,7 @@ export class UsersController {
   async updateStudentUser(
     @Param('id') id: string,
     @Body() UpdateStudentUserDto: UpdateStudentUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateStudentUser(
@@ -505,7 +532,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -548,7 +575,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve student users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -584,7 +611,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve student users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -614,7 +641,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -632,7 +659,7 @@ export class UsersController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create students',
   })
-  async bulkCreateStudents(@UploadedFile() file: Express.Multer.File) {
+  async bulkCreateStudents(@UploadedFile() file: UploadedFileType) {
     try {
       const workbook = new Workbook();
       await workbook.xlsx.load(
@@ -675,7 +702,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create students',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -728,7 +755,7 @@ export class UsersController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create institute users',
   })
-  async bulkCreateInstituteUsers(@UploadedFile() file: Express.Multer.File) {
+  async bulkCreateInstituteUsers(@UploadedFile() file: UploadedFileType) {
     try {
       const workbook = new Workbook();
       await workbook.xlsx.load(
@@ -767,7 +794,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -844,7 +871,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -880,7 +907,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve staff users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -896,7 +923,7 @@ export class UsersController {
   })
   async createStaffUser(
     @Body() createStaffUserDto: CreateStaffUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createStaffUser(
@@ -912,7 +939,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create staff user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -930,7 +957,7 @@ export class UsersController {
   async updateStaffUser(
     @Param('id') id: string,
     @Body() updateStaffUserDto: UpdateStaffUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateStaffUser(
@@ -947,7 +974,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update staff user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -973,7 +1000,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete staff user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1009,7 +1036,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve roles',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1034,7 +1061,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve roles',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1060,7 +1087,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1085,7 +1112,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1114,7 +1141,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1140,7 +1167,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }

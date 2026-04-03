@@ -534,7 +534,10 @@ export class AppController {
             instituteUserId,
             30,
           ),
-          this.coursesService.getMostPopularInstituteCourses(instituteUserId, 5),
+          this.coursesService.getMostPopularInstituteCourses(
+            instituteUserId,
+            5,
+          ),
           this.coursesService.countAllTests(),
           this.coursesService.countAllTestAttempts(),
           this.coursesService.getTestsCompletedByDay(7, instituteUserId),
@@ -546,7 +549,9 @@ export class AppController {
         let topStudentsCount = 0;
         if (students.length) {
           const studentAnalytics = await Promise.all(
-            students.map((student) => this.usersService.getUserAnalytics(student)),
+            students.map((student) =>
+              this.usersService.getUserAnalytics(student),
+            ),
           );
           topStudentsCount = studentAnalytics.filter(
             (analytics) => analytics.successChance >= 80,
