@@ -31,10 +31,20 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
+
 @ApiTags('packages')
 @Controller('packages')
 @UseGuards(JwtAuthGuard)
 export class PackagesController {
+  private static readonly MAX_SUBJECTS_PER_PACKAGE = 10;
+
   constructor(
     private readonly packagesService: PackagesService,
     private readonly coursesService: CoursesService,
@@ -65,7 +75,12 @@ export class PackagesController {
       };
     }
 
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(6 - subjectEntities.length)}`;
+    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(
+      Math.max(
+        PackagesController.MAX_SUBJECTS_PER_PACKAGE - subjectEntities.length,
+        0,
+      ),
+    )}`;
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const packageEntity = await this.packagesService.create({
@@ -174,7 +189,7 @@ export class PackagesController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages for dropdown',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -231,7 +246,12 @@ export class PackagesController {
         message: 'Course, class, and subjects not found',
       };
     }
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(6 - subjectEntities.length)}`;
+    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(
+      Math.max(
+        PackagesController.MAX_SUBJECTS_PER_PACKAGE - subjectEntities.length,
+        0,
+      ),
+    )}`;
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const updatedPackage = await this.packagesService.update(id, {

@@ -3,7 +3,9 @@ import { AppModule } from './app.module';
 import cookieParser = require('cookie-parser');
 import type { Request, Response } from 'express';
 
-let cachedHttpHandler: ((req: Request, res: Response) => void | Promise<void>) | null = null;
+let cachedHttpHandler:
+  | ((req: Request, res: Response) => void | Promise<void>)
+  | null = null;
 
 async function createApp() {
   const app = await NestFactory.create(AppModule);

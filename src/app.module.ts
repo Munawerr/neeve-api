@@ -84,7 +84,9 @@ const JWT_EXPIRES_IN: string =
   stripWrappingQuotes(process.env.JWT_EXPIRES_IN) || '1h';
 
 if (!DB_URL) {
-  throw new Error('MongoDB connection string is missing. Set MONGODB_URI or DB_URL.');
+  throw new Error(
+    'MongoDB connection string is missing. Set MONGODB_URI or DB_URL.',
+  );
 }
 
 @Module({

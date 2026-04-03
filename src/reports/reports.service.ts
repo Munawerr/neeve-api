@@ -289,7 +289,10 @@ export class ReportsService {
     }
 
     // Check permissions - only admin, report creator, or institute members can access
-    const user = await this.userModel.findById(userId).select('institute').lean();
+    const user = await this.userModel
+      .findById(userId)
+      .select('institute')
+      .lean();
     if (
       !isAdmin &&
       report.createdBy.toString() !== userId &&

@@ -31,12 +31,7 @@ import { SmsService } from 'src/sms/sms.service';
     ]),
     LoginHistoryModule,
   ],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    LoginHistoryService,
-    SmsService,
-  ],
+  providers: [AuthService, JwtStrategy, LoginHistoryService, SmsService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
