@@ -44,7 +44,7 @@ const getErrorMessage = (error: unknown): string => {
 @Controller('packages')
 @UseGuards(JwtAuthGuard)
 export class PackagesController {
-  private static readonly MAX_SUBJECTS_PER_PACKAGE = 10;
+  private static readonly MAX_SUBJECTS_PER_PACKAGE = 15;
 
   constructor(
     private readonly packagesService: PackagesService,
@@ -65,23 +65,38 @@ export class PackagesController {
   @SetMetadata('permissions', ['edit_packages'])
   async create(@Body() createPackageDto: CreatePackageDto) {
     const { course, class: classId, subjects } = createPackageDto;
+
+    if (!Array.isArray(subjects) || subjects.length < 1) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'At least one subject is required',
+      };
+    }
+
+    if (subjects.length > PackagesController.MAX_SUBJECTS_PER_PACKAGE) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: `A maximum of ${PackagesController.MAX_SUBJECTS_PER_PACKAGE} subjects is allowed`,
+      };
+    }
+
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);
 
-    if (!courseEntity || !classEntity || !subjectEntities) {
+    if (
+      !courseEntity ||
+      !classEntity ||
+      !Array.isArray(subjectEntities) ||
+      subjectEntities.length !== subjects.length
+    ) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
         message: 'Course, class, and subjects not found',
       };
     }
 
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(
-      Math.max(
-        PackagesController.MAX_SUBJECTS_PER_PACKAGE - subjectEntities.length,
-        0,
-      ),
-    )}`;
+    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const packageEntity = await this.packagesService.create({
@@ -237,22 +252,37 @@ export class PackagesController {
     @Body() updatePackageDto: UpdatePackageDto,
   ) {
     const { course, class: classId, subjects } = updatePackageDto;
+
+    if (!Array.isArray(subjects) || subjects.length < 1) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'At least one subject is required',
+      };
+    }
+
+    if (subjects.length > PackagesController.MAX_SUBJECTS_PER_PACKAGE) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: `A maximum of ${PackagesController.MAX_SUBJECTS_PER_PACKAGE} subjects is allowed`,
+      };
+    }
+
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);
 
-    if (!courseEntity || !classEntity || !subjectEntities) {
+    if (
+      !courseEntity ||
+      !classEntity ||
+      !Array.isArray(subjectEntities) ||
+      subjectEntities.length !== subjects.length
+    ) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
         message: 'Course, class, and subjects not found',
       };
     }
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(
-      Math.max(
-        PackagesController.MAX_SUBJECTS_PER_PACKAGE - subjectEntities.length,
-        0,
-      ),
-    )}`;
+    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const updatedPackage = await this.packagesService.update(id, {
