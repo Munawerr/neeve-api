@@ -20,7 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';

@@ -24,7 +24,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 @ApiTags('liveClasses')
 @Controller('live-classes')

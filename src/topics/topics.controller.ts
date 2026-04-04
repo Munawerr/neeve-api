@@ -30,7 +30,7 @@ import { FilesService } from '../files/files.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
-import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 @ApiTags('topics')
 @Controller('topics')

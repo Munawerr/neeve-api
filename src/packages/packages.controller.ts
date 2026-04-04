@@ -30,7 +30,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
-import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
