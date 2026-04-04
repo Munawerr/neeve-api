@@ -12,8 +12,13 @@ export class ChatService {
   private readonly geminiApiKey = process.env.GOOGLE_GEMINI_API_KEY;
   private readonly geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   private readonly openAiApiKey = process.env.OPENAI_API_KEY;
+  private readonly openai: OpenAI | null;
   private readonly systemPrompt =
     'You are an AI instructor specialized in helping students with their studies. Only answer questions related to studies and LMS platform.';
+
+  constructor() {
+    this.openai = this.openAiApiKey ? new OpenAI({ apiKey: this.openAiApiKey }) : null;
+  }
 
   async getResponse(input: { query?: string; messages?: ChatMessage[] }): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
     const messages = this.normalizeMessages(input);
@@ -120,13 +125,11 @@ export class ChatService {
   }
 
   private async getOpenAiResponse(messages: ChatMessage[]): Promise<string> {
-    if (!this.openAiApiKey) {
+    if (!this.openai) {
       throw new Error('OpenAI API key is not configured');
     }
 
-    const openai = new OpenAI({ apiKey: this.openAiApiKey });
-
-    const response = await openai.chat.completions.create({
+    const response = await this.openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: messages.map((message) => ({
         role: message.role,
