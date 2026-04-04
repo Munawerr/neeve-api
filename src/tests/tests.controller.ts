@@ -37,6 +37,7 @@ import * as htmlToText from 'html-to-text';
 import axios from 'axios';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { jsPDF } from 'jspdf';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 
 @ApiTags('tests')
 @Controller('tests')
@@ -247,11 +248,41 @@ export class TestsController {
     status: HttpStatus.OK,
     description: 'Test deleted successfully',
   })
-  async remove(@Param('id') id: string) {
-    await this.testsService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @Query('confirmed') confirmed: string = 'false',
+  ) {
+    const result = await this.testsService.remove(id, confirmed === 'true');
     return {
       status: HttpStatus.OK,
       message: 'Test deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted tests (super admin only)' })
+  async findDeleted() {
+    const items = await this.testsService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted tests retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted test (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.testsService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Test restored successfully',
+      data: item,
     };
   }
 

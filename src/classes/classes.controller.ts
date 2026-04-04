@@ -20,6 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -192,10 +193,37 @@ export class ClassesController {
     description: 'Class deleted successfully',
   })
   async remove(@Param('id') id: string) {
-    await this.classesService.remove(id);
+    const result = await this.classesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Class deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted classes (super admin only)' })
+  async findDeleted() {
+    const items = await this.classesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted classes retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted class (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.classesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Class restored successfully',
+      data: item,
     };
   }
 }

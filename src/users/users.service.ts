@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
@@ -37,9 +37,10 @@ export class UsersService {
   ): Promise<User | undefined | null> {
     if (populatePkGs) {
       return this.userModel
-        .findById(id)
+        .findOne({ _id: id, isDeleted: { $ne: true } })
         .populate({
           path: 'packages',
+          match: { isDeleted: { $ne: true } },
           populate: {
             path: 'subjects',
           },
@@ -48,16 +49,19 @@ export class UsersService {
         .populate('institute')
         .exec();
     }
-    return this.userModel.findById(id).exec();
+    return this.userModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
   }
 
   async findOneWithRole(id: string): Promise<User | undefined | null> {
-    return this.userModel.findById(id).populate('role').exec();
+    return this.userModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .populate('role')
+      .exec();
   }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel
-      .findOne({ email })
+      .findOne({ email, isDeleted: { $ne: true } })
       .populate('role')
       .populate('packages')
       .populate('institute')
@@ -69,7 +73,7 @@ export class UsersService {
     verificationOtp: string,
   ): Promise<User | null> {
     return this.userModel
-      .findOne({ verificationToken, verificationOtp })
+      .findOne({ verificationToken, verificationOtp, isDeleted: { $ne: true } })
       .exec();
   }
 
@@ -181,6 +185,7 @@ export class UsersService {
     search: string,
   ): Promise<{ users: User[]; total: number }> {
     const filter = {
+      isDeleted: { $ne: true },
       role: await this.getInstituteRoleId(),
       ...(search && {
         $or: [
@@ -200,7 +205,52 @@ export class UsersService {
   }
 
   async deleteInstituteUser(id: string): Promise<User | null> {
-    return this.userModel.findByIdAndDelete(id).exec();
+    const instituteUser = await this.userModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .populate('role')
+      .lean();
+    if (!instituteUser) {
+      throw new NotFoundException('Institute user not found');
+    }
+
+    const studentRoleId = await this.getStudentRoleId();
+    const activeStudentCount = await this.userModel.countDocuments({
+      institute: id,
+      role: studentRoleId,
+      isDeleted: { $ne: true },
+    });
+
+    if (activeStudentCount > 0) {
+      throw new ConflictException({
+        message:
+          'This institute still has active students. Reassign or archive students first.',
+        blockedBy: [
+          {
+            type: 'Student',
+            id,
+            name: `${activeStudentCount} active student(s)`,
+            actionHint:
+              'Move or delete active students belonging to this institute before deleting it.',
+          },
+        ],
+      });
+    }
+
+    return this.userModel
+      .findOneAndUpdate(
+        { _id: id },
+        { isDeleted: true, deletedAt: new Date(), status: 'inactive' },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async getDeletedInstituteUsers(): Promise<User[]> {
+    return this.userModel
+      .find({ role: await this.getInstituteRoleId(), isDeleted: true })
+      .populate('role')
+      .sort({ deletedAt: -1 })
+      .exec();
   }
 
   async getInstituteRoleId(): Promise<MongooseSchema.Types.ObjectId> {
@@ -283,6 +333,7 @@ export class UsersService {
     institute?: string,
   ): Promise<{ users: User[]; total: number }> {
     const filter = {
+      isDeleted: { $ne: true },
       role: await this.getStudentRoleId(),
       ...(search && {
         $or: [
@@ -303,7 +354,29 @@ export class UsersService {
   }
 
   async deleteStudentUser(id: string): Promise<User | null> {
-    return this.userModel.findByIdAndDelete(id).exec();
+    const existingUser = await this.userModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!existingUser) {
+      throw new NotFoundException('Student user not found');
+    }
+
+    return this.userModel
+      .findOneAndUpdate(
+        { _id: id },
+        { isDeleted: true, deletedAt: new Date(), status: 'inactive' },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async getDeletedStudentUsers(): Promise<User[]> {
+    return this.userModel
+      .find({ role: await this.getStudentRoleId(), isDeleted: true })
+      .populate('role')
+      .populate('institute')
+      .sort({ deletedAt: -1 })
+      .exec();
   }
 
   async getStudentRoleId(): Promise<MongooseSchema.Types.ObjectId> {
@@ -570,14 +643,17 @@ export class UsersService {
   async getAllInstituteUsersForDropdown(): Promise<User[]> {
     const instituteRoleId = await this.getInstituteRoleId();
     return this.userModel
-      .find({ role: instituteRoleId })
+      .find({ role: instituteRoleId, isDeleted: { $ne: true } })
       .select('full_name _id packages')
       .populate('packages')
       .exec();
   }
 
   async getAllStudentUsersForDropdown(instituteId?: string): Promise<any[]> {
-    const query: any = { role: await this.getStudentRoleId() };
+    const query: any = {
+      role: await this.getStudentRoleId(),
+      isDeleted: { $ne: true },
+    };
 
     // Filter by institute if provided
     if (instituteId) {
@@ -604,7 +680,7 @@ export class UsersService {
 
   async findByPhone(phone: string): Promise<User | null> {
     return this.userModel
-      .findOne({ phone })
+      .findOne({ phone, isDeleted: { $ne: true } })
       .populate('role')
       .populate('packages')
       .populate('institute')
@@ -615,13 +691,14 @@ export class UsersService {
     return this.userModel
       .findOne({
         $or: [{ email: loginData }, { regNo: loginData }],
+        isDeleted: { $ne: true },
       })
       .exec();
   }
 
   async findByRegNo(regNo: string): Promise<User | null> {
     return this.userModel
-      .findOne({ regNo })
+      .findOne({ regNo, isDeleted: { $ne: true } })
       .populate('role')
       .populate('packages')
       .populate('institute')
@@ -707,6 +784,7 @@ export class UsersService {
     search: string,
   ): Promise<{ users: User[]; total: number }> {
     const filter = {
+      isDeleted: { $ne: true },
       role: {
         $nin: [await this.getStudentRoleId(), await this.getInstituteRoleId()],
       },
@@ -796,7 +874,43 @@ export class UsersService {
   }
 
   async deleteStaffUser(id: string): Promise<User | null> {
-    return this.userModel.findByIdAndDelete(id).exec();
+    const existingUser = await this.userModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!existingUser) {
+      throw new NotFoundException('Staff user not found');
+    }
+
+    return this.userModel
+      .findOneAndUpdate(
+        { _id: id },
+        { isDeleted: true, deletedAt: new Date(), status: 'inactive' },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async getDeletedStaffUsers(): Promise<User[]> {
+    return this.userModel
+      .find({
+        role: {
+          $nin: [await this.getStudentRoleId(), await this.getInstituteRoleId()],
+        },
+        isDeleted: true,
+      })
+      .populate('role')
+      .sort({ deletedAt: -1 })
+      .exec();
+  }
+
+  async restoreUser(id: string): Promise<User | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null, status: 'active' },
+        { new: true },
+      )
+      .exec();
   }
 
   async getAllRoles(
@@ -805,6 +919,7 @@ export class UsersService {
     search: string,
   ): Promise<{ roles: Role[]; total: number }> {
     const filter = {
+      isDeleted: { $ne: true },
       unlisted: false,
       ...(search && {
         $or: [
@@ -824,7 +939,7 @@ export class UsersService {
 
   async getRolesForDropdown(): Promise<Role[]> {
     return this.roleModel
-      .find({ unlisted: false })
+      .find({ unlisted: false, isDeleted: { $ne: true } })
       .select('unlisted name _id')
       .exec();
   }
@@ -835,7 +950,7 @@ export class UsersService {
   }
 
   async findRoleById(roleId: string): Promise<Role | null> {
-    return await this.roleModel.findById(roleId);
+    return await this.roleModel.findOne({ _id: roleId, isDeleted: { $ne: true } });
   }
 
   async updateRole(
@@ -843,21 +958,78 @@ export class UsersService {
     updateRoleDto: UpdateRoleDto,
   ): Promise<Role | null> {
     return this.roleModel
-      .findByIdAndUpdate(id, updateRoleDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateRoleDto,
+        { new: true },
+      )
       .exec();
   }
 
   async deleteRole(id: string): Promise<Role | null> {
-    return this.roleModel.findByIdAndDelete(id).exec();
+    const existingRole = await this.roleModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!existingRole) {
+      throw new NotFoundException('Role not found');
+    }
+
+    const linkedUsersCount = await this.userModel.countDocuments({
+      role: id,
+      isDeleted: { $ne: true },
+    });
+
+    if (linkedUsersCount > 0) {
+      throw new ConflictException({
+        message:
+          'This role is assigned to active users. Reassign users to another role first.',
+        blockedBy: [
+          {
+            type: 'User',
+            id,
+            name: `${linkedUsersCount} active user(s)`,
+            actionHint: 'Update users to another role before deleting this role.',
+          },
+        ],
+      });
+    }
+
+    return this.roleModel
+      .findOneAndUpdate(
+        { _id: id },
+        { isDeleted: true, deletedAt: new Date() },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async getDeletedRoles(): Promise<Role[]> {
+    return this.roleModel
+      .find({ isDeleted: true })
+      .sort({ deletedAt: -1 })
+      .exec();
+  }
+
+  async restoreRole(id: string): Promise<Role | null> {
+    return this.roleModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 
   // Analytics methods for dashboard
 
   async countAllUsers(institute: string | null = null): Promise<number> {
     if (institute) {
-      return await this.userModel.countDocuments({ institute });
+      return await this.userModel.countDocuments({
+        institute,
+        isDeleted: { $ne: true },
+      });
     }
-    return await this.userModel.countDocuments();
+    return await this.userModel.countDocuments({ isDeleted: { $ne: true } });
   }
 
   async countActiveUsers(
@@ -870,11 +1042,13 @@ export class UsersService {
     if (institute) {
       return await this.userModel.countDocuments({
         institute,
+        isDeleted: { $ne: true },
         lastLogin: { $gte: date },
       });
     }
 
     return await this.userModel.countDocuments({
+      isDeleted: { $ne: true },
       lastLogin: { $gte: date },
     });
   }
@@ -883,6 +1057,7 @@ export class UsersService {
     return await this.userModel
       .find({
         institute,
+        isDeleted: { $ne: true },
       })
       .exec();
   }
@@ -895,6 +1070,7 @@ export class UsersService {
     // Then query users with that role id
     return this.userModel.countDocuments({
       role: instituteRole._id,
+      isDeleted: { $ne: true },
     });
   }
 

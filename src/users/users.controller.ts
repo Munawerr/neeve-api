@@ -38,6 +38,7 @@ import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 
 type UploadedFileType = Parameters<S3Service['uploadFile']>[0];
 
@@ -452,12 +453,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete institute user',
         error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('institute/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted institute users (super admin only)' })
+  async getDeletedInstituteUsers() {
+    const items = await this.usersService.getDeletedInstituteUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted institute users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('institute/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted institute user (super admin only)' })
+  async restoreInstituteUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Institute user restored successfully',
+      data: item,
+    };
   }
 
   @Post('student')
@@ -638,12 +668,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete student user',
         error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('student/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted student users (super admin only)' })
+  async getDeletedStudentUsers() {
+    const items = await this.usersService.getDeletedStudentUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted student users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('student/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted student user (super admin only)' })
+  async restoreStudentUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Student user restored successfully',
+      data: item,
+    };
   }
 
   @Post('students/bulk')
@@ -997,12 +1056,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete staff user',
         error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('u/staff/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted staff users (super admin only)' })
+  async getDeletedStaffUsers() {
+    const items = await this.usersService.getDeletedStaffUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted staff users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('u/staff/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted staff user (super admin only)' })
+  async restoreStaffUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Staff user restored successfully',
+      data: item,
+    };
   }
 
   @Get('c/roles')
@@ -1164,11 +1252,40 @@ export class UsersController {
         data: deletedRole,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete role',
         error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('c/roles/archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted roles (super admin only)' })
+  async getDeletedRoles() {
+    const items = await this.usersService.getDeletedRoles();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted roles retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('c/roles/archive/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted role (super admin only)' })
+  async restoreRole(@Param('id') id: string) {
+    const item = await this.usersService.restoreRole(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Role restored successfully',
+      data: item,
+    };
   }
 }

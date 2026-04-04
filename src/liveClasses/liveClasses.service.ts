@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LiveClass } from './schemas/liveClass.schema';
@@ -17,7 +17,7 @@ export class LiveClassesService {
   }
 
   findAll(): Promise<LiveClass[]> {
-    return this.liveClassModel.find().exec();
+    return this.liveClassModel.find({ isDeleted: { $ne: true } }).exec();
   }
 
   async findAllWithPaging(
@@ -27,8 +27,12 @@ export class LiveClassesService {
     search: string,
   ) {
     const query = search
-      ? { institute, title: { $regex: search, $options: 'i' } }
-      : { institute };
+      ? {
+          institute,
+          title: { $regex: search, $options: 'i' },
+          isDeleted: { $ne: true },
+        }
+      : { institute, isDeleted: { $ne: true } };
     const liveClasses = await this.liveClassModel
       .find(query)
       .skip((page - 1) * limit)
@@ -49,7 +53,7 @@ export class LiveClassesService {
 
   findOne(id: string): Promise<LiveClass | null> {
     return this.liveClassModel
-      .findById(id)
+      .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('package')
       .populate('subject')
       .exec();
@@ -60,12 +64,46 @@ export class LiveClassesService {
     updateLiveClassDto: UpdateLiveClassDto,
   ): Promise<LiveClass | null> {
     return this.liveClassModel
-      .findByIdAndUpdate(id, updateLiveClassDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateLiveClassDto,
+        { new: true },
+      )
       .exec();
   }
 
-  remove(id: string): Promise<LiveClass | null> {
-    return this.liveClassModel.findByIdAndDelete(id).exec();
+  async remove(id: string): Promise<{ deleted: true }> {
+    const existing = await this.liveClassModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+
+    if (!existing) {
+      throw new NotFoundException('Live class not found');
+    }
+
+    await this.liveClassModel
+      .updateOne({ _id: id }, { isDeleted: true, deletedAt: new Date() })
+      .exec();
+    return { deleted: true };
+  }
+
+  async findDeleted(): Promise<LiveClass[]> {
+    return this.liveClassModel
+      .find({ isDeleted: true })
+      .populate('package')
+      .populate('subject')
+      .sort({ deletedAt: -1 })
+      .exec();
+  }
+
+  async restore(id: string): Promise<LiveClass | null> {
+    return this.liveClassModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 
   async countUpcomingLiveClasses(institute: string): Promise<number> {
@@ -73,6 +111,7 @@ export class LiveClassesService {
     const count = await this.liveClassModel
       .countDocuments({
         institute,
+        isDeleted: { $ne: true },
         date: { $gte: today },
       })
       .exec();

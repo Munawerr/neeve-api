@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Res,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,6 +30,7 @@ import { FilesService } from '../files/files.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 
 @ApiTags('topics')
 @Controller('topics')
@@ -340,11 +342,41 @@ export class TopicsController {
     status: HttpStatus.OK,
     description: 'Topic deleted successfully',
   })
-  async remove(@Param('id') id: string) {
-    await this.topicsService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @Query('confirmed') confirmed: string = 'false',
+  ) {
+    const result = await this.topicsService.remove(id, confirmed === 'true');
     return {
       status: HttpStatus.OK,
       message: 'Topic deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted topics (super admin only)' })
+  async findDeleted() {
+    const items = await this.topicsService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted topics retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted topic (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.topicsService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Topic restored successfully',
+      data: item,
     };
   }
 

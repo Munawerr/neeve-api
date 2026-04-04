@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -203,10 +204,37 @@ export class CoursesController {
     description: 'Course deleted successfully',
   })
   async remove(@Param('id') id: string) {
-    await this.coursesService.remove(id);
+    const result = await this.coursesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Course deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted courses (super admin only)' })
+  async findDeleted() {
+    const items = await this.coursesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted courses retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted course (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.coursesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Course restored successfully',
+      data: item,
     };
   }
 }

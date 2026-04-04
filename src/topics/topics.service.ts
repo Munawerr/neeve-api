@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Topic } from './schemas/topic.schema';
@@ -7,6 +7,8 @@ import { UpdateTopicDto } from './dto/update-topic.dto';
 import { FilesService } from '../files/files.service';
 import { Subject } from '../subjects/schemas/subject.schema';
 import { Package } from '../packages/schemas/package.schema';
+import { Test } from 'src/tests/schemas/test.schema';
+import { Result } from 'src/results/schemas/result.schema';
 
 @Injectable()
 export class TopicsService {
@@ -17,6 +19,10 @@ export class TopicsService {
     private subjectModel: Model<Subject>,
     @InjectModel(Package.name)
     private packageModel: Model<Package>,
+    @InjectModel(Test.name)
+    private testModel: Model<Test>,
+    @InjectModel(Result.name)
+    private resultModel: Model<Result>,
     private readonly filesService: FilesService,
   ) {}
 
@@ -27,10 +33,11 @@ export class TopicsService {
 
   findAll(): Promise<Topic[]> {
     return this.topicModel
-      .find()
+      .find({ isDeleted: { $ne: true } })
       .populate({
         path: 'subTopics',
         model: 'Topic',
+        match: { isDeleted: { $ne: true } },
         populate: [
           { path: 'studyNotes', model: 'File' },
           { path: 'studyPlans', model: 'File' },
@@ -45,10 +52,11 @@ export class TopicsService {
 
   findOne(id: string): Promise<Topic | null> {
     return this.topicModel
-      .findById(id)
+      .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate({
         path: 'subTopics',
         model: 'Topic',
+        match: { isDeleted: { $ne: true } },
         populate: [
           { path: 'studyNotes', model: 'File' },
           { path: 'studyPlans', model: 'File' },
@@ -67,11 +75,12 @@ export class TopicsService {
     isParent: boolean = true,
   ): Promise<Topic[]> {
     return this.topicModel
-      .find({ subject, package: pkg, isParent })
+      .find({ subject, package: pkg, isParent, isDeleted: { $ne: true } })
       .populate('tests')
       .populate({
         path: 'subTopics',
         model: 'Topic',
+        match: { isDeleted: { $ne: true } },
         populate: [{ path: 'tests', model: 'Test' }],
       })
       .exec();
@@ -83,10 +92,11 @@ export class TopicsService {
     isParent: boolean = true,
   ): Promise<Topic[]> {
     return this.topicModel
-      .find({ subject, package: pkg, isParent })
+      .find({ subject, package: pkg, isParent, isDeleted: { $ne: true } })
       .populate({
         path: 'subTopics',
         model: 'Topic',
+        match: { isDeleted: { $ne: true } },
         populate: [
           { path: 'studyNotes', model: 'File' },
           { path: 'studyPlans', model: 'File' },
@@ -108,6 +118,7 @@ export class TopicsService {
 
       const subject = await this.subjectModel.findOne({
         code: parentTopic.subjectCode,
+        isDeleted: { $ne: true },
       });
       if (!subject) {
         throw new Error(
@@ -117,6 +128,7 @@ export class TopicsService {
 
       const _package = await this.packageModel.findOne({
         code: parentTopic.packageCode,
+        isDeleted: { $ne: true },
       });
       if (!_package) {
         throw new Error(
@@ -231,11 +243,109 @@ export class TopicsService {
 
   update(id: string, updateTopicDto: UpdateTopicDto): Promise<Topic | null> {
     return this.topicModel
-      .findByIdAndUpdate(id, updateTopicDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateTopicDto,
+        { new: true },
+      )
       .exec();
   }
 
-  remove(id: string): Promise<Topic | null> {
-    return this.topicModel.findByIdAndDelete(id).exec();
+  private async collectTopicTreeIds(rootTopicId: string): Promise<string[]> {
+    const collected = new Set<string>();
+    const queue: string[] = [rootTopicId];
+
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      if (collected.has(current)) {
+        continue;
+      }
+      collected.add(current);
+
+      const topic = await this.topicModel
+        .findOne({ _id: current, isDeleted: { $ne: true } })
+        .select('subTopics')
+        .lean();
+
+      if (!topic?.subTopics?.length) {
+        continue;
+      }
+
+      for (const subTopicId of topic.subTopics) {
+        queue.push(String(subTopicId));
+      }
+    }
+
+    return Array.from(collected);
+  }
+
+  async remove(
+    id: string,
+    confirmed = false,
+  ): Promise<{ deleted: true } | { requiresConfirmation: true; message: string; count: number }> {
+    const topic = await this.topicModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!topic) {
+      throw new NotFoundException('Topic not found');
+    }
+
+    const topicTreeIds = await this.collectTopicTreeIds(id);
+    const testsInTree = await this.testModel
+      .find({ topic: { $in: topicTreeIds }, isDeleted: { $ne: true } })
+      .select('_id')
+      .lean();
+    const testIds = testsInTree.map((test) => test._id);
+
+    const resultCount =
+      testIds.length > 0
+        ? await this.resultModel.countDocuments({ test: { $in: testIds } })
+        : 0;
+
+    if (resultCount > 0 && !confirmed) {
+      return {
+        requiresConfirmation: true,
+        message:
+          'This topic tree includes tests with student results. Deleting will archive topics/tests while keeping report history intact.',
+        count: resultCount,
+      };
+    }
+
+    await this.topicModel
+      .updateMany(
+        { _id: { $in: topicTreeIds } },
+        { isDeleted: true, deletedAt: new Date() },
+      )
+      .exec();
+
+    if (testIds.length > 0) {
+      await this.testModel
+        .updateMany(
+          { _id: { $in: testIds } },
+          { isDeleted: true, deletedAt: new Date() },
+        )
+        .exec();
+    }
+
+    return { deleted: true };
+  }
+
+  async findDeleted(): Promise<Topic[]> {
+    return this.topicModel
+      .find({ isDeleted: true })
+      .populate('subject')
+      .populate('package')
+      .sort({ deletedAt: -1 })
+      .exec();
+  }
+
+  async restore(id: string): Promise<Topic | null> {
+    return this.topicModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 }

@@ -30,6 +30,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
@@ -279,10 +280,37 @@ export class PackagesController {
   })
   @SetMetadata('permissions', ['delete_packages'])
   async remove(@Param('id') id: string) {
-    await this.packagesService.remove(id);
+    const result = await this.packagesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Package deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted packages (super admin only)' })
+  async findDeleted() {
+    const items = await this.packagesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted packages retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted package (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.packagesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Package restored successfully',
+      data: item,
     };
   }
 }

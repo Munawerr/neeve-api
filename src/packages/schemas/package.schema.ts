@@ -20,6 +20,12 @@ export class Package extends Document {
 
   @Prop()
   description: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 function arrayLimit(val: any[]): boolean {

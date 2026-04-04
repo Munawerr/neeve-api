@@ -27,6 +27,10 @@ import {
 } from 'src/questions/schemas/question.schema';
 import { QuestionsService } from 'src/questions/questions.service';
 import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
+import {
+  LiveClass,
+  LiveClassSchema,
+} from 'src/liveClasses/schemas/liveClass.schema';
 
 @Module({
   imports: [
@@ -37,6 +41,9 @@ import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
     MongooseModule.forFeature([{ name: Test.name, schema: TestSchema }]),
     MongooseModule.forFeature([{ name: Result.name, schema: ResultSchema }]),
     MongooseModule.forFeature([{ name: Topic.name, schema: TopicSchema }]),
+    MongooseModule.forFeature([
+      { name: LiveClass.name, schema: LiveClassSchema },
+    ]),
     MongooseModule.forFeature([
       { name: Question.name, schema: QuestionSchema },
     ]),
