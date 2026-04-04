@@ -28,7 +28,11 @@ export class Package extends Document {
   deletedAt?: Date;
 }
 
-function arrayLimit(val: any[]): boolean {
+function arrayLimit(val: unknown): boolean {
+  if (!Array.isArray(val)) {
+    return false;
+  }
+
   return val.length <= 15;
 }
 
