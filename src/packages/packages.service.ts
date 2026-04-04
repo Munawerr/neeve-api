@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Package } from './schemas/package.schema';
@@ -10,6 +14,9 @@ import { LiveClass } from 'src/liveClasses/schemas/liveClass.schema';
 
 @Injectable()
 export class PackagesService {
+  private static readonly CODE_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  private static readonly RANDOM_SUFFIX_LENGTH = 8;
+
   constructor(
     @InjectModel(Package.name) private readonly packageModel: Model<Package>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
@@ -21,6 +28,34 @@ export class PackagesService {
   create(createPackageDto: CreatePackageDto): Promise<Package> {
     const createdPackage = new this.packageModel(createPackageDto);
     return createdPackage.save();
+  }
+
+  private buildRandomCode(length: number): string {
+    let result = '';
+    for (let i = 0; i < length; i += 1) {
+      const randomIndex = Math.floor(
+        Math.random() * PackagesService.CODE_CHARSET.length,
+      );
+      result += PackagesService.CODE_CHARSET[randomIndex];
+    }
+    return result;
+  }
+
+  async generateUniqueCode(
+    courseCode: string,
+    classCode: string,
+  ): Promise<string> {
+    const year = new Date().getFullYear();
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate = `${isNaN(Number(courseCode)) ? courseCode : 'C' + String(courseCode)}/${isNaN(Number(classCode)) ? classCode : 'C' + String(classCode)}/${year}/${this.buildRandomCode(PackagesService.RANDOM_SUFFIX_LENGTH)}`;
+      const exists = await this.packageModel.exists({ code: candidate });
+      if (!exists) {
+        return candidate;
+      }
+    }
+
+    throw new Error('Failed to generate unique package code');
   }
 
   async findAll(
