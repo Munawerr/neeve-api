@@ -17,18 +17,38 @@ export class ChatService {
 
   async getResponse(input: { query?: string; messages?: ChatMessage[] }): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
     const messages = this.normalizeMessages(input);
+    let geminiError: unknown;
 
     if (this.geminiApiKey) {
       try {
         const response = await this.getGeminiResponse(messages);
         return { response, provider: 'gemini' };
       } catch (error) {
+        geminiError = error;
         console.error('Gemini request failed, falling back to OpenAI:', error);
       }
     }
 
-    const response = await this.getOpenAiResponse(messages);
-    return { response, provider: 'openai' };
+    if (geminiError && !this.openAiApiKey) {
+      throw new AggregateError(
+        [geminiError],
+        'Gemini request failed and OpenAI fallback is not configured',
+      );
+    }
+
+    try {
+      const response = await this.getOpenAiResponse(messages);
+      return { response, provider: 'openai' };
+    } catch (error) {
+      if (geminiError) {
+        throw new AggregateError(
+          [geminiError, error],
+          'Gemini request failed and OpenAI fallback also failed',
+        );
+      }
+
+      throw error;
+    }
   }
 
   private normalizeMessages(input: { query?: string; messages?: ChatMessage[] }): ChatMessage[] {
