@@ -19,7 +19,8 @@ export class ChatController {
   }
 
   @Post('query')
-  async getResponse(@Body('query') query: string): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
-    return this.chatService.getResponse({ query });
+  async getResponse(@Body('query') query: string): Promise<string> {
+    const result = await this.chatService.getResponse({ query });
+    return result.response;
   }
 }
