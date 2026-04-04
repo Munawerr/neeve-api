@@ -37,7 +37,7 @@ import * as htmlToText from 'html-to-text';
 import axios from 'axios';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { jsPDF } from 'jspdf';
-import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 @ApiTags('tests')
 @Controller('tests')
