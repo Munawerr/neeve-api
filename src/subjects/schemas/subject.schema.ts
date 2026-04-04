@@ -17,6 +17,12 @@ export class Subject extends Document {
 
   @Prop({ type: String })
   iconUrl?: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);

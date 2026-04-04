@@ -8,6 +8,12 @@ export class Class extends Document {
 
   @Prop({ required: true })
   title: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const ClassSchema = SchemaFactory.createForClass(Class);

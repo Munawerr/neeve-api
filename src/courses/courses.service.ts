@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Course } from './schemas/course.schema';
@@ -9,6 +9,14 @@ import { User } from '../users/schemas/user.schema';
 import { Test } from '../tests/schemas/test.schema';
 import { Result, ResultStatus } from '../results/schemas/result.schema';
 import { Topic } from 'src/topics/schemas/topic.schema';
+import { Package } from 'src/packages/schemas/package.schema';
+
+type DeleteGuardResult =
+  | { deleted: true }
+  | {
+      deleted: false;
+      blockedBy: Array<{ type: string; id: string; name: string; actionHint: string }>;
+    };
 
 @Injectable()
 export class CoursesService {
@@ -18,6 +26,7 @@ export class CoursesService {
     @InjectModel(Result.name) private resultModel: Model<Result>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Topic.name) private topicModel: Model<Topic>,
+    @InjectModel(Package.name) private packageModel: Model<Package>,
   ) {}
 
   create(createCourseDto: CreateCourseDto): Promise<Course> {
@@ -32,12 +41,13 @@ export class CoursesService {
   ): Promise<{ courses: Course[]; total: number }> {
     const filter = search
       ? {
+          isDeleted: { $ne: true },
           $or: [
             { title: { $regex: search, $options: 'i' } },
             { code: { $regex: search, $options: 'i' } },
           ],
         }
-      : {};
+      : { isDeleted: { $ne: true } };
 
     const courses = await this.courseModel
       .find(filter)
@@ -49,7 +59,7 @@ export class CoursesService {
   }
 
   async findAllForDropdown(): Promise<Course[]> {
-    return this.courseModel.find({}, 'title').exec();
+    return this.courseModel.find({ isDeleted: { $ne: true } }, 'title').exec();
   }
 
   async getAllCoursesForDropdown(instituteId?: string): Promise<any[]> {
@@ -64,30 +74,85 @@ export class CoursesService {
   }
 
   findOne(id: string): Promise<Course | null> {
-    return this.courseModel.findById(id).exec();
+    return this.courseModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
   }
 
   findByIds(ids: string[]): Promise<Course[]> {
-    return this.courseModel.find({ _id: { $in: ids } }).exec();
+    return this.courseModel
+      .find({ _id: { $in: ids }, isDeleted: { $ne: true } })
+      .exec();
   }
 
   update(id: string, updateCourseDto: UpdateCourseDto): Promise<Course | null> {
     return this.courseModel
-      .findByIdAndUpdate(id, updateCourseDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateCourseDto,
+        { new: true },
+      )
       .exec();
   }
 
-  remove(id: string): Promise<Course | null> {
-    return this.courseModel.findByIdAndDelete(id).exec();
+  async remove(id: string): Promise<DeleteGuardResult> {
+    const existingCourse = await this.courseModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!existingCourse) {
+      throw new NotFoundException('Course not found');
+    }
+
+    const referencingPackages = await this.packageModel
+      .find({ course: id, isDeleted: { $ne: true } })
+      .select('_id code description')
+      .lean();
+
+    if (referencingPackages.length > 0) {
+      throw new ConflictException({
+        message:
+          'This course is linked to active package records. Remove those links before deleting the course.',
+        blockedBy: referencingPackages.map((pkg) => ({
+          type: 'Package',
+          id: String(pkg._id),
+          name: pkg.description || pkg.code,
+          actionHint: 'Edit the package and change its course first.',
+        })),
+      });
+    }
+
+    await this.courseModel
+      .updateOne({ _id: id }, { isDeleted: true, deletedAt: new Date() })
+      .exec();
+
+    return { deleted: true };
+  }
+
+  async findDeleted(): Promise<Course[]> {
+    return this.courseModel
+      .find({ isDeleted: true })
+      .sort({ deletedAt: -1, updatedAt: -1 })
+      .exec();
+  }
+
+  async restore(id: string): Promise<Course | null> {
+    return this.courseModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 
   async getInstituteCourses(instituteId?: string): Promise<Course[]> {
     const user = await this.userModel
       .findById(instituteId)
+      .where('isDeleted')
+      .ne(true)
       .populate({
         path: 'packages',
         model: 'Package',
-        populate: [{ path: 'course', model: 'Course' }],
+        match: { isDeleted: { $ne: true } },
+        populate: [{ path: 'course', model: 'Course', match: { isDeleted: { $ne: true } } }],
       })
       .exec();
 
@@ -99,11 +164,11 @@ export class CoursesService {
   // Dashboard Analytics Methods
 
   async countAllCourses(): Promise<number> {
-    return await this.courseModel.countDocuments();
+    return await this.courseModel.countDocuments({ isDeleted: { $ne: true } });
   }
 
   async countAllTests(): Promise<number> {
-    return await this.testModel.countDocuments();
+    return await this.testModel.countDocuments({ isDeleted: { $ne: true } });
   }
 
   async countAllTestAttempts(): Promise<number> {
@@ -118,8 +183,12 @@ export class CoursesService {
   ): Promise<any[]> {
     let courses: any[] = [];
     if (courseIds.length > 0) {
-      courses = await this.courseModel.find({ _id: { $in: courseIds } }).lean();
-    } else courses = await this.courseModel.find().lean();
+      courses = await this.courseModel
+        .find({ _id: { $in: courseIds }, isDeleted: { $ne: true } })
+        .lean();
+    } else {
+      courses = await this.courseModel.find({ isDeleted: { $ne: true } }).lean();
+    }
 
     const coursesWithAttempts: any[] = [];
 
@@ -128,6 +197,7 @@ export class CoursesService {
       const tests = await this.testModel
         .find({
           course: course._id,
+          isDeleted: { $ne: true },
         })
         .select('_id');
 
@@ -189,6 +259,11 @@ export class CoursesService {
 
   async getMostPopularTests(limit: number): Promise<any[]> {
     return await this.testModel.aggregate([
+      {
+        $match: {
+          isDeleted: { $ne: true },
+        },
+      },
       {
         $lookup: {
           from: 'results',

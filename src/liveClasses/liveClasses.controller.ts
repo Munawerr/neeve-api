@@ -24,6 +24,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 
 @ApiTags('liveClasses')
 @Controller('live-classes')
@@ -178,10 +179,37 @@ export class LiveClassesController {
   })
   @SetMetadata('permissions', ['delete_live_classes'])
   async remove(@Param('id') id: string) {
-    await this.liveClassesService.remove(id);
+    const result = await this.liveClassesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Live class deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted live classes (super admin only)' })
+  async findDeleted() {
+    const items = await this.liveClassesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted live classes retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted live class (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.liveClassesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Live class restored successfully',
+      data: item,
     };
   }
 }

@@ -19,6 +19,7 @@ import {
   LoginHistorySchema,
 } from 'src/auth/schemas/login-history.schema';
 import { LoginHistoryService } from 'src/auth/login-history.service';
+import { Result, ResultSchema } from 'src/results/schemas/result.schema';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { LoginHistoryService } from 'src/auth/login-history.service';
       { name: Package.name, schema: PackageSchema },
       { name: File.name, schema: FileSchema },
       { name: LoginHistory.name, schema: LoginHistorySchema },
+      { name: Result.name, schema: ResultSchema },
     ]),
   ],
   controllers: [TestsController],

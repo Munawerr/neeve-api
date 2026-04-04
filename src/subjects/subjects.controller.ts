@@ -20,6 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SuperAdminGuard } from 'src/common/guards/super-admin.guard';
 import { SubjectsService } from './subjects.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
@@ -195,10 +196,37 @@ export class SubjectsController {
     description: 'Subject deleted successfully',
   })
   async remove(@Param('id') id: string) {
-    await this.subjectsService.remove(id);
+    const result = await this.subjectsService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Subject deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted subjects (super admin only)' })
+  async findDeleted() {
+    const items = await this.subjectsService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted subjects retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted subject (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.subjectsService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Subject restored successfully',
+      data: item,
     };
   }
 }

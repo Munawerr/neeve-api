@@ -1,14 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Class } from './schemas/class.schema';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
+import { Package } from 'src/packages/schemas/package.schema';
 
 @Injectable()
 export class ClassesService {
   constructor(
     @InjectModel(Class.name) private readonly classModel: Model<Class>,
+    @InjectModel(Package.name) private readonly packageModel: Model<Package>,
   ) {}
 
   create(createClassDto: CreateClassDto): Promise<Class> {
@@ -23,9 +25,10 @@ export class ClassesService {
   ): Promise<{ classes: Class[]; total: number }> {
     const filter = search
       ? {
+          isDeleted: { $ne: true },
           $or: [{ title: { $regex: search, $options: 'i' } }],
         }
-      : {};
+      : { isDeleted: { $ne: true } };
 
     const classes = await this.classModel
       .find(filter)
@@ -37,7 +40,7 @@ export class ClassesService {
   }
 
   async findAllForDropdown(): Promise<Class[]> {
-    return this.classModel.find({}, 'title').exec();
+    return this.classModel.find({ isDeleted: { $ne: true } }, 'title').exec();
   }
 
   async getAllClassesForDropdown(
@@ -57,7 +60,7 @@ export class ClassesService {
     }
 
     const classes = await this.classModel
-      .find(query)
+      .find({ ...query, isDeleted: { $ne: true } })
       .select('_id title')
       .sort({ title: 1 })
       .lean()
@@ -72,16 +75,64 @@ export class ClassesService {
   }
 
   findOne(id: string): Promise<Class | null> {
-    return this.classModel.findById(id).exec();
+    return this.classModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
   }
 
   update(id: string, updateClassDto: UpdateClassDto): Promise<Class | null> {
     return this.classModel
-      .findByIdAndUpdate(id, updateClassDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateClassDto,
+        { new: true },
+      )
       .exec();
   }
 
-  remove(id: string): Promise<Class | null> {
-    return this.classModel.findByIdAndDelete(id).exec();
+  async remove(id: string): Promise<{ deleted: true }> {
+    const existingClass = await this.classModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+
+    if (!existingClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const referencingPackages = await this.packageModel
+      .find({ class: id, isDeleted: { $ne: true } })
+      .select('_id code description')
+      .lean();
+
+    if (referencingPackages.length > 0) {
+      throw new ConflictException({
+        message:
+          'This class is linked to active package records. Remove those links before deleting the class.',
+        blockedBy: referencingPackages.map((pkg) => ({
+          type: 'Package',
+          id: String(pkg._id),
+          name: pkg.description || pkg.code,
+          actionHint: 'Edit the package and change its class first.',
+        })),
+      });
+    }
+
+    await this.classModel
+      .updateOne({ _id: id }, { isDeleted: true, deletedAt: new Date() })
+      .exec();
+
+    return { deleted: true };
+  }
+
+  async findDeleted(): Promise<Class[]> {
+    return this.classModel.find({ isDeleted: true }).sort({ deletedAt: -1 }).exec();
+  }
+
+  async restore(id: string): Promise<Class | null> {
+    return this.classModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 }
