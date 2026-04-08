@@ -24,8 +24,42 @@ export class TestsService {
     private readonly questionsService: QuestionsService, // Inject QuestionsService
   ) {}
 
+  private normalizeMarksValue(value: number | undefined | null): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.abs(numericValue);
+  }
+
+  private async normalizeTestMarks(test: Test | null): Promise<Test | null> {
+    if (!test) {
+      return null;
+    }
+
+    const normalizedMarks = this.normalizeMarksValue(test.marksPerQuestion);
+    if (test.marksPerQuestion !== normalizedMarks) {
+      test.marksPerQuestion = normalizedMarks;
+      await test.save();
+    }
+
+    return test;
+  }
+
+  private async normalizeTestMarksCollection(tests: Test[]): Promise<Test[]> {
+    const normalizedTests = await Promise.all(
+      tests.map((test) => this.normalizeTestMarks(test)),
+    );
+
+    return normalizedTests.filter((test): test is Test => Boolean(test));
+  }
+
   async create(createTestDto: CreateTestDto): Promise<Test> {
-    const createdTest = new this.testModel(createTestDto);
+    const createdTest = new this.testModel({
+      ...createTestDto,
+      marksPerQuestion: this.normalizeMarksValue(createTestDto.marksPerQuestion),
+    });
     return createdTest.save();
   }
 
@@ -52,7 +86,8 @@ export class TestsService {
       .populate('topic')
       .exec();
     const total = await this.testModel.countDocuments(filter);
-    return { tests, total };
+    const normalizedTests = await this.normalizeTestMarksCollection(tests);
+    return { tests: normalizedTests, total };
   }
 
   async findAllTests(
@@ -81,11 +116,14 @@ export class TestsService {
       })
       .exec();
 
-    return { mockTests, otherTests };
+    return {
+      mockTests: await this.normalizeTestMarksCollection(mockTests),
+      otherTests: await this.normalizeTestMarksCollection(otherTests),
+    };
   }
 
   async findAllMockTests(subject: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({ subject, testType: TestType.MOCK })
       .where('isDeleted')
       .ne(true)
@@ -95,10 +133,12 @@ export class TestsService {
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async findTestsByTopic(topic: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({ topic })
       .where('isDeleted')
       .ne(true)
@@ -108,10 +148,12 @@ export class TestsService {
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async findOne(id: string): Promise<Test | null> {
-    return this.testModel
+    const test = await this.testModel
       .findById(id)
       .where('isDeleted')
       .ne(true)
@@ -121,26 +163,43 @@ export class TestsService {
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarks(test);
   }
 
   // Find tests by subject
   async findTestsBySubject(subject: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({
         subject,
         isDeleted: { $ne: true },
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async update(id: string, updateTestDto: UpdateTestDto): Promise<Test | null> {
-    return this.testModel
+    const normalizedUpdateDto = {
+      ...updateTestDto,
+      ...(updateTestDto.marksPerQuestion !== undefined
+        ? {
+            marksPerQuestion: this.normalizeMarksValue(
+              updateTestDto.marksPerQuestion,
+            ),
+          }
+        : {}),
+    };
+
+    const updatedTest = await this.testModel
       .findOneAndUpdate(
         { _id: id, isDeleted: { $ne: true } },
-        updateTestDto,
+        normalizedUpdateDto,
         { new: true },
       )
       .exec();
+
+    return this.normalizeTestMarks(updatedTest);
   }
 
   async remove(

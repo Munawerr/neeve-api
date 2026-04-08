@@ -432,9 +432,14 @@ export class UsersService {
         (sum: number, result: any) => {
           const skipableQuestionsCount =
             result.test.skipableQuestionsCount || 0;
-          const effectiveQuestionCount =
-            result.numOfQuestions - skipableQuestionsCount;
-          return sum + effectiveQuestionCount * result.marksPerQuestion;
+          const effectiveQuestionCount = Math.max(
+            0,
+            result.numOfQuestions - skipableQuestionsCount,
+          );
+          return (
+            sum +
+            effectiveQuestionCount * Math.abs(Number(result.marksPerQuestion) || 0)
+          );
         },
         0,
       );
@@ -444,7 +449,8 @@ export class UsersService {
         0,
       );
 
-      const percentage = Math.max(0, (acquiredScore / totalScore) * 100);
+      const percentage =
+        totalScore > 0 ? Math.max(0, (acquiredScore / totalScore) * 100) : 0;
 
       // Get all other students' results
       const allStudentResults = await this.resultModel

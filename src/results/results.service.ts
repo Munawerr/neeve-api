@@ -9,6 +9,21 @@ import { UpdateResultDto } from './dto/update-result.dto';
 export class ResultsService {
   constructor(@InjectModel(Result.name) private resultModel: Model<Result>) {}
 
+  private getSafePercentage(obtained: number, total: number): number {
+    const safeTotal = Math.abs(Number(total));
+    const safeObtained = Number(obtained);
+
+    if (!Number.isFinite(safeTotal) || safeTotal <= 0) {
+      return 0;
+    }
+
+    if (!Number.isFinite(safeObtained)) {
+      return 0;
+    }
+
+    return (safeObtained / safeTotal) * 100;
+  }
+
   // Create a new result
   async create(createResultDto: CreateResultServiceDto): Promise<Result> {
     const createdResult = new this.resultModel(createResultDto);
@@ -195,7 +210,7 @@ export class ResultsService {
     const scores = allTestResults.map((result) => {
       const total = result.marksSummary.totalMarks;
       const obtained = result.marksSummary.obtainedMarks;
-      return (obtained / total) * 100;
+      return this.getSafePercentage(obtained, total);
     });
 
     // Add current student's score
@@ -255,7 +270,7 @@ export class ResultsService {
           (sum, result) => sum + result.marksSummary.obtainedMarks,
           0,
         );
-        return (obtained / total) * 100;
+        return this.getSafePercentage(obtained, total);
       },
     );
 
@@ -312,7 +327,7 @@ export class ResultsService {
           (sum, result) => sum + result.marksSummary.obtainedMarks,
           0,
         );
-        return (obtained / total) * 100;
+        return this.getSafePercentage(obtained, total);
       },
     );
 
@@ -347,9 +362,10 @@ export class ResultsService {
 
     // Get all scores for this test
     const scores = allResults.map((result) => ({
-      score:
-        (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) *
-        100,
+      score: this.getSafePercentage(
+        result.marksSummary.obtainedMarks,
+        result.marksSummary.totalMarks,
+      ),
     }));
 
     // Add current score if not already in the list

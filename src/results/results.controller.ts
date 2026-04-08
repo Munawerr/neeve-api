@@ -53,6 +53,15 @@ export class ResultsController {
     private readonly testsService: TestsService,
   ) {}
 
+  private getNormalizedMarksPerQuestion(value: number | string | undefined): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.abs(numericValue);
+  }
+
   // Create a new result
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -78,6 +87,9 @@ export class ResultsController {
 
     const _result: CreateResultServiceDto = {
       ...createResultDto,
+      marksPerQuestion: this.getNormalizedMarksPerQuestion(
+        createResultDto.marksPerQuestion,
+      ),
       startedAt: new Date(),
     };
     const result = await this.resultsService.create(_result);
@@ -341,18 +353,24 @@ export class ResultsController {
       const skipableQuestionsCount = test.skipableQuestionsCount || 0;
 
       // Calculate the required number of questions to answer (total - skippable)
-      const requiredAnsweredQuestions =
-        updatedResult1.numOfQuestions - skipableQuestionsCount;
+      const requiredAnsweredQuestions = Math.max(
+        0,
+        updatedResult1.numOfQuestions - skipableQuestionsCount,
+      );
 
       // Check if the test should be completed based on answered questions
       const shouldCompleteTest = answeredQuestions >= requiredAnsweredQuestions;
 
       if (shouldCompleteTest) {
         // Calculate the effective total marks based on required questions, not total questions
-        const effectiveTotalQuestions =
-          updatedResult1.numOfQuestions - skipableQuestionsCount;
-        const totalMarks =
-          effectiveTotalQuestions * updatedResult1.marksPerQuestion;
+        const effectiveTotalQuestions = Math.max(
+          0,
+          updatedResult1.numOfQuestions - skipableQuestionsCount,
+        );
+        const marksPerQuestion = this.getNormalizedMarksPerQuestion(
+          updatedResult1.marksPerQuestion,
+        );
+        const totalMarks = effectiveTotalQuestions * marksPerQuestion;
 
         // Calculate obtained marks with negative marking
         let obtainedMarks = updatedResult1.questionResults.reduce(
@@ -375,7 +393,7 @@ export class ResultsController {
               correctOptions.every((option: any) => option.isChecked) &&
               checkedOptions.every((option: any) => option.isCorrect)
             ) {
-              return sum + updatedResult1.marksPerQuestion;
+              return sum + marksPerQuestion;
             }
 
             // If the answer is incorrect, deduct 1 mark
@@ -388,7 +406,8 @@ export class ResultsController {
         obtainedMarks = Math.max(0, obtainedMarks);
 
         // Calculate average marks based on effective total marks
-        const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+        const averageMarks =
+          totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
         // Count correct answers
         const correctAnswers = updatedResult1.questionResults.filter(
@@ -519,12 +538,16 @@ export class ResultsController {
 
         // Consider skippable questions in total marks calculation
         const skipableQuestionsCount = test.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        const totalMarks =
+          effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -613,9 +636,15 @@ export class ResultsController {
         const sum = await sumPromise;
         const test = await this.testsService.findOne(result.test.toString());
         const skipableQuestionsCount = test?.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        return sum + effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        return (
+          sum +
+          effectiveQuestionCount *
+            this.getNormalizedMarksPerQuestion(result.marksPerQuestion)
+        );
       },
       Promise.resolve(0),
     );
@@ -627,7 +656,8 @@ export class ResultsController {
         0,
       ),
     );
-    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+    const averageMarks =
+      totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
     const correctAnswers = uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.correctAnswers,
@@ -697,12 +727,16 @@ export class ResultsController {
 
         // Consider skippable questions in total marks calculation
         const skipableQuestionsCount = test.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        const totalMarks =
+          effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -800,9 +834,15 @@ export class ResultsController {
     const totalMarks = uniqueResultsArray.reduce((sum, result) => {
       const testId = result.test.toString();
       const skipableQuestionsCount = testSkipableCountMap[testId] || 0;
-      const effectiveQuestionCount =
-        result.numOfQuestions - skipableQuestionsCount;
-      return sum + effectiveQuestionCount * result.marksPerQuestion;
+      const effectiveQuestionCount = Math.max(
+        0,
+        result.numOfQuestions - skipableQuestionsCount,
+      );
+      return (
+        sum +
+        effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion)
+      );
     }, 0);
 
     const obtainedMarks = Math.max(
@@ -812,7 +852,8 @@ export class ResultsController {
         0,
       ),
     );
-    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+    const averageMarks =
+      totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
     const totalQuestions = uniqueResultsArray.reduce(
       (sum, result) => sum + result.numOfQuestions,
