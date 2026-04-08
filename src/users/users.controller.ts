@@ -50,6 +50,46 @@ const getErrorMessage = (error: unknown): string => {
   return 'Unknown error';
 };
 
+const toIdString = (value: any, depth = 0): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (depth > 3) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  if (typeof value.toString === 'function') {
+    const candidate = value.toString();
+    if (candidate && candidate !== '[object Object]') {
+      return candidate;
+    }
+  }
+
+  if (value._id && value._id !== value) {
+    return toIdString(value._id, depth + 1);
+  }
+
+  return null;
+};
+
+const packageMatchesCourse = (pkg: any, courseId: string): boolean => {
+  const packageCourseId = toIdString(pkg?.course);
+  return packageCourseId === courseId;
+};
+
+const packageDocId = (pkg: any): string | null => {
+  return toIdString(pkg?._id ?? pkg);
+};
+
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
@@ -262,56 +302,68 @@ export class UsersController {
     @Param('courseId') courseId: string,
   ) {
     try {
-      const instituteUser = await this.usersService.getInstituteUser(
+      const requestedUser = await this.usersService.getInstituteUser(
         instituteId,
         true,
       );
 
-      if (instituteUser) {
-        const _packages = instituteUser.packages.filter((pkg: any) => {
-          if (!pkg) {
-            return false;
-          }
-
-          const rawCourse = pkg.course;
-
-          if (!rawCourse) {
-            return false;
-          }
-
-          if (typeof rawCourse === 'string') {
-            return rawCourse === courseId;
-          }
-
-          if (typeof rawCourse.toString === 'function') {
-            const courseString = rawCourse.toString();
-            if (courseString && courseString !== '[object Object]') {
-              return courseString === courseId;
-            }
-          }
-
-          if (rawCourse._id) {
-            return rawCourse._id.toString() === courseId;
-          }
-
-          return false;
-        });
-
-        const packageIds = _packages.map((pkg) => pkg.toObject()._id);
-
-        const packages = await this.PackagesService.findByIds(packageIds, true);
-
-        return {
-          status: HttpStatus.OK,
-          message: 'Packages retrieved successfully',
-          data: packages,
-        };
-      } else {
+      if (!requestedUser) {
         return {
           status: HttpStatus.EXPECTATION_FAILED,
           message: 'Institute user not found',
         };
       }
+
+      const requestedRoleSlug = (requestedUser.role as any)?.slug;
+      const requestedPackages = Array.isArray(requestedUser.packages)
+        ? requestedUser.packages
+        : [];
+
+      let sourcePackages = requestedPackages;
+
+      // Some student flows pass the student id in this route. Prefer student packages,
+      // and fall back to institute packages if student-level assignments are empty.
+      if (requestedRoleSlug === 'student' && requestedPackages.length === 0) {
+        const instituteIdFromStudent = toIdString(requestedUser.institute);
+
+        if (instituteIdFromStudent) {
+          const instituteUser = await this.usersService.getInstituteUser(
+            instituteIdFromStudent,
+            true,
+          );
+
+          if (instituteUser?.packages?.length) {
+            sourcePackages = instituteUser.packages;
+          }
+        }
+      }
+
+      const packageIds = sourcePackages
+        .map(packageDocId)
+        .filter((id): id is string => Boolean(id));
+
+      if (packageIds.length === 0) {
+        return {
+          status: HttpStatus.OK,
+          message: 'Packages retrieved successfully',
+          data: [],
+        };
+      }
+
+      const uniquePackageIds = [...new Set(packageIds)];
+      const packages = await this.PackagesService.findByIds(
+        uniquePackageIds,
+        true,
+      );
+      const filteredPackages = packages.filter((pkg: any) =>
+        packageMatchesCourse(pkg, courseId),
+      );
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully',
+        data: filteredPackages,
+      };
     } catch (error) {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
