@@ -3,6 +3,7 @@ import {
   Put,
   Body,
   Param,
+  Req,
   UploadedFile,
   UseInterceptors,
   Post,
@@ -34,11 +35,13 @@ import {
 import { PackagesService } from '../packages/packages.service';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
+import { Request } from 'express';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { SuperAdminGuard } from '../common/guards/super-admin.guard';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 
 type UploadedFileType = Parameters<S3Service['uploadFile']>[0];
 
@@ -1085,6 +1088,71 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update staff user',
+        error: getErrorMessage(error),
+      };
+    }
+  }
+
+  @Put(':id/reset-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Reset user password (admin for all users, institute for own students)',
+  })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: ResetUserPasswordDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User password reset successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Not allowed to reset this user password',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to reset user password',
+  })
+  async resetUserPassword(
+    @Param('id') id: string,
+    @Body() resetUserPasswordDto: ResetUserPasswordDto,
+    @Req() req: Request,
+  ) {
+    try {
+      const actor = req.user as
+        | {
+            userId?: string;
+            role?: string;
+            institute?: string;
+          }
+        | undefined;
+
+      const updatedUser = await this.usersService.resetUserPassword(
+        id,
+        resetUserPasswordDto.password,
+        {
+          userId: actor?.userId || '',
+          role: actor?.role,
+          institute: actor?.institute,
+        },
+      );
+
+      return {
+        status: HttpStatus.OK,
+        message: 'User password reset successfully',
+        data: {
+          _id: updatedUser?._id,
+        },
+      };
+    } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
+
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to reset user password',
         error: getErrorMessage(error),
       };
     }

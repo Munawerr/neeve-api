@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Topic } from './schemas/topic.schema';
@@ -12,6 +12,8 @@ import { Result } from 'src/results/schemas/result.schema';
 
 @Injectable()
 export class TopicsService {
+  private readonly logger = new Logger(TopicsService.name);
+
   constructor(
     @InjectModel(Topic.name)
     private topicModel: Model<Topic>,
@@ -109,37 +111,98 @@ export class TopicsService {
       .exec();
   }
 
-  async bulkCreateTopics(parentTopics: any): Promise<any[]> {
+  async bulkCreateTopics(
+    parentTopics: any,
+    traceId?: string,
+    context?: { subjectId?: string; packageId?: string },
+  ): Promise<any[]> {
     const createdTopics: any[] = [];
+    const topicCodes = Object.keys(parentTopics || {});
+    let contextSubject: Subject | null = null;
+    let contextPackage: Package | null = null;
+
+    if (context?.subjectId) {
+      contextSubject = await this.subjectModel.findOne({
+        _id: context.subjectId,
+        isDeleted: { $ne: true },
+      });
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Context subject lookup: id=${context.subjectId}, found=${contextSubject ? 'yes' : 'no'}`,
+      );
+      if (!contextSubject) {
+        throw new Error(`Subject with id ${context.subjectId} not found`);
+      }
+    }
+
+    if (context?.packageId) {
+      contextPackage = await this.packageModel.findOne({
+        _id: context.packageId,
+        isDeleted: { $ne: true },
+      });
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Context package lookup: id=${context.packageId}, found=${contextPackage ? 'yes' : 'no'}`,
+      );
+      if (!contextPackage) {
+        throw new Error(`Package with id ${context.packageId} not found`);
+      }
+    }
+
+    this.logger.log(
+      `[${traceId || 'topics-bulk'}] Starting bulk topic creation. Parent groups=${topicCodes.length}`,
+    );
 
     for (const code in parentTopics) {
       const topics = parentTopics[code];
-      const parentTopic = topics[0];
+      if (!Array.isArray(topics) || topics.length === 0) {
+        this.logger.warn(
+          `[${traceId || 'topics-bulk'}] Skipping topic code ${code} because grouped rows are empty`,
+        );
+        continue;
+      }
 
-      const subject = await this.subjectModel.findOne({
-        code: parentTopic.subjectCode,
-        isDeleted: { $ne: true },
-      });
+      const parentTopic = topics[0];
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Processing topic code ${code}. Group rows=${topics.length}`,
+      );
+
+      const subject = contextSubject
+        ? contextSubject
+        : await this.subjectModel.findOne({
+            code: parentTopic.subjectCode,
+            isDeleted: { $ne: true },
+          });
       if (!subject) {
+        this.logger.error(
+          `[${traceId || 'topics-bulk'}] Subject not found for topic code ${code}. subjectCode=${parentTopic.subjectCode}`,
+        );
         throw new Error(
           `Subject with code ${parentTopic.subjectCode} not found`,
         );
       }
 
-      const _package = await this.packageModel.findOne({
-        code: parentTopic.packageCode,
-        isDeleted: { $ne: true },
-      });
+      const _package = contextPackage
+        ? contextPackage
+        : await this.packageModel.findOne({
+            code: parentTopic.packageCode,
+            isDeleted: { $ne: true },
+          });
       if (!_package) {
+        this.logger.error(
+          `[${traceId || 'topics-bulk'}] Package not found for topic code ${code}. packageCode=${parentTopic.packageCode}`,
+        );
         throw new Error(
           `Package with code ${parentTopic.packageCode} not found`,
         );
       }
 
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Subject and package resolved for topic code ${code}. subjectId=${subject._id}, packageId=${_package._id}`,
+      );
+
       // Create parent topic with code and title only
       const newParentTopic = new this.topicModel({
-        code: parentTopic.code,
-        title: parentTopic.title,
+        code: String(parentTopic.code || '').trim(),
+        title: String(parentTopic.title || '').trim(),
         subject: subject._id,
         package: _package._id,
         isParent: true,
@@ -147,6 +210,9 @@ export class TopicsService {
 
       const savedParentTopic = await newParentTopic.save();
       createdTopics.push(savedParentTopic);
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Parent topic created for code ${code}. parentTopicId=${savedParentTopic._id}`,
+      );
 
       // Create a subtopic for each parent topic with all the content fields
       const studyNotesIds = await this.saveFiles(parentTopic.studyNotes);
@@ -154,11 +220,14 @@ export class TopicsService {
       const practiceProblemsIds = await this.saveFiles(
         parentTopic.practiceProblems,
       );
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Primary subtopic content prepared for code ${code}. studyNotes=${studyNotesIds.length}, studyPlans=${studyPlansIds.length}, practiceProblems=${practiceProblemsIds.length}, introVideos=${Array.isArray(parentTopic.introVideoUrls) ? parentTopic.introVideoUrls.length : 0}`,
+      );
 
       // Use description as subtopic title or fallback to parent title if not provided
       const subtopicTitle = parentTopic.description
-        ? parentTopic.description
-        : `${parentTopic.title}`;
+        ? String(parentTopic.description).trim()
+        : `${String(parentTopic.title || '').trim()}`;
 
       const newSubTopic = new this.topicModel({
         code: `-`,
@@ -173,6 +242,9 @@ export class TopicsService {
       });
 
       const savedSubTopic = await newSubTopic.save();
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Primary subtopic created for code ${code}. subTopicId=${savedSubTopic._id}`,
+      );
 
       // Link subtopic to parent
       savedParentTopic.subTopics.push(
@@ -180,10 +252,16 @@ export class TopicsService {
       );
       await savedParentTopic.save();
       createdTopics.push(savedSubTopic);
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Linked primary subtopic to parent for code ${code}. parentSubTopicCount=${savedParentTopic.subTopics.length}`,
+      );
 
       // Process any additional subtopics from the file (if they exist)
       for (let i = 1; i < topics.length; i++) {
         const additionalSubTopic = topics[i];
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Processing additional subtopic ${i} for code ${code}`,
+        );
 
         const subStudyNotesIds = await this.saveFiles(
           additionalSubTopic.studyNotes,
@@ -197,11 +275,11 @@ export class TopicsService {
 
         // Use description as subtopic title or code as fallback
         const addSubtopicTitle = additionalSubTopic.description
-          ? additionalSubTopic.description
-          : `${additionalSubTopic.code}-content`;
+          ? String(additionalSubTopic.description).trim()
+          : `${String(additionalSubTopic.code || '').trim()}-content`;
 
         const newAdditionalSubTopic = new this.topicModel({
-          code: additionalSubTopic.code,
+          code: String(additionalSubTopic.code || '').trim(),
           title: addSubtopicTitle,
           subject: subject._id,
           package: _package._id,
@@ -218,17 +296,30 @@ export class TopicsService {
         );
         await savedParentTopic.save();
         createdTopics.push(savedAdditionalSubTopic);
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Additional subtopic created for code ${code}. subTopicId=${savedAdditionalSubTopic._id}, parentSubTopicCount=${savedParentTopic.subTopics.length}`,
+        );
       }
+
+      this.logger.log(
+        `[${traceId || 'topics-bulk'}] Completed processing for topic code ${code}`,
+      );
     }
+
+    this.logger.log(
+      `[${traceId || 'topics-bulk'}] Bulk topic creation finished. Created documents=${createdTopics.length}`,
+    );
 
     return createdTopics;
   }
 
   private async saveFiles(
-    urls: string[],
+    urls: string[] | string | null | undefined,
   ): Promise<MongooseSchema.Types.ObjectId[]> {
-    const fileIds: any[] = [];
-    for (const url of urls) {
+    const normalizedUrls = this.normalizeUrlList(urls);
+    const fileIds: MongooseSchema.Types.ObjectId[] = [];
+
+    for (const url of normalizedUrls) {
       const fileType = url.split('.').pop();
       const fileName = url.split('/').pop();
       const file = await this.filesService.create({
@@ -236,9 +327,26 @@ export class TopicsService {
         fileType: fileType ? fileType : '',
         fileUrl: url,
       });
-      fileIds.push(file._id);
+      fileIds.push(file._id as MongooseSchema.Types.ObjectId);
     }
     return fileIds;
+  }
+
+  private normalizeUrlList(urls: string[] | string | null | undefined): string[] {
+    if (!urls) {
+      return [];
+    }
+
+    if (Array.isArray(urls)) {
+      return urls
+        .map((url) => String(url || '').trim())
+        .filter((url) => url.length > 0);
+    }
+
+    return String(urls)
+      .split(/[\n,]/)
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
   }
 
   update(id: string, updateTopicDto: UpdateTopicDto): Promise<Topic | null> {

@@ -12,6 +12,7 @@ import {
   UploadedFile,
   Res,
   Query,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +36,8 @@ import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 @ApiTags('topics')
 @Controller('topics')
 export class TopicsController {
+  private readonly logger = new Logger(TopicsController.name);
+
   constructor(
     private readonly topicsService: TopicsService,
     private readonly filesService: FilesService,
@@ -50,8 +53,9 @@ export class TopicsController {
     description: 'Topic created successfully',
   })
   async create(@Body() createTopicDto: CreateTopicDto) {
+    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
     const topic = await this.topicsService.create({
-      ...createTopicDto,
+      ...normalizedTopicDto,
       isParent: true,
     });
     return {
@@ -325,7 +329,8 @@ export class TopicsController {
     @Param('id') id: string,
     @Body() updateTopicDto: UpdateTopicDto,
   ) {
-    const updatedTopic = await this.topicsService.update(id, updateTopicDto);
+    const normalizedTopicDto = await this.normalizeTopicResources(updateTopicDto);
+    const updatedTopic = await this.topicsService.update(id, normalizedTopicDto);
     return {
       status: HttpStatus.OK,
       message: 'Topic updated successfully',
@@ -401,8 +406,9 @@ export class TopicsController {
         message: 'Topic not found',
       };
     }
+    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
     const subTopic = await this.topicsService.create({
-      ...createTopicDto,
+      ...normalizedTopicDto,
       isParent: false,
     });
     topic.subTopics.push(subTopic._id as MongooseSchema.Types.ObjectId);
@@ -438,30 +444,39 @@ export class TopicsController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create topics',
   })
-  async bulkCreateTopics(@UploadedFile() file: Express.Multer.File) {
+  async bulkCreateTopics(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { subjectId?: string; packageId?: string },
+  ) {
+    const traceId = `topics-bulk-${Date.now()}`;
+    const subjectIdFromBody = body?.subjectId?.trim();
+    const packageIdFromBody = body?.packageId?.trim();
+
     try {
-      // Add detailed logging to understand what's being received
-      console.log('Received upload request');
-      console.log('File received:', file ? 'Yes' : 'No');
+      this.logger.log(`[${traceId}] Bulk upload request received`);
+      this.logger.log(
+        `[${traceId}] File received: ${file ? 'yes' : 'no'}`,
+      );
 
       // Check if file exists
       if (!file) {
-        console.log('No file in request');
+        this.logger.warn(`[${traceId}] Missing file in request`);
         return {
           status: HttpStatus.BAD_REQUEST,
           message: 'File is required',
         };
       }
 
-      console.log('File details:', {
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        size: file.buffer?.length || 0,
-      });
+      this.logger.log(
+        `[${traceId}] File details: name=${file.originalname}, type=${file.mimetype}, size=${file.buffer?.length || 0}`,
+      );
+      this.logger.log(
+        `[${traceId}] Upload context: subjectId=${subjectIdFromBody || 'n/a'}, packageId=${packageIdFromBody || 'n/a'}`,
+      );
 
       // Check if file has buffer
       if (!file.buffer) {
+        this.logger.warn(`[${traceId}] File has no buffer`);
         return {
           status: HttpStatus.BAD_REQUEST,
           message: 'Invalid file format',
@@ -475,8 +490,11 @@ export class TopicsController {
       try {
         // Load the workbook directly from buffer (cast as any to avoid type issues)
         await workbook.xlsx.load(file.buffer as any);
+        this.logger.log(`[${traceId}] Workbook parsed successfully`);
       } catch (parseError) {
-        console.error('Error parsing Excel file:', parseError);
+        this.logger.error(
+          `[${traceId}] Failed to parse Excel file: ${parseError?.message || 'unknown error'}`,
+        );
         return {
           status: HttpStatus.BAD_REQUEST,
           message: 'Invalid Excel file format',
@@ -487,50 +505,80 @@ export class TopicsController {
       const worksheet = workbook.getWorksheet(1);
 
       const parentTopics: any = {};
+      let parsedDataRows = 0;
+      let rowsWithoutCode = 0;
 
       if (worksheet) {
+        this.logger.log(
+          `[${traceId}] Worksheet found: "${worksheet.name}" with ${worksheet.rowCount || 0} rows`,
+        );
+
         worksheet.eachRow((row, rowNumber) => {
           if (rowNumber > 1) {
             // Skip header row
+            parsedDataRows++;
+
             const topic = {
-              code: row.getCell(1).value,
-              title: row.getCell(2).value,
-              subjectCode: row.getCell(3).value,
-              packageCode: row.getCell(4).value,
-              description: row.getCell(5).value || '', // Added description (subtopic title)
-              introVideoUrls: row.getCell(6).value
-                ? row.getCell(6).value?.toString().split(',')
-                : [],
-              studyNotes: row.getCell(7).value
-                ? row.getCell(7).value?.toString().split(',')
-                : [],
-              studyPlans: row.getCell(8).value
-                ? row.getCell(8).value?.toString().split(',')
-                : [],
-              practiceProblems: row.getCell(9).value
-                ? row.getCell(9).value?.toString().split(',')
-                : [],
+              code: this.getCellText(row.getCell(1).value),
+              title: this.getCellText(row.getCell(2).value),
+              description: this.getCellText(row.getCell(3).value),
+              introVideoUrls: this.getDelimitedValues(row.getCell(4).value),
+              studyNotes: this.getDelimitedValues(row.getCell(5).value),
+              studyPlans: this.getDelimitedValues(row.getCell(6).value),
+              practiceProblems: this.getDelimitedValues(row.getCell(7).value),
             };
 
-            const topicCode = topic.code?.toString();
+            const topicCode = topic.code;
 
             if (topicCode) {
               if (!parentTopics[topicCode]) {
                 parentTopics[topicCode] = [];
               }
               parentTopics[topicCode].push(topic);
+            } else {
+              rowsWithoutCode++;
+              this.logger.warn(
+                `[${traceId}] Skipping row ${rowNumber} due to empty topic code`,
+              );
             }
           }
         });
+      } else {
+        this.logger.warn(`[${traceId}] Worksheet 1 not found in uploaded workbook`);
       }
 
-      await this.topicsService.bulkCreateTopics(parentTopics);
+      const groupedTopicCodes = Object.keys(parentTopics);
+      this.logger.log(
+        `[${traceId}] Parsed rows=${parsedDataRows}, grouped topic codes=${groupedTopicCodes.length}, skipped rows without code=${rowsWithoutCode}`,
+      );
+
+      const createdTopics = await this.topicsService.bulkCreateTopics(
+        parentTopics,
+        traceId,
+        {
+          subjectId: subjectIdFromBody,
+          packageId: packageIdFromBody,
+        },
+      );
+      this.logger.log(
+        `[${traceId}] Bulk create completed. Created documents=${createdTopics.length}`,
+      );
 
       return {
         status: HttpStatus.OK,
         message: 'Topics created successfully',
+        data: {
+          parsedRows: parsedDataRows,
+          groupedTopicCodes: groupedTopicCodes.length,
+          skippedRowsWithoutCode: rowsWithoutCode,
+          createdDocuments: createdTopics.length,
+        },
       };
     } catch (error) {
+      this.logger.error(
+        `[${traceId}] Bulk create failed: ${error?.message || 'unknown error'}`,
+        error?.stack,
+      );
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create topics',
@@ -554,9 +602,7 @@ export class TopicsController {
     worksheet.columns = [
       { header: 'Code', key: 'code', width: 20 },
       { header: 'Title', key: 'title', width: 30 },
-      { header: 'Subject Code', key: 'subjectCode', width: 20 },
-      { header: 'Package Code', key: 'packageCode', width: 20 },
-      { header: 'Description (Subtopic Title)', key: 'description', width: 30 },
+      { header: 'Description (Topic Definition)', key: 'description', width: 70 },
       {
         header: 'Intro Video URLs (comma separated)',
         key: 'introVideoUrls',
@@ -590,5 +636,140 @@ export class TopicsController {
 
     await workbook.xlsx.write(res);
     res.end();
+  }
+
+  private getCellText(cellValue: unknown): string {
+    if (cellValue == null) {
+      return '';
+    }
+
+    if (typeof cellValue === 'string' || typeof cellValue === 'number') {
+      return String(cellValue).trim();
+    }
+
+    if (typeof cellValue === 'boolean') {
+      return String(cellValue).trim();
+    }
+
+    if (typeof cellValue === 'object') {
+      const valueObject = cellValue as any;
+
+      // Check for text.richText property (this is the main way ExcelJS stores rich text)
+      if (valueObject.text && Array.isArray(valueObject.text.richText)) {
+        const extracted = valueObject.text.richText
+          .map((part: any) => {
+            if (typeof part === 'string') {
+              return part;
+            }
+            if (part.text != null) {
+              return String(part.text);
+            }
+            return '';
+          })
+          .join('')
+          .trim();
+        if (extracted) {
+          return extracted;
+        }
+      }
+
+      // Check for direct value property (ExcelJS may nest the value here)
+      if (valueObject.value != null && typeof valueObject.value !== 'object') {
+        return String(valueObject.value).trim();
+      }
+
+      // Check for text property (simple text)
+      if (typeof valueObject.text === 'string') {
+        return String(valueObject.text).trim();
+      }
+
+      // Check for hyperlink property
+      if (valueObject.hyperlink != null && typeof valueObject.hyperlink === 'string') {
+        return String(valueObject.hyperlink).trim();
+      }
+
+      // Check for result property (formula result)
+      if (valueObject.result != null && typeof valueObject.result !== 'object') {
+        return String(valueObject.result).trim();
+      }
+
+      // Check for formattedValue property (ExcelJS formatted value)
+      if (valueObject.formattedValue != null) {
+        return String(valueObject.formattedValue).trim();
+      }
+    }
+
+    return '';
+  }
+
+  private getDelimitedValues(cellValue: unknown): string[] {
+    const normalizedValue = this.getCellText(cellValue);
+    if (!normalizedValue) {
+      return [];
+    }
+
+    return normalizedValue
+      .split(/[\n,]/)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
+  private async normalizeTopicResources<T extends CreateTopicDto | UpdateTopicDto>(
+    topicDto: T,
+  ): Promise<T> {
+    return {
+      ...topicDto,
+      code: String(topicDto.code || '-').trim() || '-',
+      introVideoUrls: Array.isArray(topicDto.introVideoUrls)
+        ? topicDto.introVideoUrls
+            .map((url) => String(url || '').trim())
+            .filter((url) => url.length > 0)
+        : topicDto.introVideoUrls,
+      studyNotes: await this.normalizeResourceField(topicDto.studyNotes),
+      studyPlans: await this.normalizeResourceField(topicDto.studyPlans),
+      practiceProblems: await this.normalizeResourceField(
+        topicDto.practiceProblems,
+      ),
+    };
+  }
+
+  private async normalizeResourceField(
+    values: unknown,
+  ): Promise<MongooseSchema.Types.ObjectId[] | undefined> {
+    if (!Array.isArray(values)) {
+      return values === undefined
+        ? undefined
+        : (values as MongooseSchema.Types.ObjectId[]);
+    }
+
+    const normalizedValues = values
+      .map((value) => (typeof value === 'string' ? value.trim() : value))
+      .filter((value) => value !== '' && value != null);
+
+    if (normalizedValues.length === 0) {
+      return [];
+    }
+
+    const hasUrlInputs = normalizedValues.some(
+      (value) => typeof value === 'string' && /^https?:\/\//i.test(value),
+    );
+
+    if (!hasUrlInputs) {
+      return normalizedValues as MongooseSchema.Types.ObjectId[];
+    }
+
+    const createdFiles = await Promise.all(
+      (normalizedValues as string[]).map((url) =>
+        this.filesService.create({
+          fileName: url.split('/').pop() || '',
+          fileType: url.split('.').pop() || '',
+          fileUrl: url,
+        }),
+      ),
+    );
+
+    return createdFiles.map(
+      (file) => file._id as MongooseSchema.Types.ObjectId,
+    );
   }
 }
