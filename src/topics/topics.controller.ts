@@ -53,8 +53,9 @@ export class TopicsController {
     description: 'Topic created successfully',
   })
   async create(@Body() createTopicDto: CreateTopicDto) {
+    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
     const topic = await this.topicsService.create({
-      ...createTopicDto,
+      ...normalizedTopicDto,
       isParent: true,
     });
     return {
@@ -328,7 +329,8 @@ export class TopicsController {
     @Param('id') id: string,
     @Body() updateTopicDto: UpdateTopicDto,
   ) {
-    const updatedTopic = await this.topicsService.update(id, updateTopicDto);
+    const normalizedTopicDto = await this.normalizeTopicResources(updateTopicDto);
+    const updatedTopic = await this.topicsService.update(id, normalizedTopicDto);
     return {
       status: HttpStatus.OK,
       message: 'Topic updated successfully',
@@ -404,8 +406,9 @@ export class TopicsController {
         message: 'Topic not found',
       };
     }
+    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
     const subTopic = await this.topicsService.create({
-      ...createTopicDto,
+      ...normalizedTopicDto,
       isParent: false,
     });
     topic.subTopics.push(subTopic._id as MongooseSchema.Types.ObjectId);
@@ -599,7 +602,7 @@ export class TopicsController {
     worksheet.columns = [
       { header: 'Code', key: 'code', width: 20 },
       { header: 'Title', key: 'title', width: 30 },
-      { header: 'Description (Subtopic Title)', key: 'description', width: 30 },
+      { header: 'Description (Topic Definition)', key: 'description', width: 70 },
       {
         header: 'Intro Video URLs (comma separated)',
         key: 'introVideoUrls',
@@ -644,35 +647,59 @@ export class TopicsController {
       return String(cellValue).trim();
     }
 
+    if (typeof cellValue === 'boolean') {
+      return String(cellValue).trim();
+    }
+
     if (typeof cellValue === 'object') {
-      const valueObject = cellValue as {
-        text?: string;
-        hyperlink?: string;
-        richText?: Array<{ text?: string }>;
-        result?: unknown;
-      };
+      const valueObject = cellValue as any;
 
-      if (valueObject.text) {
-        return valueObject.text.trim();
-      }
-
-      if (valueObject.hyperlink) {
-        return valueObject.hyperlink.trim();
-      }
-
-      if (Array.isArray(valueObject.richText)) {
-        return valueObject.richText
-          .map((part) => part?.text || '')
+      // Check for text.richText property (this is the main way ExcelJS stores rich text)
+      if (valueObject.text && Array.isArray(valueObject.text.richText)) {
+        const extracted = valueObject.text.richText
+          .map((part: any) => {
+            if (typeof part === 'string') {
+              return part;
+            }
+            if (part.text != null) {
+              return String(part.text);
+            }
+            return '';
+          })
           .join('')
           .trim();
+        if (extracted) {
+          return extracted;
+        }
       }
 
-      if (valueObject.result != null) {
+      // Check for direct value property (ExcelJS may nest the value here)
+      if (valueObject.value != null && typeof valueObject.value !== 'object') {
+        return String(valueObject.value).trim();
+      }
+
+      // Check for text property (simple text)
+      if (typeof valueObject.text === 'string') {
+        return String(valueObject.text).trim();
+      }
+
+      // Check for hyperlink property
+      if (valueObject.hyperlink != null && typeof valueObject.hyperlink === 'string') {
+        return String(valueObject.hyperlink).trim();
+      }
+
+      // Check for result property (formula result)
+      if (valueObject.result != null && typeof valueObject.result !== 'object') {
         return String(valueObject.result).trim();
+      }
+
+      // Check for formattedValue property (ExcelJS formatted value)
+      if (valueObject.formattedValue != null) {
+        return String(valueObject.formattedValue).trim();
       }
     }
 
-    return String(cellValue).trim();
+    return '';
   }
 
   private getDelimitedValues(cellValue: unknown): string[] {
@@ -685,5 +712,64 @@ export class TopicsController {
       .split(/[\n,]/)
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
+  }
+
+  private async normalizeTopicResources<T extends CreateTopicDto | UpdateTopicDto>(
+    topicDto: T,
+  ): Promise<T> {
+    return {
+      ...topicDto,
+      code: String(topicDto.code || '-').trim() || '-',
+      introVideoUrls: Array.isArray(topicDto.introVideoUrls)
+        ? topicDto.introVideoUrls
+            .map((url) => String(url || '').trim())
+            .filter((url) => url.length > 0)
+        : topicDto.introVideoUrls,
+      studyNotes: await this.normalizeResourceField(topicDto.studyNotes),
+      studyPlans: await this.normalizeResourceField(topicDto.studyPlans),
+      practiceProblems: await this.normalizeResourceField(
+        topicDto.practiceProblems,
+      ),
+    };
+  }
+
+  private async normalizeResourceField(
+    values: unknown,
+  ): Promise<MongooseSchema.Types.ObjectId[] | undefined> {
+    if (!Array.isArray(values)) {
+      return values === undefined
+        ? undefined
+        : (values as MongooseSchema.Types.ObjectId[]);
+    }
+
+    const normalizedValues = values
+      .map((value) => (typeof value === 'string' ? value.trim() : value))
+      .filter((value) => value !== '' && value != null);
+
+    if (normalizedValues.length === 0) {
+      return [];
+    }
+
+    const hasUrlInputs = normalizedValues.some(
+      (value) => typeof value === 'string' && /^https?:\/\//i.test(value),
+    );
+
+    if (!hasUrlInputs) {
+      return normalizedValues as MongooseSchema.Types.ObjectId[];
+    }
+
+    const createdFiles = await Promise.all(
+      (normalizedValues as string[]).map((url) =>
+        this.filesService.create({
+          fileName: url.split('/').pop() || '',
+          fileType: url.split('.').pop() || '',
+          fileUrl: url,
+        }),
+      ),
+    );
+
+    return createdFiles.map(
+      (file) => file._id as MongooseSchema.Types.ObjectId,
+    );
   }
 }
