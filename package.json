@@ -6,6 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "clean:vercel": "node scripts/clean-vercel-stale-artifacts.js",
+    "vercel-build": "npm run clean:vercel ; npm run build",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "update:package-codes": "node scripts/update-package-codes.js",
