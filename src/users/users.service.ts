@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema, Types } from 'mongoose'; // Import Mongoose Schema
 import { Role } from './../roles/schemas/role.schema';
@@ -862,6 +868,57 @@ export class UsersService {
 
     return this.userModel
       .findByIdAndUpdate(id, updateData, { new: true })
+      .exec();
+  }
+
+  async resetUserPassword(
+    id: string,
+    newPassword: string,
+    actor: {
+      userId: string;
+      role?: string;
+      institute?: string;
+    },
+  ): Promise<User | null> {
+    const trimmedPassword = newPassword?.trim();
+    if (!trimmedPassword) {
+      throw new BadRequestException('Password is required');
+    }
+
+    const user = await this.findOneWithRole(id);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const actorRoleSlug = actor?.role;
+    const targetRoleSlug =
+      typeof user.role === 'string' ? user.role : (user.role as unknown as Role)?.slug;
+
+    if (actorRoleSlug !== 'admin' && actorRoleSlug !== 'super-admin') {
+      if (actorRoleSlug !== 'institute') {
+        throw new ForbiddenException('You are not allowed to reset passwords');
+      }
+
+      if (targetRoleSlug !== 'student') {
+        throw new ForbiddenException(
+          'Institute user can reset password for student users only',
+        );
+      }
+
+      const targetInstituteId = user.institute
+        ? (user.institute as unknown as Types.ObjectId).toString()
+        : '';
+
+      if (!targetInstituteId || targetInstituteId !== actor.userId) {
+        throw new ForbiddenException(
+          'Institute user can reset password only for own students',
+        );
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
+    return this.userModel
+      .findByIdAndUpdate(id, { password: hashedPassword }, { new: true })
       .exec();
   }
 
