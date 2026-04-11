@@ -116,7 +116,7 @@ export class TopicsService {
     traceId?: string,
     context?: { subjectId?: string; packageId?: string },
   ): Promise<any[]> {
-    const createdTopics: any[] = [];
+    const upsertedTopics: any[] = [];
     const topicCodes = Object.keys(parentTopics || {});
     let contextSubject: Subject | null = null;
     let contextPackage: Package | null = null;
@@ -199,62 +199,136 @@ export class TopicsService {
         `[${traceId || 'topics-bulk'}] Subject and package resolved for topic code ${code}. subjectId=${subject._id}, packageId=${_package._id}`,
       );
 
-      // Create parent topic with code and title only
-      const newParentTopic = new this.topicModel({
-        code: String(parentTopic.code || '').trim(),
-        title: String(parentTopic.title || '').trim(),
+      const incomingCode = String(parentTopic.code || '').trim();
+      const incomingTitle = String(parentTopic.title || '').trim();
+      const incomingDescription = String(parentTopic.description || '').trim();
+
+      let savedParentTopic = await this.topicModel.findOne({
+        code: incomingCode,
         subject: subject._id,
         package: _package._id,
         isParent: true,
+        isDeleted: { $ne: true },
       });
 
-      const savedParentTopic = await newParentTopic.save();
-      createdTopics.push(savedParentTopic);
-      this.logger.log(
-        `[${traceId || 'topics-bulk'}] Parent topic created for code ${code}. parentTopicId=${savedParentTopic._id}`,
-      );
+      if (!savedParentTopic) {
+        const newParentTopic = new this.topicModel({
+          code: incomingCode,
+          title: incomingTitle || incomingCode,
+          subject: subject._id,
+          package: _package._id,
+          isParent: true,
+        });
+        savedParentTopic = await newParentTopic.save();
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Parent topic created for code ${code}. parentTopicId=${savedParentTopic._id}`,
+        );
+      } else {
+        if (incomingTitle) {
+          savedParentTopic.title = incomingTitle;
+        }
+        await savedParentTopic.save();
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Parent topic updated for code ${code}. parentTopicId=${savedParentTopic._id}`,
+        );
+      }
+      upsertedTopics.push(savedParentTopic);
 
-      // Create a subtopic for each parent topic with all the content fields
-      const studyNotesIds = await this.saveFiles(parentTopic.studyNotes);
-      const studyPlansIds = await this.saveFiles(parentTopic.studyPlans);
-      const practiceProblemsIds = await this.saveFiles(
+      const introVideoUrls = this.normalizeUrlList(parentTopic.introVideoUrls);
+      const studyNoteUrls = this.normalizeUrlList(parentTopic.studyNotes);
+      const studyPlanUrls = this.normalizeUrlList(parentTopic.studyPlans);
+      const practiceProblemUrls = this.normalizeUrlList(
         parentTopic.practiceProblems,
       );
+
+      const studyNotesIds =
+        studyNoteUrls.length > 0 ? await this.saveFiles(studyNoteUrls) : [];
+      const studyPlansIds =
+        studyPlanUrls.length > 0 ? await this.saveFiles(studyPlanUrls) : [];
+      const practiceProblemsIds =
+        practiceProblemUrls.length > 0
+          ? await this.saveFiles(practiceProblemUrls)
+          : [];
+
       this.logger.log(
-        `[${traceId || 'topics-bulk'}] Primary subtopic content prepared for code ${code}. studyNotes=${studyNotesIds.length}, studyPlans=${studyPlansIds.length}, practiceProblems=${practiceProblemsIds.length}, introVideos=${Array.isArray(parentTopic.introVideoUrls) ? parentTopic.introVideoUrls.length : 0}`,
+        `[${traceId || 'topics-bulk'}] Primary subtopic content parsed for code ${code}. studyNotes=${studyNotesIds.length}, studyPlans=${studyPlansIds.length}, practiceProblems=${practiceProblemsIds.length}, introVideos=${introVideoUrls.length}`,
       );
 
-      // Use description as subtopic title or fallback to parent title if not provided
-      const subtopicTitle = parentTopic.description
-        ? String(parentTopic.description).trim()
-        : `${String(parentTopic.title || '').trim()}`;
+      const subTopicIds = Array.isArray(savedParentTopic.subTopics)
+        ? savedParentTopic.subTopics
+        : [];
 
-      const newSubTopic = new this.topicModel({
-        code: `-`,
-        title: subtopicTitle,
-        subject: subject._id,
-        package: _package._id,
-        introVideoUrls: parentTopic.introVideoUrls,
-        studyNotes: studyNotesIds,
-        studyPlans: studyPlansIds,
-        practiceProblems: practiceProblemsIds,
-        isParent: false,
-      });
+      let savedSubTopic: Topic | null = null;
+      if (subTopicIds.length > 0) {
+        savedSubTopic = await this.topicModel.findOne({
+          _id: subTopicIds[0],
+          isDeleted: { $ne: true },
+        });
+      }
 
-      const savedSubTopic = await newSubTopic.save();
-      this.logger.log(
-        `[${traceId || 'topics-bulk'}] Primary subtopic created for code ${code}. subTopicId=${savedSubTopic._id}`,
-      );
+      if (!savedSubTopic) {
+        const fallbackSubtopicTitle =
+          incomingDescription || incomingTitle || incomingCode;
+        const newSubTopic = new this.topicModel({
+          code: `-`,
+          title: fallbackSubtopicTitle,
+          subject: subject._id,
+          package: _package._id,
+          introVideoUrls,
+          studyNotes: studyNotesIds,
+          studyPlans: studyPlansIds,
+          practiceProblems: practiceProblemsIds,
+          isParent: false,
+        });
 
-      // Link subtopic to parent
-      savedParentTopic.subTopics.push(
-        savedSubTopic._id as MongooseSchema.Types.ObjectId,
-      );
-      await savedParentTopic.save();
-      createdTopics.push(savedSubTopic);
-      this.logger.log(
-        `[${traceId || 'topics-bulk'}] Linked primary subtopic to parent for code ${code}. parentSubTopicCount=${savedParentTopic.subTopics.length}`,
-      );
+        savedSubTopic = await newSubTopic.save();
+        savedParentTopic.subTopics = [
+          savedSubTopic._id as MongooseSchema.Types.ObjectId,
+        ];
+        await savedParentTopic.save();
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Primary subtopic created for code ${code}. subTopicId=${savedSubTopic._id}`,
+        );
+      } else {
+        if (incomingDescription) {
+          savedSubTopic.title = incomingDescription;
+        }
+
+        if (introVideoUrls.length > 0) {
+          savedSubTopic.introVideoUrls = this.mergeStringArrays(
+            savedSubTopic.introVideoUrls,
+            introVideoUrls,
+          );
+        }
+
+        if (studyNotesIds.length > 0) {
+          savedSubTopic.studyNotes = this.mergeObjectIdArrays(
+            savedSubTopic.studyNotes,
+            studyNotesIds,
+          );
+        }
+
+        if (studyPlansIds.length > 0) {
+          savedSubTopic.studyPlans = this.mergeObjectIdArrays(
+            savedSubTopic.studyPlans,
+            studyPlansIds,
+          );
+        }
+
+        if (practiceProblemsIds.length > 0) {
+          savedSubTopic.practiceProblems = this.mergeObjectIdArrays(
+            savedSubTopic.practiceProblems,
+            practiceProblemsIds,
+          );
+        }
+
+        await savedSubTopic.save();
+        this.logger.log(
+          `[${traceId || 'topics-bulk'}] Primary subtopic updated for code ${code}. subTopicId=${savedSubTopic._id}`,
+        );
+      }
+
+      upsertedTopics.push(savedSubTopic);
 
       // Process any additional subtopics from the file (if they exist)
       for (let i = 1; i < topics.length; i++) {
@@ -278,24 +352,87 @@ export class TopicsService {
           ? String(additionalSubTopic.description).trim()
           : `${String(additionalSubTopic.code || '').trim()}-content`;
 
-        const newAdditionalSubTopic = new this.topicModel({
-          code: String(additionalSubTopic.code || '').trim(),
-          title: addSubtopicTitle,
-          subject: subject._id,
-          package: _package._id,
-          introVideoUrls: additionalSubTopic.introVideoUrls,
-          studyNotes: subStudyNotesIds,
-          studyPlans: subStudyPlansIds,
-          practiceProblems: subPracticeProblemsIds,
-          isParent: false,
-        });
+        const incomingAdditionalCode = String(
+          additionalSubTopic.code || '',
+        ).trim();
+        let savedAdditionalSubTopic: Topic | null = null;
 
-        const savedAdditionalSubTopic = await newAdditionalSubTopic.save();
-        savedParentTopic.subTopics.push(
-          savedAdditionalSubTopic._id as MongooseSchema.Types.ObjectId,
+        if (incomingAdditionalCode) {
+          savedAdditionalSubTopic = await this.topicModel.findOne({
+            code: incomingAdditionalCode,
+            subject: subject._id,
+            package: _package._id,
+            isParent: false,
+            isDeleted: { $ne: true },
+          });
+        }
+
+        if (!savedAdditionalSubTopic) {
+          const newAdditionalSubTopic = new this.topicModel({
+            code: incomingAdditionalCode || '-',
+            title: addSubtopicTitle,
+            subject: subject._id,
+            package: _package._id,
+            introVideoUrls: this.normalizeUrlList(
+              additionalSubTopic.introVideoUrls,
+            ),
+            studyNotes: subStudyNotesIds,
+            studyPlans: subStudyPlansIds,
+            practiceProblems: subPracticeProblemsIds,
+            isParent: false,
+          });
+          savedAdditionalSubTopic = await newAdditionalSubTopic.save();
+        } else {
+          if (addSubtopicTitle) {
+            savedAdditionalSubTopic.title = addSubtopicTitle;
+          }
+
+          const additionalIntroVideoUrls = this.normalizeUrlList(
+            additionalSubTopic.introVideoUrls,
+          );
+          if (additionalIntroVideoUrls.length > 0) {
+            savedAdditionalSubTopic.introVideoUrls = this.mergeStringArrays(
+              savedAdditionalSubTopic.introVideoUrls,
+              additionalIntroVideoUrls,
+            );
+          }
+
+          if (subStudyNotesIds.length > 0) {
+            savedAdditionalSubTopic.studyNotes = this.mergeObjectIdArrays(
+              savedAdditionalSubTopic.studyNotes,
+              subStudyNotesIds,
+            );
+          }
+
+          if (subStudyPlansIds.length > 0) {
+            savedAdditionalSubTopic.studyPlans = this.mergeObjectIdArrays(
+              savedAdditionalSubTopic.studyPlans,
+              subStudyPlansIds,
+            );
+          }
+
+          if (subPracticeProblemsIds.length > 0) {
+            savedAdditionalSubTopic.practiceProblems =
+              this.mergeObjectIdArrays(
+                savedAdditionalSubTopic.practiceProblems,
+                subPracticeProblemsIds,
+              );
+          }
+
+          await savedAdditionalSubTopic.save();
+        }
+
+        const subTopicAlreadyLinked = (savedParentTopic.subTopics || []).some(
+          (id) => String(id) === String(savedAdditionalSubTopic?._id),
         );
-        await savedParentTopic.save();
-        createdTopics.push(savedAdditionalSubTopic);
+        if (!subTopicAlreadyLinked) {
+          savedParentTopic.subTopics.push(
+            savedAdditionalSubTopic._id as MongooseSchema.Types.ObjectId,
+          );
+          await savedParentTopic.save();
+        }
+
+        upsertedTopics.push(savedAdditionalSubTopic);
         this.logger.log(
           `[${traceId || 'topics-bulk'}] Additional subtopic created for code ${code}. subTopicId=${savedAdditionalSubTopic._id}, parentSubTopicCount=${savedParentTopic.subTopics.length}`,
         );
@@ -307,10 +444,10 @@ export class TopicsService {
     }
 
     this.logger.log(
-      `[${traceId || 'topics-bulk'}] Bulk topic creation finished. Created documents=${createdTopics.length}`,
+      `[${traceId || 'topics-bulk'}] Bulk topic upsert finished. Processed documents=${upsertedTopics.length}`,
     );
 
-    return createdTopics;
+    return upsertedTopics;
   }
 
   private async saveFiles(
@@ -347,6 +484,34 @@ export class TopicsService {
       .split(/[\n,]/)
       .map((url) => url.trim())
       .filter((url) => url.length > 0);
+  }
+
+  private mergeStringArrays(existing: string[] | undefined, incoming: string[]): string[] {
+    const existingValues = (Array.isArray(existing) ? existing : [])
+      .map((value) => String(value || '').trim())
+      .filter((value) => value.length > 0);
+    const incomingValues = (Array.isArray(incoming) ? incoming : [])
+      .map((value) => String(value || '').trim())
+      .filter((value) => value.length > 0);
+
+    return Array.from(new Set([...existingValues, ...incomingValues]));
+  }
+
+  private mergeObjectIdArrays(
+    existing: MongooseSchema.Types.ObjectId[] | undefined,
+    incoming: MongooseSchema.Types.ObjectId[],
+  ): MongooseSchema.Types.ObjectId[] {
+    const merged = new Map<string, MongooseSchema.Types.ObjectId>();
+
+    (Array.isArray(existing) ? existing : []).forEach((id) => {
+      merged.set(String(id), id);
+    });
+
+    (Array.isArray(incoming) ? incoming : []).forEach((id) => {
+      merged.set(String(id), id);
+    });
+
+    return Array.from(merged.values());
   }
 
   update(id: string, updateTopicDto: UpdateTopicDto): Promise<Topic | null> {
