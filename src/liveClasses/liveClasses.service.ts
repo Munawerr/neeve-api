@@ -4,12 +4,44 @@ import { Model } from 'mongoose';
 import { LiveClass } from './schemas/liveClass.schema';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
 import { UpdateLiveClassDto } from './dto/update-liveClass.dto';
+import { User } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class LiveClassesService {
   constructor(
     @InjectModel(LiveClass.name) private liveClassModel: Model<LiveClass>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
+
+  private async buildAudienceQuery(
+    institute: string,
+    role?: string,
+    userId?: string,
+  ): Promise<Record<string, any>> {
+    const query: Record<string, any> = {
+      institute,
+      isDeleted: { $ne: true },
+    };
+
+    if (role === 'student' && userId) {
+      const student = await this.userModel
+        .findById(userId)
+        .select('packages')
+        .lean();
+
+      const packageIds = Array.isArray(student?.packages)
+        ? student.packages.map((pkg: any) => pkg.toString())
+        : [];
+
+      if (packageIds.length === 0) {
+        query.package = { $in: [] };
+      } else {
+        query.package = { $in: packageIds };
+      }
+    }
+
+    return query;
+  }
 
   create(createLiveClassDto: CreateLiveClassDto): Promise<LiveClass> {
     const createdLiveClass = new this.liveClassModel(createLiveClassDto);
@@ -25,14 +57,16 @@ export class LiveClassesService {
     page: number,
     limit: number,
     search: string,
+    role?: string,
+    userId?: string,
   ) {
+    const baseQuery = await this.buildAudienceQuery(institute, role, userId);
     const query = search
       ? {
-          institute,
+          ...baseQuery,
           title: { $regex: search, $options: 'i' },
-          isDeleted: { $ne: true },
         }
-      : { institute, isDeleted: { $ne: true } };
+      : baseQuery;
     const liveClasses = await this.liveClassModel
       .find(query)
       .skip((page - 1) * limit)
@@ -106,12 +140,16 @@ export class LiveClassesService {
       .exec();
   }
 
-  async countUpcomingLiveClasses(institute: string): Promise<number> {
+  async countUpcomingLiveClasses(
+    institute: string,
+    role?: string,
+    userId?: string,
+  ): Promise<number> {
     const today = new Date();
+    const baseQuery = await this.buildAudienceQuery(institute, role, userId);
     const count = await this.liveClassModel
       .countDocuments({
-        institute,
-        isDeleted: { $ne: true },
+        ...baseQuery,
         date: { $gte: today },
       })
       .exec();
