@@ -15,6 +15,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
 import { QuestionResultsModule } from './question-results/question-results.module';
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 import { ReportsModule } from './reports/reports.module'; // Import the new ReportsModule
 import { AnalyticsModule } from './analytics/analytics.module'; // Import AnalyticsModule
 import { SsoModule } from './sso/sso.module'; // Import SSO Module
@@ -134,6 +135,7 @@ if (!DB_URL) {
     ResultsModule,
     QuestionResultsModule,
     LiveClassesModule,
+    AssignmentsModule,
     ThreadsModule,
     DiscussionsModule,
     ChatModule, // Add ChatModule
