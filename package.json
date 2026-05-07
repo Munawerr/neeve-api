@@ -34,7 +34,7 @@
     "@nestjs/swagger": "^11.0.3",
     "@types/cookie-parser": "^1.4.9",
     "ajv": "^8.17.1",
-    "aws-sdk": "^1.18.0",
+    "aws-sdk": "^2.0.0",
     "axios": "^1.7.9",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
