@@ -10,7 +10,9 @@ import {
   HttpStatus,
   SetMetadata,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LiveClassesService } from './liveClasses.service';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
@@ -67,14 +69,20 @@ export class LiveClassesController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
+    @Req() req: Request,
   ) {
     try {
+      const requester = req.user as
+        | { userId?: string; role?: string }
+        | undefined;
       const { liveClasses, total } =
         await this.liveClassesService.findAllWithPaging(
           institute,
           page,
           limit,
           search,
+          requester?.role,
+          requester?.userId,
         );
       return {
         status: HttpStatus.OK,
@@ -99,10 +107,20 @@ export class LiveClassesController {
     description: 'Count of upcoming live classes retrieved successfully',
   })
   @SetMetadata('permissions', ['view_live_classes'])
-  async getUpcomingLiveClassesCount(@Query('institute') institute: string) {
+  async getUpcomingLiveClassesCount(
+    @Query('institute') institute: string,
+    @Req() req: Request,
+  ) {
     try {
+      const requester = req.user as
+        | { userId?: string; role?: string }
+        | undefined;
       const count =
-        await this.liveClassesService.countUpcomingLiveClasses(institute);
+        await this.liveClassesService.countUpcomingLiveClasses(
+          institute,
+          requester?.role,
+          requester?.userId,
+        );
       return {
         status: HttpStatus.OK,
         message: 'Count of upcoming live classes retrieved successfully',
