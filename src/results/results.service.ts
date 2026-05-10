@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Result, ResultStatus } from './schemas/result.schema';
+import { Result, ResultStatus, TestType } from './schemas/result.schema';
 import { CreateResultServiceDto } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 
@@ -451,6 +451,7 @@ export class ResultsService {
       subject: data.subjectId,
       institute: data.instituteId,
       isBulkUploaded: true,
+      testType: TestType.MOCK,
       status: ResultStatus.FINISHED,
       startedAt: new Date(),
       finishedAt: new Date(),
