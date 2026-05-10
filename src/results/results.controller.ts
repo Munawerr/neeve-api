@@ -25,6 +25,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { ResultsService } from './results.service';
 import {
   CreateResultDto,
@@ -50,6 +51,18 @@ import { TestType } from 'src/tests/schemas/test.schema';
 import { SubjectsService } from '../subjects/subjects.service';
 import { Subject } from '../subjects/schemas/subject.schema';
 import { BulkUploadSubmitDto } from './dto/bulk-upload.dto';
+
+// ---------------------------------------------------------------------------
+// URL validation helper
+// ---------------------------------------------------------------------------
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Bulk-upload CSV helper functions
@@ -236,21 +249,27 @@ export class ResultsController {
   // Bulk Upload — Parse CSV
   // ---------------------------------------------------------------------------
   @Post('bulk-upload/parse')
-  @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (
+          file.mimetype !== 'text/csv' &&
+          !file.originalname.toLowerCase().endsWith('.csv')
+        ) {
+          return cb(new Error('Only CSV files are allowed'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Parse a CSV file for bulk report card upload (admin only)' })
   async parseBulkUploadCSV(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
   ) {
-    const requestingUser = await this.usersService.findOne(req.user.userId);
-    if (
-      !requestingUser ||
-      ['student', 'institute'].includes((requestingUser.role as any)?.slug)
-    ) {
-      throw new ForbiddenException('Only admin users can perform bulk uploads');
-    }
 
     if (!file) {
       return { status: HttpStatus.BAD_REQUEST, message: 'No file uploaded' };
@@ -367,7 +386,7 @@ export class ResultsController {
   // Bulk Upload — Submit Confirmed Rows
   // ---------------------------------------------------------------------------
   @Post('bulk-upload/submit')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Submit confirmed bulk upload rows to save to DB (admin only)' })
   @ApiBody({ type: BulkUploadSubmitDto })
@@ -375,13 +394,6 @@ export class ResultsController {
     @Body() submitDto: BulkUploadSubmitDto,
     @Request() req: any,
   ) {
-    const requestingUser = await this.usersService.findOne(req.user.userId);
-    if (
-      !requestingUser ||
-      ['student', 'institute'].includes((requestingUser.role as any)?.slug)
-    ) {
-      throw new ForbiddenException('Only admin users can perform bulk uploads');
-    }
 
     const results = {
       success: 0,
@@ -418,7 +430,10 @@ export class ResultsController {
             rank: row.rank,
             totalStudents: row.totalStudents,
             timeTaken: row.timeTaken,
-            reportCardLink: row.reportCardLink,
+            reportCardLink:
+              row.reportCardLink && isValidUrl(row.reportCardLink)
+                ? row.reportCardLink
+                : undefined,
           });
 
           results.success++;
