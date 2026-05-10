@@ -401,4 +401,87 @@ export class ResultsService {
   async remove(id: string): Promise<void> {
     await this.resultModel.findByIdAndDelete(id).exec();
   }
+
+  // --- Bulk Upload Methods ---
+
+  async findBulkUploadedByStudentAndSubject(
+    studentId: string,
+    subjectId: string,
+  ): Promise<Result | null> {
+    return this.resultModel
+      .findOne({
+        student: studentId,
+        subject: subjectId,
+        isBulkUploaded: true,
+      })
+      .exec();
+  }
+
+  async deleteBulkUploadedByStudentAndSubject(
+    studentId: string,
+    subjectId: string,
+  ): Promise<void> {
+    await this.resultModel
+      .deleteMany({
+        student: studentId,
+        subject: subjectId,
+        isBulkUploaded: true,
+      })
+      .exec();
+  }
+
+  async createBulkUploadedResult(data: {
+    studentId: string;
+    subjectId: string;
+    instituteId: string;
+    obtained: number;
+    total: number;
+    rank: number;
+    totalStudents: number;
+    timeTaken: number;
+    reportCardLink?: string;
+  }): Promise<Result> {
+    const averageMarks =
+      data.total > 0
+        ? Math.min(100, Math.max(0, (data.obtained / data.total) * 100))
+        : 0;
+
+    const result = new this.resultModel({
+      student: data.studentId,
+      subject: data.subjectId,
+      institute: data.instituteId,
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      numOfQuestions: 0,
+      marksPerQuestion: 0,
+      timeTaken: data.timeTaken,
+      reportCardLink: data.reportCardLink,
+      marksSummary: {
+        totalMarks: data.total,
+        obtainedMarks: data.obtained,
+        averageMarks,
+        correctAnswers: 0,
+        incorrectAnswers: 0,
+        averageTimePerQuestion: 0,
+        skippedQuestions: 0,
+        rank: data.rank,
+        totalStudents: data.totalStudents,
+      },
+    });
+
+    return result.save();
+  }
+
+  async findBulkUploadedResultsByStudent(studentId: string): Promise<Result[]> {
+    return this.resultModel
+      .find({
+        student: studentId,
+        isBulkUploaded: true,
+        status: ResultStatus.FINISHED,
+      })
+      .populate('subject')
+      .exec();
+  }
 }
