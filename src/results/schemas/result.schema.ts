@@ -98,7 +98,7 @@ export class QuestionResult {
 @Schema()
 // Schema for Result
 export class Result extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Test', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Test', required: false })
   test: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subject', required: true })
@@ -116,7 +116,7 @@ export class Result extends Document {
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'QuestionResult' })
   questionResults: MongooseSchema.Types.ObjectId[];
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: Date.now })
   startedAt: Date;
 
   @Prop({ required: false })
@@ -129,10 +129,10 @@ export class Result extends Document {
   })
   status: ResultStatus;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 0 })
   numOfQuestions: number;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: 0 })
   marksPerQuestion: number;
 
   @Prop({
@@ -148,6 +148,15 @@ export class Result extends Document {
     required: false,
   })
   marksSummary: MarksSummary;
+
+  @Prop({ default: false })
+  isBulkUploaded: boolean;
+
+  @Prop()
+  timeTaken: number;
+
+  @Prop()
+  reportCardLink: string;
 
   @Prop({ required: true, default: false })
   isCompleted: boolean;
@@ -175,3 +184,5 @@ ResultSchema.index({ student: 1, status: 1, finishedAt: -1 });
 ResultSchema.index({ test: 1, status: 1 });
 ResultSchema.index({ institute: 1, test: 1, status: 1 });
 ResultSchema.index({ startedAt: -1 });
+ResultSchema.index({ student: 1, isBulkUploaded: 1 });
+ResultSchema.index({ student: 1, subject: 1, isBulkUploaded: 1 });

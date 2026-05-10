@@ -699,6 +699,18 @@ export class UsersService {
       .exec();
   }
 
+  async findStudentByPhoneSuffix(last10: string): Promise<User | null> {
+    return this.userModel
+      .findOne({
+        phone: { $regex: last10 + '$' },
+        isDeleted: { $ne: true },
+      })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
+  }
+
   async findByEmailOrRegNo(loginData: string): Promise<User | null> {
     return this.userModel
       .findOne({
