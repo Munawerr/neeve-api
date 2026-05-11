@@ -130,6 +130,7 @@ export class ResultsService {
       .find({
         student,
         status: ResultStatus.FINISHED,
+        isBulkUploaded: { $ne: true },
         // testType: { $ne: TestType.PRACTICE },
       })
       .populate({
