@@ -144,6 +144,9 @@ export class Result extends Document {
       incorrectAnswers: Number,
       averageTimePerQuestion: Number,
       skippedQuestions: Number,
+      percentile: Number,
+      rank: Number,
+      totalStudents: Number,
     },
     required: false,
   })
