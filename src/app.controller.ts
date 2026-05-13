@@ -179,7 +179,21 @@ export class AppController {
         };
       }
 
-      const courseIds = user.packages.map((pkg) => pkg.toObject().course);
+      // Extract course IDs as plain strings. When packages are populated with
+      // their nested course document, pkg.toObject().course returns a full
+      // Course plain-object rather than a hex string. Mongoose 8 cannot cast
+      // plain objects to ObjectId inside $in, which caused courses to return
+      // empty on every page refresh — preventing getPackages from dispatching.
+      const courseIds = (user.packages as any[])
+        .map((pkg) => {
+          const course = pkg.course;
+          if (!course) return null;
+          // Populated Course document → _id is an ObjectId; raw ObjectId → use directly
+          const id = course._id ?? course;
+          const str = id?.toString?.();
+          return str && str !== '[object Object]' ? str : null;
+        })
+        .filter((id): id is string => Boolean(id));
 
       const distinctCourseIds = [...new Set(courseIds)];
       const courses = await this.coursesService.findByIds(distinctCourseIds);
