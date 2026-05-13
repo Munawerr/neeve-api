@@ -303,6 +303,7 @@ export class UsersController {
   async getPackagesForInstitute(
     @Param('instituteId') instituteId: string,
     @Param('courseId') courseId: string,
+    @Req() req: Request,
   ) {
     try {
       const requestedUser = await this.usersService.getInstituteUser(
@@ -337,6 +338,32 @@ export class UsersController {
 
           if (instituteUser?.packages?.length) {
             sourcePackages = instituteUser.packages;
+          }
+        }
+      }
+
+      // When the looked-up user is an institute user (not a student), the packages
+      // stored on the institute record may be empty or incomplete. Always also check
+      // the logged-in student's own packages (from the JWT) so that per-student
+      // package assignments are respected.
+      const loggedInUserId = (req as any).user?.userId;
+      if (
+        loggedInUserId &&
+        String(loggedInUserId) !== String(requestedUser._id)
+      ) {
+        const loggedInUser = await this.usersService.getInstituteUser(
+          loggedInUserId,
+          true,
+        );
+        if (loggedInUser && Array.isArray(loggedInUser.packages) && loggedInUser.packages.length > 0) {
+          // Merge packages; student's own packages take priority.
+          const existingIds = new Set(sourcePackages.map(packageDocId).filter(Boolean));
+          for (const pkg of loggedInUser.packages) {
+            const pid = packageDocId(pkg);
+            if (pid && !existingIds.has(pid)) {
+              sourcePackages = [...sourcePackages, pkg];
+              existingIds.add(pid);
+            }
           }
         }
       }
