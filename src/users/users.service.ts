@@ -406,13 +406,13 @@ export class UsersService {
       });
       return { studentCount, testResultsCount };
     } else if (_user.role && _user.role.slug === 'student') {
-      const testResults = await this.resultModel
+      const testResults = (await this.resultModel
         .find({
           student: user._id,
           status: ResultStatus.FINISHED,
         })
         .populate('test')
-        .exec();
+        .exec()).filter((r: any) => r.test != null);
 
       // Get unique test results (best attempt for each test)
       const uniqueResults = testResults.reduce(
@@ -459,13 +459,13 @@ export class UsersService {
         totalScore > 0 ? Math.max(0, (acquiredScore / totalScore) * 100) : 0;
 
       // Get all other students' results
-      const allStudentResults = await this.resultModel
+      const allStudentResults = (await this.resultModel
         .find({
           status: ResultStatus.FINISHED,
           student: { $ne: user._id },
         })
         .populate('test')
-        .exec();
+        .exec()).filter((r: any) => r.test != null);
 
       // Group results by student
       const studentResults = allStudentResults.reduce(
