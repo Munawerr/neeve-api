@@ -147,6 +147,7 @@ export class FilesController {
   async startEnrichMetadata() {
     const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
     if (!apiKey) {
+      console.log('[enrich] startEnrichMetadata called but GOOGLE_DRIVE_API_KEY is not configured');
       return {
         status: HttpStatus.BAD_REQUEST,
         message: 'GOOGLE_DRIVE_API_KEY is not configured',
@@ -154,6 +155,7 @@ export class FilesController {
     }
 
     const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    console.log(`[enrich] Starting enrichment job ${jobId}`);
     this.enrichJobs.set(jobId, {
       total: 0,
       updated: 0,
@@ -175,8 +177,10 @@ export class FilesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get enrichment job status' })
   async getEnrichJobStatus(@Param('jobId') jobId: string) {
+    console.log(`[enrich] Status check for job ${jobId}`);
     const job = this.enrichJobs.get(jobId);
     if (!job) {
+      console.log(`[enrich] Job ${jobId} not found`);
       return {
         status: HttpStatus.NOT_FOUND,
         message: 'Job not found',
@@ -200,36 +204,71 @@ export class FilesController {
 
     try {
       const allFiles = await this.filesService.findAll();
+      console.log(`[enrich:${jobId}] Found ${allFiles.length} total files`);
+
       const driveFiles = allFiles.filter((f) => isGoogleDriveUrl(f.fileUrl));
       job.total = driveFiles.length;
+      console.log(`[enrich:${jobId}] Filtered to ${driveFiles.length} Google Drive files`);
+      console.log(`[enrich:${jobId}] GOOGLE_DRIVE_API_KEY present: ${!!apiKey}`);
 
       for (const file of driveFiles) {
+        const fileId = extractGoogleDriveFileId(file.fileUrl);
+        console.log(`[enrich:${jobId}] Processing file _id=${file._id} fileId=${fileId} currentName="${file.fileName}" url=${file.fileUrl.substring(0, 80)}`);
+
+        if (!fileId) {
+          console.log(`[enrich:${jobId}] Could not extract fileId from URL, skipping`);
+          job.failed++;
+          continue;
+        }
+
+        let metadata: { name?: string; thumbnailLink?: string } | null = null;
         try {
-          const fileId = extractGoogleDriveFileId(file.fileUrl);
-          if (!fileId) { job.failed++; continue; }
+          metadata = await fetchGoogleDriveFileMetadata(fileId, apiKey);
+        } catch (err) {
+          console.log(`[enrich:${jobId}] fetchGoogleDriveFileMetadata threw for fileId=${fileId}: ${err}`);
+        }
 
-          const metadata = await fetchGoogleDriveFileMetadata(fileId, apiKey);
-          if (!metadata) { job.failed++; continue; }
+        if (!metadata) {
+          console.log(`[enrich:${jobId}] No metadata returned from Drive API for fileId=${fileId}`);
+          job.failed++;
+          continue;
+        }
 
-          const updates: Record<string, string> = {};
-          if (metadata.name && file.fileName !== metadata.name) {
-            updates.fileName = metadata.name;
-          }
-          if (metadata.thumbnailLink) {
-            updates.thumbnailUrl = metadata.thumbnailLink;
-          }
+        console.log(`[enrich:${jobId}] Drive API returned name="${metadata.name}" thumbnailLink="${metadata.thumbnailLink}"`);
 
-          if (Object.keys(updates).length > 0) {
+        const updates: Record<string, string> = {};
+        if (metadata.name && file.fileName !== metadata.name) {
+          updates.fileName = metadata.name;
+          console.log(`[enrich:${jobId}] Will update fileName: "${file.fileName}" -> "${metadata.name}"`);
+        } else {
+          console.log(`[enrich:${jobId}] fileName unchanged (current="${file.fileName}" drive="${metadata.name}")`);
+        }
+
+        if (metadata.thumbnailLink) {
+          updates.thumbnailUrl = metadata.thumbnailLink;
+          console.log(`[enrich:${jobId}] Will update thumbnailUrl: "${metadata.thumbnailLink}"`);
+        } else {
+          console.log(`[enrich:${jobId}] No thumbnailLink returned from Drive API`);
+        }
+
+        if (Object.keys(updates).length > 0) {
+          try {
             await this.filesService.update(String(file._id), updates);
             job.updated++;
+            console.log(`[enrich:${jobId}] Successfully updated file ${file._id}`);
+          } catch (err) {
+            console.log(`[enrich:${jobId}] Update failed for file ${file._id}: ${err}`);
+            job.failed++;
           }
-        } catch {
-          job.failed++;
-    }
-  }
+        } else {
+          console.log(`[enrich:${jobId}] No updates needed for file ${file._id}`);
+        }
+      }
 
+      console.log(`[enrich:${jobId}] Job complete: ${job.updated}/${job.total} updated, ${job.failed} failed`);
       job.status = 'completed';
     } catch (error) {
+      console.log(`[enrich:${jobId}] Fatal error: ${error}`);
       job.status = 'failed';
       job.error = String(error);
     }
