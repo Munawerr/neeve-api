@@ -1,13 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Result, ResultStatus } from './schemas/result.schema';
+import { Result, ResultStatus, TestType } from './schemas/result.schema';
 import { CreateResultServiceDto } from './dto/create-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 
 @Injectable()
 export class ResultsService {
   constructor(@InjectModel(Result.name) private resultModel: Model<Result>) {}
+
+  private getSafePercentage(obtained: number, total: number): number {
+    const safeTotal = Math.abs(Number(total));
+    const safeObtained = Number(obtained);
+
+    if (!Number.isFinite(safeTotal) || safeTotal <= 0) {
+      return 0;
+    }
+
+    if (!Number.isFinite(safeObtained)) {
+      return 0;
+    }
+
+    return (safeObtained / safeTotal) * 100;
+  }
 
   // Create a new result
   async create(createResultDto: CreateResultServiceDto): Promise<Result> {
@@ -115,6 +130,7 @@ export class ResultsService {
       .find({
         student,
         status: ResultStatus.FINISHED,
+        isBulkUploaded: { $ne: true },
         // testType: { $ne: TestType.PRACTICE },
       })
       .populate({
@@ -195,7 +211,7 @@ export class ResultsService {
     const scores = allTestResults.map((result) => {
       const total = result.marksSummary.totalMarks;
       const obtained = result.marksSummary.obtainedMarks;
-      return (obtained / total) * 100;
+      return this.getSafePercentage(obtained, total);
     });
 
     // Add current student's score
@@ -255,7 +271,7 @@ export class ResultsService {
           (sum, result) => sum + result.marksSummary.obtainedMarks,
           0,
         );
-        return (obtained / total) * 100;
+        return this.getSafePercentage(obtained, total);
       },
     );
 
@@ -312,7 +328,7 @@ export class ResultsService {
           (sum, result) => sum + result.marksSummary.obtainedMarks,
           0,
         );
-        return (obtained / total) * 100;
+        return this.getSafePercentage(obtained, total);
       },
     );
 
@@ -347,9 +363,10 @@ export class ResultsService {
 
     // Get all scores for this test
     const scores = allResults.map((result) => ({
-      score:
-        (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) *
-        100,
+      score: this.getSafePercentage(
+        result.marksSummary.obtainedMarks,
+        result.marksSummary.totalMarks,
+      ),
     }));
 
     // Add current score if not already in the list
@@ -384,5 +401,89 @@ export class ResultsService {
   // Remove a result by ID
   async remove(id: string): Promise<void> {
     await this.resultModel.findByIdAndDelete(id).exec();
+  }
+
+  // --- Bulk Upload Methods ---
+
+  async findBulkUploadedByStudentAndSubject(
+    studentId: string,
+    subjectId: string,
+  ): Promise<Result | null> {
+    return this.resultModel
+      .findOne({
+        student: studentId,
+        subject: subjectId,
+        isBulkUploaded: true,
+      })
+      .exec();
+  }
+
+  async deleteBulkUploadedByStudentAndSubject(
+    studentId: string,
+    subjectId: string,
+  ): Promise<void> {
+    await this.resultModel
+      .deleteMany({
+        student: studentId,
+        subject: subjectId,
+        isBulkUploaded: true,
+      })
+      .exec();
+  }
+
+  async createBulkUploadedResult(data: {
+    studentId: string;
+    subjectId: string;
+    instituteId: string;
+    obtained: number;
+    total: number;
+    rank: number;
+    totalStudents: number;
+    timeTaken: number;
+    reportCardLink?: string;
+  }): Promise<Result> {
+    const averageMarks =
+      data.total > 0
+        ? Math.min(100, Math.max(0, (data.obtained / data.total) * 100))
+        : 0;
+
+    const result = new this.resultModel({
+      student: data.studentId,
+      subject: data.subjectId,
+      institute: data.instituteId,
+      isBulkUploaded: true,
+      testType: TestType.MOCK,
+      status: ResultStatus.FINISHED,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      numOfQuestions: 0,
+      marksPerQuestion: 0,
+      timeTaken: data.timeTaken,
+      reportCardLink: data.reportCardLink,
+      marksSummary: {
+        totalMarks: data.total,
+        obtainedMarks: data.obtained,
+        averageMarks,
+        correctAnswers: 0,
+        incorrectAnswers: 0,
+        averageTimePerQuestion: 0,
+        skippedQuestions: 0,
+        rank: data.rank,
+        totalStudents: data.totalStudents,
+      },
+    });
+
+    return result.save();
+  }
+
+  async findBulkUploadedResultsByStudent(studentId: string): Promise<Result[]> {
+    return this.resultModel
+      .find({
+        student: studentId,
+        isBulkUploaded: true,
+        status: ResultStatus.FINISHED,
+      })
+      .populate('subject')
+      .exec();
   }
 }

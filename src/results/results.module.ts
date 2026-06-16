@@ -26,9 +26,11 @@ import {
   LoginHistorySchema,
 } from 'src/auth/schemas/login-history.schema';
 import { LoginHistoryService } from 'src/auth/login-history.service';
+import { SubjectsModule } from 'src/subjects/subjects.module';
 
 @Module({
   imports: [
+    SubjectsModule,
     MongooseModule.forFeature([
       { name: Result.name, schema: ResultSchema },
       { name: QuestionResult.name, schema: QuestionResultSchema },

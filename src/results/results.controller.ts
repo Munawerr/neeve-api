@@ -9,7 +9,12 @@ import {
   UseGuards,
   HttpStatus,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  ForbiddenException,
+  Request,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -20,6 +25,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { ResultsService } from './results.service';
 import {
   CreateResultDto,
@@ -42,6 +48,144 @@ import { QuestionResult } from 'src/question-results/schemas/question-result.sch
 import { UsersService } from '../users/users.service';
 import { TestsService } from 'src/tests/tests.service';
 import { TestType } from 'src/tests/schemas/test.schema';
+import { SubjectsService } from '../subjects/subjects.service';
+import { Subject } from '../subjects/schemas/subject.schema';
+import { BulkUploadSubmitDto } from './dto/bulk-upload.dto';
+
+// ---------------------------------------------------------------------------
+// URL validation helper
+// ---------------------------------------------------------------------------
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk-upload CSV helper functions
+// ---------------------------------------------------------------------------
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function parseCSV(fileContent: string): string[][] {
+  const lines = fileContent
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  return lines.map(parseCSVLine);
+}
+
+function detectColumns(headers: string[]): {
+  nameIdx: number;
+  emailIdx: number;
+  phoneIdx: number;
+  subjectHeaders: Array<{ name: string; colIndex: number }>;
+  marksIdx: number;
+  timeIdx: number;
+  rankIdx: number;
+  linkIdx: number;
+} {
+  const normalized = headers.map((h) => h.trim());
+  const len = normalized.length;
+  return {
+    nameIdx: 0,
+    emailIdx: 1,
+    phoneIdx: 2,
+    subjectHeaders: normalized.slice(3, len - 4).map((name, i) => ({
+      name,
+      colIndex: i + 3,
+    })),
+    marksIdx: len - 4,
+    timeIdx: len - 3,
+    rankIdx: len - 2,
+    linkIdx: len - 1,
+  };
+}
+
+function parseSubjectMark(
+  raw: string,
+): { obtained: number; total: number } | null {
+  const cleaned = raw.replace(/\s/g, '');
+  const match = cleaned.match(/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const obtained = parseFloat(match[1]);
+  const total = parseFloat(match[2]);
+  if (isNaN(obtained) || isNaN(total) || total <= 0) return null;
+  return { obtained: Math.max(0, obtained), total };
+}
+
+function extractUrl(raw: string): string {
+  const hyperlinkMatch = raw.match(/=HYPERLINK\("([^"]+)"/i);
+  if (hyperlinkMatch) return hyperlinkMatch[1];
+  const urlMatch = raw.match(/https?:\/\/[^\s"]+/);
+  if (urlMatch) return urlMatch[0];
+  return raw;
+}
+
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const setA = new Set(a.split(' ').filter((w) => w.length > 0));
+  const setB = new Set(b.split(' ').filter((w) => w.length > 0));
+  const intersection = new Set([...setA].filter((w) => setB.has(w)));
+  const union = new Set([...setA, ...setB]);
+  return union.size === 0 ? 0 : intersection.size / union.size;
+}
+
+function matchSubject(csvHeader: string, subjects: Subject[]): Subject | null {
+  const normHeader = normalizeForMatch(csvHeader);
+
+  const exactMatch = subjects.find(
+    (s) => normalizeForMatch(s.title) === normHeader,
+  );
+  if (exactMatch) return exactMatch;
+
+  const containsMatch = subjects.find((s) => {
+    const normTitle = normalizeForMatch(s.title);
+    return normTitle.includes(normHeader) || normHeader.includes(normTitle);
+  });
+  if (containsMatch) return containsMatch;
+
+  let bestScore = 0;
+  let bestSubject: Subject | null = null;
+  for (const subject of subjects) {
+    const score = jaccardSimilarity(normalizeForMatch(subject.title), normHeader);
+    if (score > bestScore) {
+      bestScore = score;
+      bestSubject = subject;
+    }
+  }
+  if (bestScore >= 0.5) return bestSubject;
+
+  return null;
+}
 
 @ApiTags('results')
 @Controller('results')
@@ -51,7 +195,17 @@ export class ResultsController {
     private readonly questionResultsService: QuestionResultsService,
     private readonly usersService: UsersService,
     private readonly testsService: TestsService,
+    private readonly subjectsService: SubjectsService,
   ) {}
+
+  private getNormalizedMarksPerQuestion(value: number | string | undefined): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.abs(numericValue);
+  }
 
   // Create a new result
   @Post()
@@ -78,6 +232,9 @@ export class ResultsController {
 
     const _result: CreateResultServiceDto = {
       ...createResultDto,
+      marksPerQuestion: this.getNormalizedMarksPerQuestion(
+        createResultDto.marksPerQuestion,
+      ),
       startedAt: new Date(),
     };
     const result = await this.resultsService.create(_result);
@@ -85,6 +242,215 @@ export class ResultsController {
       status: HttpStatus.OK,
       message: 'Result created successfully',
       data: result,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk Upload — Parse CSV
+  // ---------------------------------------------------------------------------
+  @Post('bulk-upload/parse')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (
+          file.mimetype !== 'text/csv' &&
+          !file.originalname.toLowerCase().endsWith('.csv')
+        ) {
+          return cb(new Error('Only CSV files are allowed'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Parse a CSV file for bulk report card upload (admin only)' })
+  async parseBulkUploadCSV(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+
+    if (!file) {
+      return { status: HttpStatus.BAD_REQUEST, message: 'No file uploaded' };
+    }
+
+    const fileContent = file.buffer.toString('utf-8');
+    const rows = parseCSV(fileContent);
+
+    if (rows.length < 2) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'CSV file is empty or has no data rows',
+      };
+    }
+
+    const headers = rows[0];
+    const cols = detectColumns(headers);
+
+    // Pre-fetch all subjects and all students once
+    const { subjects: allSubjects } = await this.subjectsService.findAll(1, 10000);
+
+    const preview = await Promise.all(
+      rows.slice(1).map(async (row, rowIndex) => {
+        const csvName = row[cols.nameIdx] || '';
+        const csvEmail = row[cols.emailIdx] || '';
+        const csvPhone = row[cols.phoneIdx] || '';
+        const csvTime = parseInt(row[cols.timeIdx] || '0', 10) || 0;
+        const csvRank = parseInt(row[cols.rankIdx] || '1', 10) || 1;
+        const csvLink = extractUrl(row[cols.linkIdx] || '');
+        const csvTotalParsed = parseSubjectMark(row[cols.marksIdx] || '');
+
+        const subjectData = cols.subjectHeaders.map(({ name, colIndex }) => {
+          const raw = row[colIndex] || '';
+          const parsed = parseSubjectMark(raw);
+          return {
+            csvHeader: name,
+            rawValue: raw,
+            obtained: parsed?.obtained ?? null,
+            total: parsed?.total ?? null,
+          };
+        });
+
+        // Lookup student: email → exact phone → phone suffix (last 10 digits)
+        let matchedStudent: any = null;
+        const trimmedEmail = csvEmail.trim().toLowerCase();
+        if (trimmedEmail) {
+          matchedStudent = await this.usersService.findByEmail(trimmedEmail);
+        }
+        if (!matchedStudent) {
+          const trimmedPhone = csvPhone.trim();
+          if (trimmedPhone) {
+            matchedStudent = await this.usersService.findByPhone(trimmedPhone);
+          }
+        }
+        if (!matchedStudent) {
+          const rawDigits = csvPhone.trim().replace(/\D/g, '');
+          if (rawDigits.length >= 7) {
+            const last10 = rawDigits.slice(-10);
+            matchedStudent =
+              await this.usersService.findStudentByPhoneSuffix(last10);
+          }
+        }
+
+        // Match subject headers against all subjects
+        const subjectMatches = subjectData.map((sd) => ({
+          csvHeader: sd.csvHeader,
+          rawValue: sd.rawValue,
+          obtained: sd.obtained,
+          total: sd.total,
+          matchedSubject: matchSubject(sd.csvHeader, allSubjects),
+        }));
+
+        return {
+          rowIndex,
+          csvRow: {
+            name: csvName,
+            email: csvEmail,
+            phone: csvPhone,
+            timeTaken: csvTime,
+            rank: csvRank,
+            totalStudents: null,
+            reportCardLink: csvLink,
+            totalObtained: csvTotalParsed?.obtained ?? null,
+            totalMarks: csvTotalParsed?.total ?? null,
+          },
+          matchedStudent: matchedStudent
+            ? {
+                _id: matchedStudent._id,
+                full_name: matchedStudent.full_name,
+                email: matchedStudent.email,
+                phone: matchedStudent.phone,
+                regNo: matchedStudent.regNo,
+              }
+            : null,
+          subjectMatches,
+          status: matchedStudent ? 'matched' : 'unmatched',
+        };
+      }),
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'CSV parsed successfully',
+      data: {
+        totalRows: preview.length,
+        matchedCount: preview.filter((r) => r.status === 'matched').length,
+        unmatchedCount: preview.filter((r) => r.status === 'unmatched').length,
+        rows: preview,
+      },
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk Upload — Submit Confirmed Rows
+  // ---------------------------------------------------------------------------
+  @Post('bulk-upload/submit')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit confirmed bulk upload rows to save to DB (admin only)' })
+  @ApiBody({ type: BulkUploadSubmitDto })
+  async submitBulkUpload(
+    @Body() submitDto: BulkUploadSubmitDto,
+    @Request() req: any,
+  ) {
+
+    const results = {
+      success: 0,
+      failed: [] as Array<{ studentId: string; subjectId: string; error: string }>,
+    };
+
+    for (const row of submitDto.rows) {
+      const student = await this.usersService.getStudentUser(row.studentId);
+      if (!student) {
+        results.failed.push({
+          studentId: row.studentId,
+          subjectId: '',
+          error: 'Student not found',
+        });
+        continue;
+      }
+
+      const instituteId =
+        (student as any).institute?.toString() || (student as any)._id?.toString();
+
+      for (const sr of row.subjectResults) {
+        try {
+          await this.resultsService.deleteBulkUploadedByStudentAndSubject(
+            row.studentId,
+            sr.subjectId,
+          );
+
+          await this.resultsService.createBulkUploadedResult({
+            studentId: row.studentId,
+            subjectId: sr.subjectId,
+            instituteId,
+            obtained: sr.obtained,
+            total: sr.total,
+            rank: row.rank,
+            totalStudents: row.totalStudents,
+            timeTaken: row.timeTaken,
+            reportCardLink:
+              row.reportCardLink && isValidUrl(row.reportCardLink)
+                ? row.reportCardLink
+                : undefined,
+          });
+
+          results.success++;
+        } catch (error: any) {
+          results.failed.push({
+            studentId: row.studentId,
+            subjectId: sr.subjectId,
+            error: error.message || 'Unknown error',
+          });
+        }
+      }
+    }
+
+    return {
+      status: HttpStatus.OK,
+      message: `Bulk upload complete: ${results.success} records saved, ${results.failed.length} failed`,
+      data: results,
     };
   }
 
@@ -341,18 +707,24 @@ export class ResultsController {
       const skipableQuestionsCount = test.skipableQuestionsCount || 0;
 
       // Calculate the required number of questions to answer (total - skippable)
-      const requiredAnsweredQuestions =
-        updatedResult1.numOfQuestions - skipableQuestionsCount;
+      const requiredAnsweredQuestions = Math.max(
+        0,
+        updatedResult1.numOfQuestions - skipableQuestionsCount,
+      );
 
       // Check if the test should be completed based on answered questions
       const shouldCompleteTest = answeredQuestions >= requiredAnsweredQuestions;
 
       if (shouldCompleteTest) {
         // Calculate the effective total marks based on required questions, not total questions
-        const effectiveTotalQuestions =
-          updatedResult1.numOfQuestions - skipableQuestionsCount;
-        const totalMarks =
-          effectiveTotalQuestions * updatedResult1.marksPerQuestion;
+        const effectiveTotalQuestions = Math.max(
+          0,
+          updatedResult1.numOfQuestions - skipableQuestionsCount,
+        );
+        const marksPerQuestion = this.getNormalizedMarksPerQuestion(
+          updatedResult1.marksPerQuestion,
+        );
+        const totalMarks = effectiveTotalQuestions * marksPerQuestion;
 
         // Calculate obtained marks with negative marking
         let obtainedMarks = updatedResult1.questionResults.reduce(
@@ -375,7 +747,7 @@ export class ResultsController {
               correctOptions.every((option: any) => option.isChecked) &&
               checkedOptions.every((option: any) => option.isCorrect)
             ) {
-              return sum + updatedResult1.marksPerQuestion;
+              return sum + marksPerQuestion;
             }
 
             // If the answer is incorrect, deduct 1 mark
@@ -388,7 +760,8 @@ export class ResultsController {
         obtainedMarks = Math.max(0, obtainedMarks);
 
         // Calculate average marks based on effective total marks
-        const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+        const averageMarks =
+          totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
         // Count correct answers
         const correctAnswers = updatedResult1.questionResults.filter(
@@ -519,12 +892,16 @@ export class ResultsController {
 
         // Consider skippable questions in total marks calculation
         const skipableQuestionsCount = test.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        const totalMarks =
+          effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -613,9 +990,15 @@ export class ResultsController {
         const sum = await sumPromise;
         const test = await this.testsService.findOne(result.test.toString());
         const skipableQuestionsCount = test?.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        return sum + effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        return (
+          sum +
+          effectiveQuestionCount *
+            this.getNormalizedMarksPerQuestion(result.marksPerQuestion)
+        );
       },
       Promise.resolve(0),
     );
@@ -627,7 +1010,8 @@ export class ResultsController {
         0,
       ),
     );
-    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+    const averageMarks =
+      totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
     const correctAnswers = uniqueResultsArray.reduce(
       (sum, result) => sum + result.marksSummary.correctAnswers,
@@ -697,12 +1081,16 @@ export class ResultsController {
 
         // Consider skippable questions in total marks calculation
         const skipableQuestionsCount = test.skipableQuestionsCount || 0;
-        const effectiveQuestionCount =
-          result.numOfQuestions - skipableQuestionsCount;
-        const totalMarks = effectiveQuestionCount * result.marksPerQuestion;
+        const effectiveQuestionCount = Math.max(
+          0,
+          result.numOfQuestions - skipableQuestionsCount,
+        );
+        const totalMarks =
+          effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = (obtainedMarks / totalMarks) * 100;
+        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -800,9 +1188,15 @@ export class ResultsController {
     const totalMarks = uniqueResultsArray.reduce((sum, result) => {
       const testId = result.test.toString();
       const skipableQuestionsCount = testSkipableCountMap[testId] || 0;
-      const effectiveQuestionCount =
-        result.numOfQuestions - skipableQuestionsCount;
-      return sum + effectiveQuestionCount * result.marksPerQuestion;
+      const effectiveQuestionCount = Math.max(
+        0,
+        result.numOfQuestions - skipableQuestionsCount,
+      );
+      return (
+        sum +
+        effectiveQuestionCount *
+          this.getNormalizedMarksPerQuestion(result.marksPerQuestion)
+      );
     }, 0);
 
     const obtainedMarks = Math.max(
@@ -812,7 +1206,8 @@ export class ResultsController {
         0,
       ),
     );
-    const averageMarks = Math.max(0, (obtainedMarks / totalMarks) * 100);
+    const averageMarks =
+      totalMarks > 0 ? Math.max(0, (obtainedMarks / totalMarks) * 100) : 0;
 
     const totalQuestions = uniqueResultsArray.reduce(
       (sum, result) => sum + result.numOfQuestions,
@@ -897,10 +1292,62 @@ export class ResultsController {
       testSummary,
     };
 
+    // === BULK UPLOAD CHECK ===
+    const bulkResults =
+      await this.resultsService.findBulkUploadedResultsByStudent(studentId);
+
+    let bulkUploadPayload: any = { hasBulkUploadedData: false };
+
+    if (bulkResults && bulkResults.length > 0) {
+      const firstBulk = bulkResults[0];
+      const bulkRank = firstBulk.marksSummary?.rank ?? null;
+      const bulkTotalStudents = firstBulk.marksSummary?.totalStudents ?? null;
+
+      const bulkUploadedSubjectResults = bulkResults.map((result) => {
+        const subject: any = result.subject;
+        return {
+          subjectId: subject?._id,
+          subjectTitle: subject?.title || 'Unknown Subject',
+          obtained: result.marksSummary?.obtainedMarks ?? 0,
+          total: result.marksSummary?.totalMarks ?? 0,
+          averageMarks: result.marksSummary?.averageMarks ?? 0,
+          timeTaken: (result as any).timeTaken ?? 0,
+          reportCardLink: (result as any).reportCardLink ?? null,
+        };
+      });
+
+      const reportCardLink =
+        bulkResults.find((r) => (r as any).reportCardLink)
+          ? (bulkResults.find((r) => (r as any).reportCardLink) as any)
+              .reportCardLink
+          : null;
+
+      bulkUploadPayload = {
+        hasBulkUploadedData: true,
+        bulkRank,
+        bulkTotalStudents,
+        reportCardLink,
+        bulkUploadedSubjectResults,
+      };
+    }
+    // === END BULK UPLOAD CHECK ===
+
     return {
       status: HttpStatus.OK,
       message: 'Combined report card retrieved successfully',
-      data: combinedReportCard,
+      data: {
+        ...combinedReportCard,
+        rank: bulkUploadPayload.hasBulkUploadedData
+          ? bulkUploadPayload.bulkRank
+          : undefined,
+        totalStudents: bulkUploadPayload.hasBulkUploadedData
+          ? bulkUploadPayload.bulkTotalStudents
+          : undefined,
+        hasBulkUploadedData: bulkUploadPayload.hasBulkUploadedData,
+        reportCardLink: bulkUploadPayload.reportCardLink ?? null,
+        bulkUploadedSubjectResults:
+          bulkUploadPayload.bulkUploadedSubjectResults ?? [],
+      },
     };
   }
 

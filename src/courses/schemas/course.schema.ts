@@ -20,6 +20,12 @@ export class Course extends Document {
 
   @Prop({ type: String, default: 'active' })
   status: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const CourseSchema = SchemaFactory.createForClass(Course);

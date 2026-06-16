@@ -11,7 +11,7 @@ export class Package extends Document {
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
-    validate: [arrayLimit, '{PATH} exceeds the limit of 6'],
+    validate: [arrayLimit, '{PATH} exceeds the limit of 15'],
   })
   subjects: mongoose.Schema.Types.ObjectId[];
 
@@ -20,10 +20,20 @@ export class Package extends Document {
 
   @Prop()
   description: string;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
-function arrayLimit(val: any[]): boolean {
-  return val.length <= 6;
+function arrayLimit(val: unknown): boolean {
+  if (!Array.isArray(val)) {
+    return false;
+  }
+
+  return val.length <= 15;
 }
 
 export const PackageSchema = SchemaFactory.createForClass(Package);

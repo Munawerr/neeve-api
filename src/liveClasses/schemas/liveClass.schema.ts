@@ -34,10 +34,16 @@ export class LiveClass extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Institute',
+    ref: 'User',
     required: true,
   })
   institute: mongoose.Schema.Types.ObjectId;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const LiveClassSchema = SchemaFactory.createForClass(LiveClass);

@@ -36,6 +36,12 @@ export class Thread extends Document {
 
   @Prop({ default: Date.now })
   updatedAt: Date;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const ThreadSchema = SchemaFactory.createForClass(Thread);

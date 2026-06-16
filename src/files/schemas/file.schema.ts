@@ -14,6 +14,9 @@ export class File extends Document {
 
   @Prop({ required: true })
   fileUrl: string;
+
+  @Prop({ type: String, default: null })
+  thumbnailUrl?: string;
 }
 
 export const FileSchema = SchemaFactory.createForClass(File);

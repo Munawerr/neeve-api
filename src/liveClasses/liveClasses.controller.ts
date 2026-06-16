@@ -10,7 +10,9 @@ import {
   HttpStatus,
   SetMetadata,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LiveClassesService } from './liveClasses.service';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
@@ -24,6 +26,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 @ApiTags('liveClasses')
 @Controller('live-classes')
@@ -66,14 +69,20 @@ export class LiveClassesController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
+    @Req() req: Request,
   ) {
     try {
+      const requester = req.user as
+        | { userId?: string; role?: string }
+        | undefined;
       const { liveClasses, total } =
         await this.liveClassesService.findAllWithPaging(
           institute,
           page,
           limit,
           search,
+          requester?.role,
+          requester?.userId,
         );
       return {
         status: HttpStatus.OK,
@@ -98,10 +107,20 @@ export class LiveClassesController {
     description: 'Count of upcoming live classes retrieved successfully',
   })
   @SetMetadata('permissions', ['view_live_classes'])
-  async getUpcomingLiveClassesCount(@Query('institute') institute: string) {
+  async getUpcomingLiveClassesCount(
+    @Query('institute') institute: string,
+    @Req() req: Request,
+  ) {
     try {
+      const requester = req.user as
+        | { userId?: string; role?: string }
+        | undefined;
       const count =
-        await this.liveClassesService.countUpcomingLiveClasses(institute);
+        await this.liveClassesService.countUpcomingLiveClasses(
+          institute,
+          requester?.role,
+          requester?.userId,
+        );
       return {
         status: HttpStatus.OK,
         message: 'Count of upcoming live classes retrieved successfully',
@@ -178,10 +197,37 @@ export class LiveClassesController {
   })
   @SetMetadata('permissions', ['delete_live_classes'])
   async remove(@Param('id') id: string) {
-    await this.liveClassesService.remove(id);
+    const result = await this.liveClassesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Live class deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted live classes (super admin only)' })
+  async findDeleted() {
+    const items = await this.liveClassesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted live classes retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted live class (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.liveClassesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Live class restored successfully',
+      data: item,
     };
   }
 }

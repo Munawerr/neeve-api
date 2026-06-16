@@ -39,7 +39,7 @@ export class ExcelReportService {
 
     // Write to buffer
     const buffer = await workbook.xlsx.writeBuffer();
-    return buffer as Buffer;
+    return buffer as unknown as Buffer;
   }
 
   private addReportHeader(worksheet: ExcelJS.Worksheet, report: Report): void {

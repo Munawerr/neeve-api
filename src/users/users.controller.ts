@@ -3,6 +3,7 @@ import {
   Put,
   Body,
   Param,
+  Req,
   UploadedFile,
   UseInterceptors,
   Post,
@@ -33,11 +34,64 @@ import {
 } from '@nestjs/swagger';
 import { PackagesService } from '../packages/packages.service';
 import { Workbook } from 'exceljs';
-import { Response, Express } from 'express';
+import { Response } from 'express';
+import { Request } from 'express';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdateStaffUserDto } from './dto/update-staff-user.dto';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
+
+type UploadedFileType = Parameters<S3Service['uploadFile']>[0];
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
+
+const toIdString = (value: any, depth = 0): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (depth > 3) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  if (typeof value.toString === 'function') {
+    const candidate = value.toString();
+    if (candidate && candidate !== '[object Object]') {
+      return candidate;
+    }
+  }
+
+  if (value._id && value._id !== value) {
+    return toIdString(value._id, depth + 1);
+  }
+
+  return null;
+};
+
+const packageMatchesCourse = (pkg: any, courseId: string): boolean => {
+  const packageCourseId = toIdString(pkg?.course);
+  return packageCourseId === courseId;
+};
+
+const packageDocId = (pkg: any): string | null => {
+  return toIdString(pkg?._id ?? pkg);
+};
 
 @ApiTags('users')
 @Controller('users')
@@ -80,7 +134,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update profile',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -101,7 +155,7 @@ export class UsersController {
   })
   async uploadImage(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFileType,
   ) {
     try {
       const imageUrl = await this.s3Service.uploadFile(file);
@@ -115,7 +169,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload profile image',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -136,7 +190,7 @@ export class UsersController {
   })
   async uploadCover(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFileType,
   ) {
     try {
       const coverUrl = await this.s3Service.uploadFile(file);
@@ -150,7 +204,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to upload profile cover',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -171,7 +225,7 @@ export class UsersController {
   })
   async createInstituteUser(
     @Body() createInstituteUserDto: CreateInstituteUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createInstituteUser(
@@ -187,7 +241,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -210,7 +264,7 @@ export class UsersController {
   async updateInstituteUser(
     @Param('id') id: string,
     @Body() UpdateInstituteUserDto: UpdateInstituteUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateInstituteUser(
@@ -227,7 +281,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -249,46 +303,102 @@ export class UsersController {
   async getPackagesForInstitute(
     @Param('instituteId') instituteId: string,
     @Param('courseId') courseId: string,
+    @Req() req: Request,
   ) {
     try {
-      const instituteUser = await this.usersService.getInstituteUser(
+      const requestedUser = await this.usersService.getInstituteUser(
         instituteId,
         true,
       );
 
-      if (instituteUser && instituteUser.toObject().role?.slug == 'student') {
-        return {
-          status: HttpStatus.OK,
-          message: 'Packages retrieved successfully',
-          data: instituteUser.packages,
-        };
-      }
-
-      if (instituteUser) {
-        const _packages = instituteUser.packages.filter(
-          (pkg) => pkg.course.toString() === courseId,
-        );
-
-        const packageIds = _packages.map((pkg) => pkg.toObject()._id);
-
-        const packages = await this.PackagesService.findByIds(packageIds, true);
-
-        return {
-          status: HttpStatus.OK,
-          message: 'Packages retrieved successfully',
-          data: packages,
-        };
-      } else {
+      if (!requestedUser) {
         return {
           status: HttpStatus.EXPECTATION_FAILED,
           message: 'Institute user not found',
         };
       }
+
+      const requestedRoleSlug = (requestedUser.role as any)?.slug;
+      const requestedPackages = Array.isArray(requestedUser.packages)
+        ? requestedUser.packages
+        : [];
+
+      let sourcePackages = requestedPackages;
+
+      // Some student flows pass the student id in this route. Prefer student packages,
+      // and fall back to institute packages if student-level assignments are empty.
+      if (requestedRoleSlug === 'student' && requestedPackages.length === 0) {
+        const instituteIdFromStudent = toIdString(requestedUser.institute);
+
+        if (instituteIdFromStudent) {
+          const instituteUser = await this.usersService.getInstituteUser(
+            instituteIdFromStudent,
+            true,
+          );
+
+          if (instituteUser?.packages?.length) {
+            sourcePackages = instituteUser.packages;
+          }
+        }
+      }
+
+      // When the looked-up user is an institute user (not a student), the packages
+      // stored on the institute record may be empty or incomplete. Always also check
+      // the logged-in student's own packages (from the JWT) so that per-student
+      // package assignments are respected.
+      const loggedInUserId = (req as any).user?.userId;
+      if (
+        loggedInUserId &&
+        String(loggedInUserId) !== String(requestedUser._id)
+      ) {
+        const loggedInUser = await this.usersService.getInstituteUser(
+          loggedInUserId,
+          true,
+        );
+        if (loggedInUser && Array.isArray(loggedInUser.packages) && loggedInUser.packages.length > 0) {
+          // Merge packages; student's own packages take priority.
+          const existingIds = new Set(sourcePackages.map(packageDocId).filter(Boolean));
+          for (const pkg of loggedInUser.packages) {
+            const pid = packageDocId(pkg);
+            if (pid && !existingIds.has(pid)) {
+              sourcePackages = [...sourcePackages, pkg];
+              existingIds.add(pid);
+            }
+          }
+        }
+      }
+
+      const packageIds = sourcePackages
+        .map(packageDocId)
+        .filter((id): id is string => Boolean(id));
+
+      if (packageIds.length === 0) {
+        return {
+          status: HttpStatus.OK,
+          message: 'Packages retrieved successfully',
+          data: [],
+        };
+      }
+
+      const uniquePackageIds = [...new Set(packageIds)];
+      const packages = await this.PackagesService.findByIds(
+        uniquePackageIds,
+        true,
+      );
+      const filteredPackages = packages.filter((pkg: any) =>
+        packageMatchesCourse(pkg, courseId),
+      );
+
+      return {
+        status: HttpStatus.OK,
+        message: 'Packages retrieved successfully',
+        data: filteredPackages,
+      };
     } catch (error) {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -329,7 +439,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -369,7 +479,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -398,7 +508,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -425,12 +535,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete institute user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('institute/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted institute users (super admin only)' })
+  async getDeletedInstituteUsers() {
+    const items = await this.usersService.getDeletedInstituteUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted institute users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('institute/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted institute user (super admin only)' })
+  async restoreInstituteUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Institute user restored successfully',
+      data: item,
+    };
   }
 
   @Post('student')
@@ -449,7 +588,7 @@ export class UsersController {
   })
   async createStudentUser(
     @Body() createStudentUserDto: CreateStudentUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createStudentUser(
@@ -465,7 +604,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -488,7 +627,7 @@ export class UsersController {
   async updateStudentUser(
     @Param('id') id: string,
     @Body() UpdateStudentUserDto: UpdateStudentUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateStudentUser(
@@ -505,7 +644,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -548,7 +687,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve student users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -584,7 +723,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve student users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -611,12 +750,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete student user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('student/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted student users (super admin only)' })
+  async getDeletedStudentUsers() {
+    const items = await this.usersService.getDeletedStudentUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted student users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('student/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted student user (super admin only)' })
+  async restoreStudentUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Student user restored successfully',
+      data: item,
+    };
   }
 
   @Post('students/bulk')
@@ -632,7 +800,7 @@ export class UsersController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create students',
   })
-  async bulkCreateStudents(@UploadedFile() file: Express.Multer.File) {
+  async bulkCreateStudents(@UploadedFile() file: UploadedFileType) {
     try {
       const workbook = new Workbook();
       await workbook.xlsx.load(
@@ -675,7 +843,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create students',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -728,7 +896,7 @@ export class UsersController {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
     description: 'Failed to create institute users',
   })
-  async bulkCreateInstituteUsers(@UploadedFile() file: Express.Multer.File) {
+  async bulkCreateInstituteUsers(@UploadedFile() file: UploadedFileType) {
     try {
       const workbook = new Workbook();
       await workbook.xlsx.load(
@@ -767,7 +935,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create institute users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -844,7 +1012,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -880,7 +1048,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve staff users',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -896,7 +1064,7 @@ export class UsersController {
   })
   async createStaffUser(
     @Body() createStaffUserDto: CreateStaffUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const newUser = await this.usersService.createStaffUser(
@@ -912,7 +1080,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create staff user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -930,7 +1098,7 @@ export class UsersController {
   async updateStaffUser(
     @Param('id') id: string,
     @Body() updateStaffUserDto: UpdateStaffUserDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFileType,
   ) {
     try {
       const updatedUser = await this.usersService.updateStaffUser(
@@ -947,7 +1115,72 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update staff user',
-        error: error.message,
+        error: getErrorMessage(error),
+      };
+    }
+  }
+
+  @Put(':id/reset-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Reset user password (admin for all users, institute for own students)',
+  })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: ResetUserPasswordDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User password reset successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Not allowed to reset this user password',
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Failed to reset user password',
+  })
+  async resetUserPassword(
+    @Param('id') id: string,
+    @Body() resetUserPasswordDto: ResetUserPasswordDto,
+    @Req() req: Request,
+  ) {
+    try {
+      const actor = req.user as
+        | {
+            userId?: string;
+            role?: string;
+            institute?: string;
+          }
+        | undefined;
+
+      const updatedUser = await this.usersService.resetUserPassword(
+        id,
+        resetUserPasswordDto.password,
+        {
+          userId: actor?.userId || '',
+          role: actor?.role,
+          institute: actor?.institute,
+        },
+      );
+
+      return {
+        status: HttpStatus.OK,
+        message: 'User password reset successfully',
+        data: {
+          _id: updatedUser?._id,
+        },
+      };
+    } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
+
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Failed to reset user password',
+        error: getErrorMessage(error),
       };
     }
   }
@@ -970,12 +1203,41 @@ export class UsersController {
         data: deletedUser,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete staff user',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('u/staff/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted staff users (super admin only)' })
+  async getDeletedStaffUsers() {
+    const items = await this.usersService.getDeletedStaffUsers();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted staff users retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('u/staff/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted staff user (super admin only)' })
+  async restoreStaffUser(@Param('id') id: string) {
+    const item = await this.usersService.restoreUser(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Staff user restored successfully',
+      data: item,
+    };
   }
 
   @Get('c/roles')
@@ -1009,7 +1271,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve roles',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1034,7 +1296,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve roles',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1060,7 +1322,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1085,7 +1347,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to create role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1114,7 +1376,7 @@ export class UsersController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to update role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -1137,11 +1399,40 @@ export class UsersController {
         data: deletedRole,
       };
     } catch (error) {
+      if (error?.status) {
+        throw error;
+      }
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to delete role',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
+  }
+
+  @Get('c/roles/archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted roles (super admin only)' })
+  async getDeletedRoles() {
+    const items = await this.usersService.getDeletedRoles();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted roles retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put('c/roles/archive/:id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore deleted role (super admin only)' })
+  async restoreRole(@Param('id') id: string) {
+    const item = await this.usersService.restoreRole(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Role restored successfully',
+      data: item,
+    };
   }
 }

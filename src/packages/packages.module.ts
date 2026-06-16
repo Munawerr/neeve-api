@@ -23,6 +23,10 @@ import {
 } from 'src/auth/schemas/login-history.schema';
 import { LoginHistoryService } from 'src/auth/login-history.service';
 import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
+import {
+  LiveClass,
+  LiveClassSchema,
+} from 'src/liveClasses/schemas/liveClass.schema';
 
 @Module({
   imports: [
@@ -37,6 +41,7 @@ import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
       { name: Test.name, schema: TestSchema },
       { name: LoginHistory.name, schema: LoginHistorySchema },
       { name: Topic.name, schema: TopicSchema },
+      { name: LiveClass.name, schema: LiveClassSchema },
     ]),
   ],
   controllers: [PackagesController],

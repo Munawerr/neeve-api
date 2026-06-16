@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
-import { MailModule } from './mail/mail.module';
+
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { SubjectsModule } from './subjects/subjects.module';
@@ -15,6 +15,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
 import { QuestionResultsModule } from './question-results/question-results.module';
 import { LiveClassesModule } from './liveClasses/liveClasses.module';
+import { AssignmentsModule } from './assignments/assignments.module';
 import { ReportsModule } from './reports/reports.module'; // Import the new ReportsModule
 import { AnalyticsModule } from './analytics/analytics.module'; // Import AnalyticsModule
 import { SsoModule } from './sso/sso.module'; // Import SSO Module
@@ -84,7 +85,9 @@ const JWT_EXPIRES_IN: string =
   stripWrappingQuotes(process.env.JWT_EXPIRES_IN) || '1h';
 
 if (!DB_URL) {
-  throw new Error('MongoDB connection string is missing. Set MONGODB_URI or DB_URL.');
+  throw new Error(
+    'MongoDB connection string is missing. Set MONGODB_URI or DB_URL.',
+  );
 }
 
 @Module({
@@ -121,7 +124,6 @@ if (!DB_URL) {
     ]), // Add schema
     UsersModule,
     AuthModule,
-    MailModule,
     SubjectsModule,
     CoursesModule,
     ClassesModule,
@@ -133,6 +135,7 @@ if (!DB_URL) {
     ResultsModule,
     QuestionResultsModule,
     LiveClassesModule,
+    AssignmentsModule,
     ThreadsModule,
     DiscussionsModule,
     ChatModule, // Add ChatModule

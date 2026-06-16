@@ -225,24 +225,30 @@ export class ReportGeneratorService {
         totalPossibleScore,
       },
       subjectPerformance,
-      testResults: results.map((result: any) => ({
-        testName: result.test?.title || 'Unknown',
-        subject: result.subject?.title || 'Unknown',
-        status: result.status,
-        startedAt: result.startedAt,
-        finishedAt: result.finishedAt,
-        score: result.marksSummary ? result.marksSummary.obtainedMarks : 'N/A',
-        totalMarks: result.marksSummary
-          ? result.marksSummary.totalMarks
-          : 'N/A',
-        percentage: result.marksSummary
-          ? (
-              (result.marksSummary.obtainedMarks /
-                result.marksSummary.totalMarks) *
-              100
-            ).toFixed(2)
-          : 'N/A',
-      })),
+      testResults: results.map((result: any) => {
+        const isBulk = result.isBulkUploaded === true;
+        return {
+          testName: isBulk ? 'Bulk Upload Entry' : result.test?.title || 'Unknown',
+          subject: result.subject?.title || 'Unknown',
+          status: result.status,
+          startedAt: result.startedAt,
+          finishedAt: result.finishedAt,
+          score: result.marksSummary ? result.marksSummary.obtainedMarks : 'N/A',
+          totalMarks: result.marksSummary
+            ? result.marksSummary.totalMarks
+            : 'N/A',
+          percentage: result.marksSummary
+            ? (
+                (result.marksSummary.obtainedMarks /
+                  result.marksSummary.totalMarks) *
+                100
+              ).toFixed(2)
+            : 'N/A',
+          isBulkUploaded: isBulk,
+          reportCardLink: result.reportCardLink || null,
+          timeTaken: result.timeTaken || null,
+        };
+      }),
     };
   }
 

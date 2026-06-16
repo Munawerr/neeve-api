@@ -41,6 +41,12 @@ export class Topic extends Document {
 
   @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'File' })
   practiceProblems: MongooseSchema.Types.ObjectId[];
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const TopicSchema = SchemaFactory.createForClass(Topic);

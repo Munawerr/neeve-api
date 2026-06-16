@@ -33,6 +33,12 @@ export class Test extends Document {
 
   @Prop({ default: 0 })
   skipableQuestionsCount: number;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  isDeleted: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const TestSchema = SchemaFactory.createForClass(Test);

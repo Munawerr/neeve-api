@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Test, TestType } from './schemas/test.schema';
@@ -10,16 +14,52 @@ import * as mammoth from 'mammoth'; // Replace docx4js with mammoth
 import { OpenAI } from 'openai'; // Corrected import
 import { QuestionsService } from '../questions/questions.service'; // Import QuestionsService
 import { OptionDto } from '../questions/dto/create-question.dto';
+import { Result } from 'src/results/schemas/result.schema';
 
 @Injectable()
 export class TestsService {
   constructor(
     @InjectModel(Test.name) private testModel: Model<Test>,
+    @InjectModel(Result.name) private resultModel: Model<Result>,
     private readonly questionsService: QuestionsService, // Inject QuestionsService
   ) {}
 
+  private normalizeMarksValue(value: number | undefined | null): number {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return 0;
+    }
+
+    return Math.abs(numericValue);
+  }
+
+  private async normalizeTestMarks(test: Test | null): Promise<Test | null> {
+    if (!test) {
+      return null;
+    }
+
+    const normalizedMarks = this.normalizeMarksValue(test.marksPerQuestion);
+    if (test.marksPerQuestion !== normalizedMarks) {
+      test.marksPerQuestion = normalizedMarks;
+      await test.save();
+    }
+
+    return test;
+  }
+
+  private async normalizeTestMarksCollection(tests: Test[]): Promise<Test[]> {
+    const normalizedTests = await Promise.all(
+      tests.map((test) => this.normalizeTestMarks(test)),
+    );
+
+    return normalizedTests.filter((test): test is Test => Boolean(test));
+  }
+
   async create(createTestDto: CreateTestDto): Promise<Test> {
-    const createdTest = new this.testModel(createTestDto);
+    const createdTest = new this.testModel({
+      ...createTestDto,
+      marksPerQuestion: this.normalizeMarksValue(createTestDto.marksPerQuestion),
+    });
     return createdTest.save();
   }
 
@@ -30,12 +70,13 @@ export class TestsService {
   ): Promise<{ tests: Test[]; total: number }> {
     const filter = search
       ? {
+          isDeleted: { $ne: true },
           $or: [
             { title: { $regex: search, $options: 'i' } },
             { description: { $regex: search, $options: 'i' } },
           ],
         }
-      : {};
+      : { isDeleted: { $ne: true } };
 
     const tests = await this.testModel
       .find(filter)
@@ -45,7 +86,8 @@ export class TestsService {
       .populate('topic')
       .exec();
     const total = await this.testModel.countDocuments(filter);
-    return { tests, total };
+    const normalizedTests = await this.normalizeTestMarksCollection(tests);
+    return { tests: normalizedTests, total };
   }
 
   async findAllTests(
@@ -54,6 +96,8 @@ export class TestsService {
   ): Promise<{ mockTests: Test[]; otherTests: Test[] }> {
     const mockTests = await this.testModel
       .find({ subject: subjectId, testType: TestType.MOCK })
+      .where('isDeleted')
+      .ne(true)
       .populate('subject')
       .populate({
         path: 'questions',
@@ -63,6 +107,8 @@ export class TestsService {
 
     const otherTests = await this.testModel
       .find({ topic: topicId, testType: { $ne: TestType.MOCK } })
+      .where('isDeleted')
+      .ne(true)
       .populate('topic')
       .populate({
         path: 'questions',
@@ -70,59 +116,136 @@ export class TestsService {
       })
       .exec();
 
-    return { mockTests, otherTests };
+    return {
+      mockTests: await this.normalizeTestMarksCollection(mockTests),
+      otherTests: await this.normalizeTestMarksCollection(otherTests),
+    };
   }
 
   async findAllMockTests(subject: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({ subject, testType: TestType.MOCK })
+      .where('isDeleted')
+      .ne(true)
       .populate('subject')
       .populate({
         path: 'questions',
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async findTestsByTopic(topic: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({ topic })
+      .where('isDeleted')
+      .ne(true)
       .populate('topic')
       .populate({
         path: 'questions',
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async findOne(id: string): Promise<Test | null> {
-    return this.testModel
+    const test = await this.testModel
       .findById(id)
+      .where('isDeleted')
+      .ne(true)
       .populate('topic')
       .populate({
         path: 'questions',
         model: 'Question',
       })
       .exec();
+
+    return this.normalizeTestMarks(test);
   }
 
   // Find tests by subject
   async findTestsBySubject(subject: string): Promise<Test[]> {
-    return this.testModel
+    const tests = await this.testModel
       .find({
         subject,
+        isDeleted: { $ne: true },
       })
       .exec();
+
+    return this.normalizeTestMarksCollection(tests);
   }
 
   async update(id: string, updateTestDto: UpdateTestDto): Promise<Test | null> {
+    const normalizedUpdateDto = {
+      ...updateTestDto,
+      ...(updateTestDto.marksPerQuestion !== undefined
+        ? {
+            marksPerQuestion: this.normalizeMarksValue(
+              updateTestDto.marksPerQuestion,
+            ),
+          }
+        : {}),
+    };
+
+    const updatedTest = await this.testModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        normalizedUpdateDto,
+        { new: true },
+      )
+      .exec();
+
+    return this.normalizeTestMarks(updatedTest);
+  }
+
+  async remove(
+    id: string,
+    confirmed = false,
+  ): Promise<{ deleted: true } | { requiresConfirmation: true; message: string; count: number }> {
+    const existingTest = await this.testModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+    if (!existingTest) {
+      throw new NotFoundException('Test not found');
+    }
+
+    const resultCount = await this.resultModel.countDocuments({ test: id });
+    if (resultCount > 0 && !confirmed) {
+      return {
+        requiresConfirmation: true,
+        message:
+          'This test has student attempts/results. Delete will archive the test while keeping historical records intact.',
+        count: resultCount,
+      };
+    }
+
+    await this.testModel
+      .updateOne({ _id: id }, { isDeleted: true, deletedAt: new Date() })
+      .exec();
+    return { deleted: true };
+  }
+
+  async findDeleted(): Promise<Test[]> {
     return this.testModel
-      .findByIdAndUpdate(id, updateTestDto, { new: true })
+      .find({ isDeleted: true })
+      .populate('subject')
+      .populate('topic')
+      .sort({ deletedAt: -1 })
       .exec();
   }
 
-  async remove(id: string): Promise<void> {
-    await this.testModel.findByIdAndDelete(id).exec();
+  async restore(id: string): Promise<Test | null> {
+    return this.testModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
   }
 
   async extractAndSaveQuestions(

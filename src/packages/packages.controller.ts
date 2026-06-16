@@ -30,11 +30,22 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
 
 @ApiTags('packages')
 @Controller('packages')
 @UseGuards(JwtAuthGuard)
 export class PackagesController {
+  private static readonly MAX_SUBJECTS_PER_PACKAGE = 15;
+
   constructor(
     private readonly packagesService: PackagesService,
     private readonly coursesService: CoursesService,
@@ -54,18 +65,38 @@ export class PackagesController {
   @SetMetadata('permissions', ['edit_packages'])
   async create(@Body() createPackageDto: CreatePackageDto) {
     const { course, class: classId, subjects } = createPackageDto;
+
+    if (!Array.isArray(subjects) || subjects.length < 1) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'At least one subject is required',
+      };
+    }
+
+    if (subjects.length > PackagesController.MAX_SUBJECTS_PER_PACKAGE) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: `A maximum of ${PackagesController.MAX_SUBJECTS_PER_PACKAGE} subjects is allowed`,
+      };
+    }
+
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);
 
-    if (!courseEntity || !classEntity || !subjectEntities) {
+    if (
+      !courseEntity ||
+      !classEntity ||
+      !Array.isArray(subjectEntities) ||
+      subjectEntities.length !== subjects.length
+    ) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
         message: 'Course, class, and subjects not found',
       };
     }
 
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(6 - subjectEntities.length)}`;
+    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const packageEntity = await this.packagesService.create({
@@ -174,7 +205,7 @@ export class PackagesController {
       return {
         status: HttpStatus.INTERNAL_SERVER_ERROR,
         message: 'Failed to retrieve packages for dropdown',
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -221,17 +252,37 @@ export class PackagesController {
     @Body() updatePackageDto: UpdatePackageDto,
   ) {
     const { course, class: classId, subjects } = updatePackageDto;
+
+    if (!Array.isArray(subjects) || subjects.length < 1) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'At least one subject is required',
+      };
+    }
+
+    if (subjects.length > PackagesController.MAX_SUBJECTS_PER_PACKAGE) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: `A maximum of ${PackagesController.MAX_SUBJECTS_PER_PACKAGE} subjects is allowed`,
+      };
+    }
+
     const courseEntity = await this.coursesService.findOne(course);
     const classEntity = await this.classesService.findOne(classId);
     const subjectEntities = await this.subjectsService.findByIds(subjects);
 
-    if (!courseEntity || !classEntity || !subjectEntities) {
+    if (
+      !courseEntity ||
+      !classEntity ||
+      !Array.isArray(subjectEntities) ||
+      subjectEntities.length !== subjects.length
+    ) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
         message: 'Course, class, and subjects not found',
       };
     }
-    const code = `${courseEntity.code}/${classEntity.code}/${subjectEntities.map((s) => s.code).join('')}${'X'.repeat(6 - subjectEntities.length)}`;
+    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const updatedPackage = await this.packagesService.update(id, {
@@ -259,10 +310,37 @@ export class PackagesController {
   })
   @SetMetadata('permissions', ['delete_packages'])
   async remove(@Param('id') id: string) {
-    await this.packagesService.remove(id);
+    const result = await this.packagesService.remove(id);
     return {
       status: HttpStatus.OK,
       message: 'Package deleted successfully',
+      data: result,
+    };
+  }
+
+  @Get('archive/deleted')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get deleted packages (super admin only)' })
+  async findDeleted() {
+    const items = await this.packagesService.findDeleted();
+    return {
+      status: HttpStatus.OK,
+      message: 'Deleted packages retrieved successfully',
+      data: { items, total: items.length },
+    };
+  }
+
+  @Put(':id/restore')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a soft deleted package (super admin only)' })
+  async restore(@Param('id') id: string) {
+    const item = await this.packagesService.restore(id);
+    return {
+      status: HttpStatus.OK,
+      message: 'Package restored successfully',
+      data: item,
     };
   }
 }

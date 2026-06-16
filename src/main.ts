@@ -13,5 +13,6 @@ async function bootstrap() {
   app.use(cookieParser()); // Use cookie-parser middleware
 
   await app.listen(process.env.PORT ?? 3000);
+  console.log(`Application listening on port ${process.env.PORT ?? 3000}`);
 }
 bootstrap();

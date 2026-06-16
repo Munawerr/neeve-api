@@ -1,15 +1,47 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LiveClass } from './schemas/liveClass.schema';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
 import { UpdateLiveClassDto } from './dto/update-liveClass.dto';
+import { User } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class LiveClassesService {
   constructor(
     @InjectModel(LiveClass.name) private liveClassModel: Model<LiveClass>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
+
+  private async buildAudienceQuery(
+    institute: string,
+    role?: string,
+    userId?: string,
+  ): Promise<Record<string, any>> {
+    const query: Record<string, any> = {
+      institute,
+      isDeleted: { $ne: true },
+    };
+
+    if (role === 'student' && userId) {
+      const student = await this.userModel
+        .findById(userId)
+        .select('packages')
+        .lean();
+
+      const packageIds = Array.isArray(student?.packages)
+        ? student.packages.map((pkg: any) => pkg.toString())
+        : [];
+
+      if (packageIds.length === 0) {
+        query.package = { $in: [] };
+      } else {
+        query.package = { $in: packageIds };
+      }
+    }
+
+    return query;
+  }
 
   create(createLiveClassDto: CreateLiveClassDto): Promise<LiveClass> {
     const createdLiveClass = new this.liveClassModel(createLiveClassDto);
@@ -17,7 +49,7 @@ export class LiveClassesService {
   }
 
   findAll(): Promise<LiveClass[]> {
-    return this.liveClassModel.find().exec();
+    return this.liveClassModel.find({ isDeleted: { $ne: true } }).exec();
   }
 
   async findAllWithPaging(
@@ -25,10 +57,16 @@ export class LiveClassesService {
     page: number,
     limit: number,
     search: string,
+    role?: string,
+    userId?: string,
   ) {
+    const baseQuery = await this.buildAudienceQuery(institute, role, userId);
     const query = search
-      ? { institute, title: { $regex: search, $options: 'i' } }
-      : { institute };
+      ? {
+          ...baseQuery,
+          title: { $regex: search, $options: 'i' },
+        }
+      : baseQuery;
     const liveClasses = await this.liveClassModel
       .find(query)
       .skip((page - 1) * limit)
@@ -49,7 +87,7 @@ export class LiveClassesService {
 
   findOne(id: string): Promise<LiveClass | null> {
     return this.liveClassModel
-      .findById(id)
+      .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('package')
       .populate('subject')
       .exec();
@@ -60,19 +98,58 @@ export class LiveClassesService {
     updateLiveClassDto: UpdateLiveClassDto,
   ): Promise<LiveClass | null> {
     return this.liveClassModel
-      .findByIdAndUpdate(id, updateLiveClassDto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, isDeleted: { $ne: true } },
+        updateLiveClassDto,
+        { new: true },
+      )
       .exec();
   }
 
-  remove(id: string): Promise<LiveClass | null> {
-    return this.liveClassModel.findByIdAndDelete(id).exec();
+  async remove(id: string): Promise<{ deleted: true }> {
+    const existing = await this.liveClassModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .lean();
+
+    if (!existing) {
+      throw new NotFoundException('Live class not found');
+    }
+
+    await this.liveClassModel
+      .updateOne({ _id: id }, { isDeleted: true, deletedAt: new Date() })
+      .exec();
+    return { deleted: true };
   }
 
-  async countUpcomingLiveClasses(institute: string): Promise<number> {
+  async findDeleted(): Promise<LiveClass[]> {
+    return this.liveClassModel
+      .find({ isDeleted: true })
+      .populate('package')
+      .populate('subject')
+      .sort({ deletedAt: -1 })
+      .exec();
+  }
+
+  async restore(id: string): Promise<LiveClass | null> {
+    return this.liveClassModel
+      .findByIdAndUpdate(
+        id,
+        { isDeleted: false, deletedAt: null },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async countUpcomingLiveClasses(
+    institute: string,
+    role?: string,
+    userId?: string,
+  ): Promise<number> {
     const today = new Date();
+    const baseQuery = await this.buildAudienceQuery(institute, role, userId);
     const count = await this.liveClassModel
       .countDocuments({
-        institute,
+        ...baseQuery,
         date: { $gte: today },
       })
       .exec();
