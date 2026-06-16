@@ -152,12 +152,14 @@ export class FilesController {
     console.log(`[enrich] Found ${allFiles.length} total files`);
 
     const driveFiles = allFiles.filter((f) => isGoogleDriveUrl(f.fileUrl));
-    console.log(`[enrich] Filtered to ${driveFiles.length} Google Drive files`);
+    const pendingFiles = driveFiles.filter((f) => !f.thumbnailUrl);
+    const skipped = driveFiles.length - pendingFiles.length;
+    console.log(`[enrich] Filtered to ${driveFiles.length} Google Drive files, ${skipped} already enriched, ${pendingFiles.length} pending`);
 
     let updated = 0;
     let failed = 0;
 
-    for (const file of driveFiles) {
+    for (const file of pendingFiles) {
       const fileId = extractGoogleDriveFileId(file.fileUrl);
       console.log(`[enrich] Processing file _id=${file._id} fileId=${fileId} name="${file.fileName}"`);
 
@@ -204,12 +206,12 @@ export class FilesController {
       }
     }
 
-    console.log(`[enrich] Done: ${updated}/${driveFiles.length} updated, ${failed} failed`);
+    console.log(`[enrich] Done: ${updated}/${pendingFiles.length} updated, ${failed} failed, ${skipped} skipped`);
 
     return {
       status: HttpStatus.OK,
       message: 'File metadata enrichment completed',
-      data: { total: driveFiles.length, updated, failed },
+      data: { total: driveFiles.length, updated, failed, skipped },
     };
   }
 
