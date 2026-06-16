@@ -27,6 +27,14 @@ import {
   fetchGoogleDriveFileMetadata,
 } from '../common/utils/drive.utils';
 
+interface EnrichJob {
+  total: number;
+  updated: number;
+  failed: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+}
+
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
@@ -181,13 +189,7 @@ export class FilesController {
     };
   }
 
-  private enrichJobs = new Map<string, {
-    total: number;
-    updated: number;
-    failed: number;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
-    error?: string;
-  }>();
+  private enrichJobs = new Map<string, EnrichJob>();
 
   private async processEnrichJob(jobId: string) {
     const job = this.enrichJobs.get(jobId);
@@ -223,8 +225,8 @@ export class FilesController {
           }
         } catch {
           job.failed++;
-        }
-      }
+    }
+  }
 
       job.status = 'completed';
     } catch (error) {
@@ -234,3 +236,4 @@ export class FilesController {
   }
 
 
+}
