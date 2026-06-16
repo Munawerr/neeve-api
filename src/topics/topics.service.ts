@@ -5,6 +5,7 @@ import { Topic } from './schemas/topic.schema';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { FilesService } from '../files/files.service';
+import { FileMetadataService } from '../files/file-metadata.service';
 import { Subject } from '../subjects/schemas/subject.schema';
 import { Package } from '../packages/schemas/package.schema';
 import { Test } from 'src/tests/schemas/test.schema';
@@ -26,6 +27,7 @@ export class TopicsService {
     @InjectModel(Result.name)
     private resultModel: Model<Result>,
     private readonly filesService: FilesService,
+    private readonly fileMetadataService: FileMetadataService,
   ) {}
 
   async create(createTopicDto: CreateTopicDto): Promise<Topic> {
@@ -458,11 +460,15 @@ export class TopicsService {
 
     for (const url of normalizedUrls) {
       const fileType = url.split('.').pop();
-      const fileName = url.split('/').pop();
+      const [fileName, thumbnailUrl] = await Promise.all([
+        this.fileMetadataService.enrichFileName(url),
+        this.fileMetadataService.enrichThumbnailUrl(url),
+      ]);
       const file = await this.filesService.create({
-        fileName: fileName ? fileName : '',
-        fileType: fileType ? fileType : '',
+        fileName,
+        fileType: fileType || '',
         fileUrl: url,
+        thumbnailUrl: thumbnailUrl || undefined,
       });
       fileIds.push(file._id as MongooseSchema.Types.ObjectId);
     }
