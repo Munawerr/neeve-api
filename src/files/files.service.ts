@@ -17,5 +17,11 @@ export class FilesService {
     return this.fileModel.find({ user: userId }).exec();
   }
 
-  // Add more methods as needed
+  async findAll(): Promise<File[]> {
+    return this.fileModel.find().exec();
+  }
+
+  async update(id: string, updateData: Record<string, string>): Promise<File | null> {
+    return this.fileModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+  }
 }

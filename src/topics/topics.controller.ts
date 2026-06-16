@@ -28,6 +28,7 @@ import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { FilesService } from '../files/files.service';
+import { FileMetadataService } from '../files/file-metadata.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Workbook } from 'exceljs';
 import { Response } from 'express';
@@ -41,6 +42,7 @@ export class TopicsController {
   constructor(
     private readonly topicsService: TopicsService,
     private readonly filesService: FilesService,
+    private readonly fileMetadataService: FileMetadataService,
   ) {}
 
   @Post()
@@ -759,13 +761,18 @@ export class TopicsController {
     }
 
     const createdFiles = await Promise.all(
-      (normalizedValues as string[]).map((url) =>
-        this.filesService.create({
-          fileName: url.split('/').pop() || '',
+      (normalizedValues as string[]).map(async (url) => {
+        const [fileName, thumbnailUrl] = await Promise.all([
+          this.fileMetadataService.enrichFileName(url),
+          this.fileMetadataService.enrichThumbnailUrl(url),
+        ]);
+        return this.filesService.create({
+          fileName,
           fileType: url.split('.').pop() || '',
           fileUrl: url,
-        }),
-      ),
+          thumbnailUrl: thumbnailUrl || undefined,
+        });
+      }),
     );
 
     return createdFiles.map(

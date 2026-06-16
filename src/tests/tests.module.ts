@@ -13,6 +13,7 @@ import { QuestionsService } from 'src/questions/questions.service';
 import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { FilesService } from 'src/files/files.service';
+import { FilesModule } from 'src/files/files.module';
 import { File, FileSchema } from 'src/files/schemas/file.schema';
 import {
   LoginHistory,
@@ -23,6 +24,7 @@ import { Result, ResultSchema } from 'src/results/schemas/result.schema';
 
 @Module({
   imports: [
+    FilesModule,
     MongooseModule.forFeature([
       { name: Test.name, schema: TestSchema },
       { name: Topic.name, schema: TopicSchema },

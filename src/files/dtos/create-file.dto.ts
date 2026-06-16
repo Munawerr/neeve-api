@@ -3,4 +3,5 @@ export class CreateFileDto {
   fileName: string;
   fileType: string;
   fileUrl: string;
+  thumbnailUrl?: string;
 }
