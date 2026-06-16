@@ -27,6 +27,14 @@ import {
   fetchGoogleDriveFileMetadata,
 } from '../common/utils/drive.utils';
 
+interface EnrichJob {
+  total: number;
+  updated: number;
+  failed: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+}
+
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
@@ -133,54 +141,99 @@ export class FilesController {
     summary: 'One-time migration: enrich existing file records with Drive metadata',
   })
   @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'File metadata enrichment completed',
+    status: HttpStatus.ACCEPTED,
+    description: 'Enrichment job started',
   })
-  async enrichExistingFileMetadata() {
-    const allFiles = await this.filesService.findAll();
-    const driveFiles = allFiles.filter((f) => isGoogleDriveUrl(f.fileUrl));
-
-    let updated = 0;
-    let failed = 0;
+  async startEnrichMetadata() {
     const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
-
     if (!apiKey) {
       return {
         status: HttpStatus.BAD_REQUEST,
         message: 'GOOGLE_DRIVE_API_KEY is not configured',
-        data: { total: driveFiles.length, updated: 0, failed: 0 },
       };
     }
 
-    for (const file of driveFiles) {
-      try {
-        const fileId = extractGoogleDriveFileId(file.fileUrl);
-        if (!fileId) { failed++; continue; }
+    const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    this.enrichJobs.set(jobId, {
+      total: 0,
+      updated: 0,
+      failed: 0,
+      status: 'pending' as const,
+    });
 
-        const metadata = await fetchGoogleDriveFileMetadata(fileId, apiKey);
-        if (!metadata) { failed++; continue; }
-
-        const updates: Record<string, string> = {};
-        if (metadata.name && file.fileName !== metadata.name) {
-          updates.fileName = metadata.name;
-        }
-        if (metadata.thumbnailLink) {
-          updates.thumbnailUrl = metadata.thumbnailLink;
-        }
-
-        if (Object.keys(updates).length > 0) {
-          await this.filesService.update(String(file._id), updates);
-          updated++;
-        }
-      } catch {
-        failed++;
-      }
-    }
+    this.processEnrichJob(jobId).catch(() => {});
 
     return {
-      status: HttpStatus.OK,
-      message: 'File metadata enrichment completed',
-      data: { total: driveFiles.length, updated, failed },
+      status: HttpStatus.ACCEPTED,
+      message: 'Enrichment job started',
+      data: { jobId },
     };
   }
+
+  @Get('enrich-metadata/:jobId/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get enrichment job status' })
+  async getEnrichJobStatus(@Param('jobId') jobId: string) {
+    const job = this.enrichJobs.get(jobId);
+    if (!job) {
+      return {
+        status: HttpStatus.NOT_FOUND,
+        message: 'Job not found',
+      };
+    }
+    return {
+      status: HttpStatus.OK,
+      message: 'Job status retrieved',
+      data: { ...job },
+    };
+  }
+
+  private enrichJobs = new Map<string, EnrichJob>();
+
+  private async processEnrichJob(jobId: string) {
+    const job = this.enrichJobs.get(jobId);
+    if (!job) return;
+
+    job.status = 'processing';
+    const apiKey = process.env.GOOGLE_DRIVE_API_KEY!;
+
+    try {
+      const allFiles = await this.filesService.findAll();
+      const driveFiles = allFiles.filter((f) => isGoogleDriveUrl(f.fileUrl));
+      job.total = driveFiles.length;
+
+      for (const file of driveFiles) {
+        try {
+          const fileId = extractGoogleDriveFileId(file.fileUrl);
+          if (!fileId) { job.failed++; continue; }
+
+          const metadata = await fetchGoogleDriveFileMetadata(fileId, apiKey);
+          if (!metadata) { job.failed++; continue; }
+
+          const updates: Record<string, string> = {};
+          if (metadata.name && file.fileName !== metadata.name) {
+            updates.fileName = metadata.name;
+          }
+          if (metadata.thumbnailLink) {
+            updates.thumbnailUrl = metadata.thumbnailLink;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await this.filesService.update(String(file._id), updates);
+            job.updated++;
+          }
+        } catch {
+          job.failed++;
+    }
+  }
+
+      job.status = 'completed';
+    } catch (error) {
+      job.status = 'failed';
+      job.error = String(error);
+    }
+  }
+
+
 }
