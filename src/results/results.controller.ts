@@ -159,20 +159,60 @@ function jaccardSimilarity(a: string, b: string): number {
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
 
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function hasCommonWord(a: string, b: string): boolean {
+  const wordsA = a.split(/\s+/).filter((w) => w.length > 1);
+  const wordsB = b.split(/\s+/).filter((w) => w.length > 1);
+  return wordsA.some((w) => wordsB.includes(w));
+}
+
 function matchSubject(csvHeader: string, subjects: Subject[]): Subject | null {
   const normHeader = normalizeForMatch(csvHeader);
 
+  // Step 1: Exact match after normalization
   const exactMatch = subjects.find(
     (s) => normalizeForMatch(s.title) === normHeader,
   );
   if (exactMatch) return exactMatch;
 
+  // Step 2: One contains the other
   const containsMatch = subjects.find((s) => {
     const normTitle = normalizeForMatch(s.title);
     return normTitle.includes(normHeader) || normHeader.includes(normTitle);
   });
   if (containsMatch) return containsMatch;
 
+  // Step 3: Abbreviation match — csv header is an abbreviation of the subject title
+  // e.g. "PHY" → "Physics", "MTH" → "Mathematics"
+  const abbreviationMatch = subjects.find((s) => {
+    const titleParts = normalizeForMatch(s.title).split(/\s+/);
+    const titleAcronym = titleParts.map((p) => p[0]).join('');
+    return titleAcronym === normHeader || titleAcronym.includes(normHeader);
+  });
+  if (abbreviationMatch) return abbreviationMatch;
+
+  // Step 4: Common word match (at least one significant word overlaps)
+  const commonWordMatch = subjects.find((s) =>
+    hasCommonWord(normalizeForMatch(s.title), normHeader),
+  );
+  if (commonWordMatch) return commonWordMatch;
+
+  // Step 5: Jaccard word-overlap score >= 0.4
   let bestScore = 0;
   let bestSubject: Subject | null = null;
   for (const subject of subjects) {
@@ -182,7 +222,21 @@ function matchSubject(csvHeader: string, subjects: Subject[]): Subject | null {
       bestSubject = subject;
     }
   }
-  if (bestScore >= 0.5) return bestSubject;
+  if (bestScore >= 0.4) return bestSubject;
+
+  // Step 6: Levenshtein distance (for typos / small differences)
+  let bestLevScore = Infinity;
+  let bestLevSubject: Subject | null = null;
+  for (const subject of subjects) {
+    const dist = levenshteinDistance(normHeader, normalizeForMatch(subject.title));
+    const maxLen = Math.max(normHeader.length, normalizeForMatch(subject.title).length);
+    const normalizedDist = maxLen > 0 ? dist / maxLen : 1;
+    if (normalizedDist < bestLevScore) {
+      bestLevScore = normalizedDist;
+      bestLevSubject = subject;
+    }
+  }
+  if (bestLevScore <= 0.3) return bestLevSubject;
 
   return null;
 }
@@ -395,12 +449,58 @@ export class ResultsController {
     @Request() req: any,
   ) {
 
+    // Validate input structure
+    if (!submitDto || !Array.isArray(submitDto.rows) || submitDto.rows.length === 0) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'No rows provided in the request body',
+        data: { success: 0, failed: [] },
+      };
+    }
+
     const results = {
       success: 0,
       failed: [] as Array<{ studentId: string; subjectId: string; error: string }>,
+      warnings: [] as Array<{ studentId: string; message: string }>,
     };
 
     for (const row of submitDto.rows) {
+      // Validate each row has required fields
+      if (!row.studentId) {
+        results.failed.push({
+          studentId: row.studentId || 'unknown',
+          subjectId: '',
+          error: 'Missing studentId',
+        });
+        continue;
+      }
+
+      if (!Array.isArray(row.subjectResults) || row.subjectResults.length === 0) {
+        results.failed.push({
+          studentId: row.studentId,
+          subjectId: '',
+          error: 'No subject results found for this student. Ensure subjects in the CSV match subjects in the database.',
+        });
+        continue;
+      }
+
+      // Validate each subject result has required fields
+      let hasInvalidSubjectResult = false;
+      for (const sr of row.subjectResults) {
+        if (!sr.subjectId || typeof sr.obtained !== 'number' || typeof sr.total !== 'number') {
+          hasInvalidSubjectResult = true;
+          break;
+        }
+      }
+      if (hasInvalidSubjectResult) {
+        results.failed.push({
+          studentId: row.studentId,
+          subjectId: '',
+          error: 'One or more subject results have missing or invalid fields (subjectId, obtained, total)',
+        });
+        continue;
+      }
+
       const student = await this.usersService.getStudentUser(row.studentId);
       if (!student) {
         results.failed.push({

@@ -459,7 +459,10 @@ export class ResultsService {
       numOfQuestions: 0,
       marksPerQuestion: 0,
       timeTaken: data.timeTaken,
-      reportCardLink: data.reportCardLink,
+      reportCardLink: data.reportCardLink || undefined,
+      isCompleted: false,
+      startTime: new Date(),
+      totalMarks: 0,
       marksSummary: {
         totalMarks: data.total,
         obtainedMarks: data.obtained,
