@@ -434,7 +434,9 @@ export class ResultsService {
         ? Math.min(100, Math.max(0, (data.obtained / data.total) * 100))
         : 0;
 
-    const update = {
+    const doc = {
+      student: data.studentId,
+      subject: data.subjectId,
       institute: data.instituteId,
       isBulkUploaded: true,
       testType: TestType.MOCK,
@@ -461,13 +463,13 @@ export class ResultsService {
       },
     };
 
-    return this.resultModel
-      .findOneAndUpdate(
-        { student: data.studentId, subject: data.subjectId },
-        { $set: update },
-        { upsert: true, new: true },
-      )
+    // Delete any existing result for this student+subject (bulk or regular)
+    await this.resultModel
+      .deleteMany({ student: data.studentId, subject: data.subjectId })
       .exec();
+
+    const result = new this.resultModel(doc);
+    return result.save();
   }
 
   async findBulkUploadedResultsByStudent(studentId: string): Promise<Result[]> {
