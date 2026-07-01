@@ -74,6 +74,15 @@ export class UsersService {
       .exec();
   }
 
+  async findByEmailCaseInsensitive(email: string): Promise<User | null> {
+    return this.userModel
+      .findOne({ email: { $regex: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, isDeleted: { $ne: true } })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
+  }
+
   async findByTokenAndOTP(
     verificationToken: string,
     verificationOtp: string,
@@ -723,6 +732,19 @@ export class UsersService {
   async findByRegNo(regNo: string): Promise<User | null> {
     return this.userModel
       .findOne({ regNo, isDeleted: { $ne: true } })
+      .populate('role')
+      .populate('packages')
+      .populate('institute')
+      .exec();
+  }
+
+  async findStudentByName(name: string): Promise<User | null> {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.userModel
+      .findOne({
+        full_name: { $regex: escaped, $options: 'i' },
+        isDeleted: { $ne: true },
+      })
       .populate('role')
       .populate('packages')
       .populate('institute')
