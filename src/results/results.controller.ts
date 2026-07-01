@@ -366,11 +366,11 @@ export class ResultsController {
           };
         });
 
-        // Lookup student: email → exact phone → phone suffix (last 10 digits)
+        // Lookup student: email → phone → phone suffix → name
         let matchedStudent: any = null;
         const trimmedEmail = csvEmail.trim().toLowerCase();
         if (trimmedEmail) {
-          matchedStudent = await this.usersService.findByEmail(trimmedEmail);
+          matchedStudent = await this.usersService.findByEmailCaseInsensitive(trimmedEmail);
         }
         if (!matchedStudent) {
           const trimmedPhone = csvPhone.trim();
@@ -384,6 +384,13 @@ export class ResultsController {
             const last10 = rawDigits.slice(-10);
             matchedStudent =
               await this.usersService.findStudentByPhoneSuffix(last10);
+          }
+        }
+        if (!matchedStudent) {
+          const trimmedName = csvName.trim();
+          if (trimmedName) {
+            matchedStudent =
+              await this.usersService.findStudentByName(trimmedName);
           }
         }
 
