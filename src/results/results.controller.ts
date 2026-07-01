@@ -516,12 +516,7 @@ export class ResultsController {
 
       for (const sr of row.subjectResults) {
         try {
-          await this.resultsService.deleteBulkUploadedByStudentAndSubject(
-            row.studentId,
-            sr.subjectId,
-          );
-
-          await this.resultsService.createBulkUploadedResult({
+          await this.resultsService.upsertBulkUploadedResult({
             studentId: row.studentId,
             subjectId: sr.subjectId,
             instituteId,
