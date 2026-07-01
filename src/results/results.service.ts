@@ -418,20 +418,7 @@ export class ResultsService {
       .exec();
   }
 
-  async deleteBulkUploadedByStudentAndSubject(
-    studentId: string,
-    subjectId: string,
-  ): Promise<void> {
-    await this.resultModel
-      .deleteMany({
-        student: studentId,
-        subject: subjectId,
-        isBulkUploaded: true,
-      })
-      .exec();
-  }
-
-  async createBulkUploadedResult(data: {
+  async upsertBulkUploadedResult(data: {
     studentId: string;
     subjectId: string;
     instituteId: string;
@@ -447,9 +434,7 @@ export class ResultsService {
         ? Math.min(100, Math.max(0, (data.obtained / data.total) * 100))
         : 0;
 
-    const result = new this.resultModel({
-      student: data.studentId,
-      subject: data.subjectId,
+    const update = {
       institute: data.instituteId,
       isBulkUploaded: true,
       testType: TestType.MOCK,
@@ -474,9 +459,15 @@ export class ResultsService {
         rank: data.rank,
         totalStudents: data.totalStudents,
       },
-    });
+    };
 
-    return result.save();
+    return this.resultModel
+      .findOneAndUpdate(
+        { student: data.studentId, subject: data.subjectId },
+        { $set: update },
+        { upsert: true, new: true },
+      )
+      .exec();
   }
 
   async findBulkUploadedResultsByStudent(studentId: string): Promise<Result[]> {
