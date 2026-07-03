@@ -523,7 +523,7 @@ export class ResultsController {
 
       for (const sr of row.subjectResults) {
         try {
-          await this.resultsService.upsertBulkUploadedResult({
+          await this.resultsService.createBulkUploadedResult({
             studentId: row.studentId,
             subjectId: sr.subjectId,
             instituteId,
@@ -536,6 +536,7 @@ export class ResultsController {
               row.reportCardLink && isValidUrl(row.reportCardLink)
                 ? row.reportCardLink
                 : undefined,
+            testType: row.testType || 'mock',
           });
 
           results.success++;
@@ -1405,18 +1406,25 @@ export class ResultsController {
       const bulkRank = firstBulk.marksSummary?.rank ?? null;
       const bulkTotalStudents = firstBulk.marksSummary?.totalStudents ?? null;
 
-      const bulkUploadedSubjectResults = bulkResults.map((result) => {
+      // Deduplicate: keep only the LATEST result per subject (results are sorted newest-first)
+      const subjectMap = new Map<string, any>();
+      for (const result of bulkResults) {
         const subject: any = result.subject;
-        return {
-          subjectId: subject?._id,
-          subjectTitle: subject?.title || 'Unknown Subject',
-          obtained: result.marksSummary?.obtainedMarks ?? 0,
-          total: result.marksSummary?.totalMarks ?? 0,
-          averageMarks: result.marksSummary?.averageMarks ?? 0,
-          timeTaken: (result as any).timeTaken ?? 0,
-          reportCardLink: (result as any).reportCardLink ?? null,
-        };
-      });
+        const subjectId = subject?._id?.toString();
+        if (subjectId && !subjectMap.has(subjectId)) {
+          subjectMap.set(subjectId, {
+            subjectId,
+            subjectTitle: subject?.title || 'Unknown Subject',
+            obtained: result.marksSummary?.obtainedMarks ?? 0,
+            total: result.marksSummary?.totalMarks ?? 0,
+            averageMarks: result.marksSummary?.averageMarks ?? 0,
+            timeTaken: (result as any).timeTaken ?? 0,
+            reportCardLink: (result as any).reportCardLink ?? null,
+            testType: result.testType || 'mock',
+          });
+        }
+      }
+      const bulkUploadedSubjectResults = Array.from(subjectMap.values());
 
       const reportCardLink =
         bulkResults.find((r) => (r as any).reportCardLink)
@@ -1449,6 +1457,54 @@ export class ResultsController {
         reportCardLink: bulkUploadPayload.reportCardLink ?? null,
         bulkUploadedSubjectResults:
           bulkUploadPayload.bulkUploadedSubjectResults ?? [],
+      },
+    };
+  }
+
+  // Get subject result history for a student
+  @Get('history/:studentId/:subjectId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get historical results for a student+subject' })
+  async getSubjectHistory(
+    @Param('studentId') studentId: string,
+    @Param('subjectId') subjectId: string,
+  ) {
+    const results =
+      await this.resultsService.findSubjectHistory(studentId, subjectId);
+
+    const student = await this.usersService.getStudentUser(studentId);
+    const subject = await this.subjectsService.findOne(subjectId);
+
+    const history = results.map((r) => ({
+      resultId: r._id,
+      obtained: r.marksSummary?.obtainedMarks ?? 0,
+      total: r.marksSummary?.totalMarks ?? 0,
+      averageMarks: r.marksSummary?.averageMarks ?? 0,
+      rank: r.marksSummary?.rank ?? null,
+      totalStudents: r.marksSummary?.totalStudents ?? null,
+      timeTaken: (r as any).timeTaken ?? 0,
+      reportCardLink: (r as any).reportCardLink ?? null,
+      testType: r.testType || 'mock',
+      createdAt: (r._id as any).getTimestamp(),
+    }));
+
+    return {
+      status: HttpStatus.OK,
+      data: {
+        student: student
+          ? {
+              _id: student._id,
+              full_name: student.full_name,
+              email: student.email,
+              phone: student.phone,
+              regNo: student.regNo,
+            }
+          : null,
+        subject: subject
+          ? { _id: subject._id, title: subject.title }
+          : null,
+        history,
       },
     };
   }
