@@ -1443,11 +1443,35 @@ export class ResultsController {
     }
     // === END BULK UPLOAD CHECK ===
 
+    // Merge bulk upload data into aggregate performance stats
+    let totalMarksWithBulk = totalMarks;
+    let obtainedMarksWithBulk = obtainedMarks;
+    if (bulkUploadPayload.hasBulkUploadedData) {
+      for (const subjectResult of bulkUploadPayload.bulkUploadedSubjectResults) {
+        totalMarksWithBulk += subjectResult.total;
+        obtainedMarksWithBulk += subjectResult.obtained;
+      }
+    }
+    const averageMarksWithBulk =
+      totalMarksWithBulk > 0
+        ? Math.max(0, (obtainedMarksWithBulk / totalMarksWithBulk) * 100)
+        : 0;
+
+    const percentileWithBulk =
+      await this.resultsService.calculateOverallPercentile(
+        studentId,
+        averageMarksWithBulk,
+      );
+
     return {
       status: HttpStatus.OK,
       message: 'Combined report card retrieved successfully',
       data: {
         ...combinedReportCard,
+        totalMarks: totalMarksWithBulk,
+        obtainedMarks: obtainedMarksWithBulk,
+        averageMarks: averageMarksWithBulk,
+        percentile: percentileWithBulk,
         rank: bulkUploadPayload.hasBulkUploadedData
           ? bulkUploadPayload.bulkRank
           : undefined,
