@@ -55,6 +55,11 @@ export class BulkUploadConfirmedRowDto {
   @IsOptional()
   @IsString()
   reportCardLink?: string;
+
+  @ApiProperty({ description: 'Test type (mock, practice, test, screening)', required: false, default: 'mock' })
+  @IsOptional()
+  @IsString()
+  testType?: string;
 }
 
 export class BulkUploadSubmitDto {

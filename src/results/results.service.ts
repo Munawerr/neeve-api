@@ -418,7 +418,7 @@ export class ResultsService {
       .exec();
   }
 
-  async upsertBulkUploadedResult(data: {
+  async createBulkUploadedResult(data: {
     studentId: string;
     subjectId: string;
     instituteId: string;
@@ -428,18 +428,27 @@ export class ResultsService {
     totalStudents: number;
     timeTaken: number;
     reportCardLink?: string;
+    testType?: string;
   }): Promise<Result> {
     const averageMarks =
       data.total > 0
         ? Math.min(100, Math.max(0, (data.obtained / data.total) * 100))
         : 0;
 
+    // Map string testType to enum; default to MOCK
+    const testTypeMap: Record<string, TestType> = {
+      mock: TestType.MOCK,
+      practice: TestType.PRACTICE,
+      test: TestType.TEST,
+    };
+    const testType = testTypeMap[data.testType || 'mock'] || TestType.MOCK;
+
     const doc = {
       student: data.studentId,
       subject: data.subjectId,
       institute: data.instituteId,
       isBulkUploaded: true,
-      testType: TestType.MOCK,
+      testType,
       status: ResultStatus.FINISHED,
       startedAt: new Date(),
       finishedAt: new Date(),
@@ -463,13 +472,24 @@ export class ResultsService {
       },
     };
 
-    // Delete any existing result for this student+subject (bulk or regular)
-    await this.resultModel
-      .deleteMany({ student: data.studentId, subject: data.subjectId })
-      .exec();
-
     const result = new this.resultModel(doc);
     return result.save();
+  }
+
+  async findSubjectHistory(
+    studentId: string,
+    subjectId: string,
+  ): Promise<Result[]> {
+    return this.resultModel
+      .find({
+        student: studentId,
+        subject: subjectId,
+        isBulkUploaded: true,
+        status: ResultStatus.FINISHED,
+      })
+      .populate('subject')
+      .sort({ _id: -1 })
+      .exec();
   }
 
   async findBulkUploadedResultsByStudent(studentId: string): Promise<Result[]> {
@@ -480,6 +500,7 @@ export class ResultsService {
         status: ResultStatus.FINISHED,
       })
       .populate('subject')
+      .sort({ _id: -1 })
       .exec();
   }
 }
