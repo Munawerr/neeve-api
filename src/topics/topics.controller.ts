@@ -589,6 +589,123 @@ export class TopicsController {
     }
   }
 
+  @Get('export/:subjectId/:packageId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Export topics as Excel file' })
+  @ApiParam({ name: 'subjectId', required: true })
+  @ApiParam({ name: 'packageId', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Topics exported successfully',
+  })
+  async exportTopics(
+    @Param('subjectId') subjectId: string,
+    @Param('packageId') packageId: string,
+    @Res() res: Response,
+  ) {
+    const topics = await this.topicsService.findAllBySubjectAndPackage(
+      subjectId,
+      packageId,
+    );
+
+    const workbook = new Workbook();
+    const worksheet = workbook.addWorksheet('Topics');
+
+    worksheet.columns = [
+      { header: 'Code', key: 'code', width: 20 },
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Description (Topic Definition)', key: 'description', width: 70 },
+      { header: 'Intro Video URLs (comma separated)', key: 'introVideoUrls', width: 30 },
+      { header: 'Study Notes URLs (comma separated)', key: 'studyNotes', width: 30 },
+      { header: 'Study Plans URLs (comma separated)', key: 'studyPlans', width: 30 },
+      { header: 'Practice Problems URLs (comma separated)', key: 'practiceProblems', width: 30 },
+    ];
+
+    for (const rawTopic of topics) {
+      // Convert Mongoose documents to plain JS objects to avoid getter quirks
+      const topic: any = (rawTopic as any).toObject ? (rawTopic as any).toObject() : rawTopic;
+      const subTopics: any[] = topic.subTopics || [];
+      const primarySub = subTopics.length > 0 ? subTopics[0] : null;
+
+      const row = worksheet.addRow([]);
+
+      // Helper: set a cell to a plain string
+      const set = (col: number, val: any) => {
+        const cell = row.getCell(col);
+        if (val == null || typeof val !== 'string') { cell.value = ''; return; }
+        cell.value = val.trim();
+      };
+
+      set(1, topic.code);
+      set(2, topic.title);
+      set(3, primarySub?.title || topic.description);
+
+      if (primarySub) {
+        // introVideoUrls is [String] — already primitive strings
+        set(4, Array.isArray(primarySub.introVideoUrls) ? primarySub.introVideoUrls.join(', ') : '');
+        // studyNotes/studyPlans/practiceProblems are populated File[] with fileUrl
+        const joinUrls = (arr: any): string => {
+          if (!Array.isArray(arr)) return '';
+          const parts: string[] = [];
+          for (const item of arr) {
+            if (item == null) continue;
+            const plain = typeof item.toObject === 'function' ? item.toObject() : item;
+            const u = plain.fileUrl || '';
+            if (typeof u === 'string' && u.trim()) parts.push(u.trim());
+          }
+          return parts.join(', ');
+        };
+        set(5, joinUrls(primarySub.studyNotes));
+        set(6, joinUrls(primarySub.studyPlans));
+        set(7, joinUrls(primarySub.practiceProblems));
+      } else {
+        set(4, ''); set(5, ''); set(6, ''); set(7, '');
+      }
+
+      // Additional subtopic rows
+      for (let i = 1; i < subTopics.length; i++) {
+        const sub: any = subTopics[i];
+        const sr = worksheet.addRow([]);
+        const sets = (col: number, val: any) => {
+          const cell = sr.getCell(col);
+          if (val == null || typeof val !== 'string') { cell.value = ''; return; }
+          cell.value = val.trim();
+        };
+        sets(1, topic.code);
+        sets(2, sub.title);
+        sets(3, sub.description || '');
+        sets(4, Array.isArray(sub.introVideoUrls) ? sub.introVideoUrls.join(', ') : '');
+        const joinSubUrls = (arr: any): string => {
+          if (!Array.isArray(arr)) return '';
+          const parts: string[] = [];
+          for (const item of arr) {
+            if (item == null) continue;
+            const plain = typeof item.toObject === 'function' ? item.toObject() : item;
+            const u = plain.fileUrl || '';
+            if (typeof u === 'string' && u.trim()) parts.push(u.trim());
+          }
+          return parts.join(', ');
+        };
+        sets(5, joinSubUrls(sub.studyNotes));
+        sets(6, joinSubUrls(sub.studyPlans));
+        sets(7, joinSubUrls(sub.practiceProblems));
+      }
+    }
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + 'topics_export.xlsx',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
   @Get('download/template')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

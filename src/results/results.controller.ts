@@ -1413,6 +1413,7 @@ export class ResultsController {
         const subjectId = subject?._id?.toString();
         if (subjectId && !subjectMap.has(subjectId)) {
           subjectMap.set(subjectId, {
+            resultId: result._id,
             subjectId,
             subjectTitle: subject?.title || 'Unknown Subject',
             obtained: result.marksSummary?.obtainedMarks ?? 0,
