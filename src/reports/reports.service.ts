@@ -293,11 +293,17 @@ export class ReportsService {
       .findById(userId)
       .select('institute')
       .lean();
-    if (
-      !isAdmin &&
-      report.createdBy.toString() !== userId &&
-      report.institute?.toString() !== user?.institute?.toString()
-    ) {
+    // Populated docs need _id.toString(); unpopulated ObjectId has toString() directly
+    const creatorId =
+      (report.createdBy as any)?._id?.toString?.() ??
+      (report.createdBy as any)?.toString?.();
+    const reportInstituteId =
+      (report.institute as any)?._id?.toString?.() ??
+      (report.institute as any)?.toString?.();
+    const userInstituteId =
+      (user?.institute as any)?.toString?.() ??
+      (user?.institute as any)?.toString?.();
+    if (!isAdmin && creatorId !== userId && reportInstituteId !== userInstituteId) {
       throw new ForbiddenException(
         'You do not have permission to view this report',
       );
