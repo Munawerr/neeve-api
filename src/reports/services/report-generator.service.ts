@@ -244,6 +244,7 @@ export class ReportGeneratorService {
                 100
               ).toFixed(2)
             : 'N/A',
+          testType: result.testType || 'mock',
           isBulkUploaded: isBulk,
           reportCardLink: result.reportCardLink || null,
           timeTaken: result.timeTaken || null,

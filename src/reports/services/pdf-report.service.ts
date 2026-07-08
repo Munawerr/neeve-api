@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as pdfMake from 'pdfmake';
 import { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { Report, ReportType } from '../schemas/report.schema';
-import { PdfConfigService, PDF_MARGINS } from './pdf-config.service';
+import { PdfConfigService, PDF_MARGINS, PDF_COLORS, FONT_SIZES } from './pdf-config.service';
 import { PdfHeaderFooterService } from './pdf-header-footer.service';
 import { PdfTableService } from './pdf-table.service';
 
@@ -63,28 +63,25 @@ export class PdfReportService {
 
   private buildStudentReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Student Information');
-    content.push(
-      this.headerFooter.buildInfoCard([
-        { label: 'Name', value: data.studentInfo.name },
-        { label: 'Email', value: data.studentInfo.email },
-        { label: 'Phone', value: data.studentInfo.phone },
-        { label: 'Institute', value: data.studentInfo.institute },
-      ]),
-    );
+    content.push(this.buildInfoTable([
+      { label: 'Name', value: data.studentInfo.name },
+      { label: 'Email', value: data.studentInfo.email },
+      { label: 'Phone', value: data.studentInfo.phone },
+      { label: 'Institute', value: data.studentInfo.institute },
+    ]));
 
     this.addSectionHeader(content, 'Performance Summary');
-    content.push(
-      this.headerFooter.buildSummaryCard([
-        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
-        { label: 'Completed', value: String(data.summary.completedTests ?? 0) },
-        { label: 'Total Score', value: String(data.summary.totalScore ?? 0) },
-        { label: 'Possible', value: String(data.summary.totalPossibleScore ?? 0) },
-        { label: 'Overall %', value: `${data.summary.averageScore ?? 0}%` },
-      ]),
-    );
+    const summary = data.summary || {};
+    content.push(this.buildSummaryGrid([
+      { label: 'Total Tests', value: String(summary.totalTests ?? 0) },
+      { label: 'Completed', value: String(summary.completedTests ?? 0) },
+      { label: 'Total Score', value: String(summary.totalScore ?? 0) },
+      { label: 'Possible', value: String(summary.totalPossibleScore ?? 0) },
+      { label: 'Overall %', value: `${summary.averageScore ?? 0}%` },
+    ]));
 
     if (data.subjectPerformance?.length) {
-      this.addSectionHeader(content, 'Subject Performance');
+      this.addSectionHeader(content, 'Subject-wise Performance');
       content.push(
         this.tableService.buildTable(
           ['Subject', 'Tests', 'Score', 'Possible', '%'],
@@ -114,6 +111,37 @@ export class PdfReportService {
         ),
       );
     }
+  }
+
+  private buildInfoTable(items: { label: string; value: string }[]): Content {
+    const rows = items.map((item) => [
+      { text: `${item.label}:`, bold: true, color: PDF_COLORS.body, fontSize: FONT_SIZES.body },
+      { text: item.value || '-', color: PDF_COLORS.black, fontSize: FONT_SIZES.body, margin: [0, 0, 0, 2] },
+    ]);
+    return {
+      table: { widths: [80, '*'], body: rows },
+      layout: 'lightHorizontalLines',
+      margin: [0, 0, 0, 8],
+    } as any;
+  }
+
+  private buildSummaryGrid(items: { label: string; value: string }[]): Content {
+    const rows: any[][] = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const left = items[i];
+      const right = items[i + 1];
+      rows.push([
+        { text: `${left.label}: ${left.value}`, fontSize: FONT_SIZES.body, margin: [0, 1, 0, 1] },
+        right
+          ? { text: `${right.label}: ${right.value}`, fontSize: FONT_SIZES.body, margin: [0, 1, 0, 1] }
+          : { text: '', fontSize: FONT_SIZES.body },
+      ]);
+    }
+    return {
+      table: { widths: ['*', '*'], body: rows },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 8],
+    } as any;
   }
 
   private buildSubjectReport(data: any, content: Content[]): void {
