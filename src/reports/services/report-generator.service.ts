@@ -853,56 +853,83 @@ export class ReportGeneratorService {
       .populate('course')
       .lean();
 
-    // Build query to filter results
+    // Build date filter
+    const dateFilter: any = {};
+    if (report.dateRange) {
+      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+    }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
+
+    // Get unique subject IDs from tests
+    const subjectIds = [
+      ...new Set(tests.map((test: any) => test.subject?._id?.toString?.() ?? test.subject?.toString?.())),
+    ].filter(Boolean);
+
+    // Fetch regular results for tests in this package
     const query: any = {
       test: { $in: tests.map((test) => test._id) },
+      isBulkUploaded: { $ne: true },
     };
+    if (report.institute) query.institute = report.institute;
+    if (hasDateFilter) query.startedAt = dateFilter;
 
-    if (report.institute) {
-      query.institute = report.institute;
-    }
-
-    if (report.dateRange) {
-      query.startedAt = {
-        $gte: report.dateRange.startDate,
-        $lte: report.dateRange.endDate,
-      };
-    }
-
-    // Get results for all tests in this package
-    const results = await this.resultModel
+    const regularResults = await this.resultModel
       .find(query)
       .populate('student', 'full_name email')
       .populate('test', 'title')
       .populate('subject', 'title')
       .exec();
 
+    // Fetch bulk-uploaded results for subjects in this package
+    const bulkQuery: any = {
+      subject: { $in: subjectIds },
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
+    if (report.institute) bulkQuery.institute = report.institute;
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
+
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    const allResults = [...regularResults, ...bulkResults];
+
     // Calculate overall metrics
-    const totalTests = results.length;
-    const completedTests = results.filter(
+    const totalTestCount = tests.length;
+    const totalAttempted = allResults.length;
+    const totalCompleted = allResults.filter(
       (r) => r.status === ResultStatus.FINISHED,
     ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
 
-    results.forEach((result) => {
+    allResults.forEach((result) => {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
       }
     });
 
-    const averageScore =
+    const avgPercentage =
       totalPossibleScore > 0
-        ? ((totalScore / totalPossibleScore) * 100).toFixed(2)
+        ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
+
+    const uniqueStudents = new Set(allResults.map((r: any) =>
+      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
+    ));
 
     // Course-wise performance analysis
     const courseMap = new Map();
 
-    results.forEach((result: any) => {
-      const testId = result.test?._id.toString();
-      const test: any = tests.find((t) => t._id.toString() === testId);
+    allResults.forEach((result: any) => {
+      const testId = result.test?._id?.toString?.();
+      const test: any = testId ? tests.find((t) => t._id.toString() === testId) : null;
       if (!test || !test.course) return;
 
       const courseId = test.course._id.toString();
@@ -910,7 +937,7 @@ export class ReportGeneratorService {
 
       if (!courseMap.has(courseId)) {
         courseMap.set(courseId, {
-          course: courseName,
+          courseName,
           testsAttempted: 0,
           testsCompleted: 0,
           totalScore: 0,
@@ -922,7 +949,7 @@ export class ReportGeneratorService {
 
       const courseData = courseMap.get(courseId);
       courseData.testsAttempted++;
-      courseData.students.add(result.student?._id.toString());
+      courseData.students.add((result.student as any)?._id?.toString?.() ?? (result.student as any)?.toString?.());
 
       if (result.status === ResultStatus.FINISHED) {
         courseData.testsCompleted++;
@@ -938,80 +965,52 @@ export class ReportGeneratorService {
     courseMap.forEach((data) => {
       const avgScore =
         data.totalPossibleScore > 0
-          ? ((data.totalScore / data.totalPossibleScore) * 100).toFixed(2)
+          ? ((data.totalScore / data.totalPossibleScore) * 100).toFixed(1)
+          : '0';
+      const avgPct =
+        data.totalPossibleScore > 0
+          ? ((data.totalScore / data.totalPossibleScore) * 100).toFixed(1)
           : '0';
 
       coursePerformance.push({
-        course: data.course,
+        courseName: data.courseName,
         testsAttempted: data.testsAttempted,
         testsCompleted: data.testsCompleted,
-        totalScore: data.totalScore,
-        totalPossibleScore: data.totalPossibleScore,
-        averageScore: avgScore,
+        avgScore,
+        avgPercentage: avgPct,
         studentCount: data.students.size,
       });
     });
 
-    // Student-wise performance analysis
-    const studentMap = new Map();
+    // Compute test type distributions for subjects in this package
+    const testTypeDistributions = await this.computeTestTypeDistributions(
+      subjectIds,
+      report.dateRange,
+      report.institute?.toString(),
+    );
 
-    results.forEach((result: any) => {
-      const studentId = result.student?._id.toString();
-      const studentName = result.student?.name || 'Unknown';
-
-      if (!studentMap.has(studentId)) {
-        studentMap.set(studentId, {
-          student: studentName,
-          testsAttempted: 0,
-          testsCompleted: 0,
-          totalScore: 0,
-          totalPossibleScore: 0,
-          averageScore: '0',
-        });
-      }
-
-      const studentData = studentMap.get(studentId);
-      studentData.testsAttempted++;
-
-      if (result.status === ResultStatus.FINISHED) {
-        studentData.testsCompleted++;
-      }
-
-      if (result.marksSummary) {
-        studentData.totalScore += result.marksSummary.obtainedMarks;
-        studentData.totalPossibleScore += result.marksSummary.totalMarks;
-      }
-    });
-
-    const studentPerformance: any[] = [];
-    studentMap.forEach((data) => {
-      const avgScore =
-        data.totalPossibleScore > 0
-          ? ((data.totalScore / data.totalPossibleScore) * 100).toFixed(2)
-          : '0';
-
-      studentPerformance.push({
-        ...data,
-        averageScore: avgScore,
-      });
-    });
+    // Compute leaderboard from bulk results for subjects in this package
+    const leaderboard = this.computeLeaderboard(bulkResults);
 
     return {
       packageInfo: {
         id: pkg._id,
+        name: `Package ${pkg.code}`,
+        code: pkg.code,
         description: pkg.description,
       },
       summary: {
         totalCourses: courses.length,
-        totalTests: tests.length,
-        testsAttempted: totalTests,
-        testsCompleted: completedTests,
-        averageScore,
-        totalScore,
-        totalPossibleScore,
+        totalTests: totalTestCount,
+        totalAttempted,
+        totalCompleted,
+        totalStudents: uniqueStudents.size,
+        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgPercentage,
       },
       coursePerformance,
-      studentPerformance,
+      testTypeDistributions,
+      leaderboard,
     };
   }
 
