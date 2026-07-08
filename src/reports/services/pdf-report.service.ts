@@ -1,678 +1,463 @@
 import { Injectable } from '@nestjs/common';
+import * as pdfMake from 'pdfmake';
+import { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { Report, ReportType } from '../schemas/report.schema';
-import { jsPDF } from 'jspdf';
+import { PdfConfigService, PDF_MARGINS } from './pdf-config.service';
+import { PdfHeaderFooterService } from './pdf-header-footer.service';
+import { PdfTableService } from './pdf-table.service';
 
 @Injectable()
 export class PdfReportService {
-  async generateReport(data: any, report: Report): Promise<Buffer> {
-    const doc = new jsPDF();
+  constructor(
+    private config: PdfConfigService,
+    private headerFooter: PdfHeaderFooterService,
+    private tableService: PdfTableService,
+  ) {}
 
-    // Start building PDF based on report type
-    this.buildReportHeader(doc, report);
+  async generateReport(data: any, report: Report): Promise<Buffer> {
+    const docDef = this.buildDocDefinition(data, report);
+    const pdf = pdfMake.createPdf(docDef);
+    return pdf.getBuffer();
+  }
+
+  private buildDocDefinition(data: any, report: Report): TDocumentDefinitions {
+    const content: Content[] = [];
 
     switch (report.reportType) {
       case ReportType.STUDENT:
-        await this.buildStudentReport(doc, data);
+        this.buildStudentReport(data, content);
         break;
       case ReportType.SUBJECT:
-        await this.buildSubjectReport(doc, data);
+        this.buildSubjectReport(data, content);
         break;
       case ReportType.COURSE:
-        await this.buildCourseReport(doc, data);
+        this.buildCourseReport(data, content);
         break;
       case ReportType.PACKAGE:
-        await this.buildPackageReport(doc, data);
+        this.buildPackageReport(data, content);
         break;
       case ReportType.TEST:
-        await this.buildTestReport(doc, data);
+        this.buildTestReport(data, content);
         break;
       case ReportType.INSTITUTE:
-        await this.buildInstituteReport(doc, data);
+        this.buildInstituteReport(data, content);
         break;
       case ReportType.OVERALL:
-        await this.buildOverallReport(doc, data);
+        this.buildOverallReport(data, content);
         break;
     }
 
-    // Return the PDF as a buffer
-    return Buffer.from(doc.output('arraybuffer'));
+    return {
+      content,
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 10,
+        color: '#213126',
+      },
+      pageMargins: [PDF_MARGINS.left, 90, PDF_MARGINS.right, 60],
+      header: this.headerFooter.buildHeader(report.name, report.dateRange as { startDate?: string; endDate?: string } | undefined),
+      footer: this.headerFooter.buildFooter(),
+      styles: this.config.getStyles(),
+    };
   }
 
-  private buildReportHeader(doc: jsPDF, report: Report): void {
-    doc.setFontSize(20);
-    doc.text(report.name, doc.internal.pageSize.width / 2, 20, {
-      align: 'center',
-    });
-
-    if (report.description) {
-      doc.setFontSize(12);
-      doc.text(report.description, doc.internal.pageSize.width / 2, 35, {
-        align: 'center',
-      });
-    }
-
-    doc.setFontSize(10);
-    const date = new Date().toLocaleString();
-    doc.text(`Generated on: ${date}`, doc.internal.pageSize.width - 20, 45, {
-      align: 'right',
-    });
-
-    doc.setLineWidth(0.5);
-    doc.line(20, 50, doc.internal.pageSize.width - 20, 50);
-  }
-
-  private async buildStudentReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Student Information
-    doc.setFontSize(16);
-    doc.text('Student Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Name: ${data.studentInfo.name}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Email: ${data.studentInfo.email}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Phone: ${data.studentInfo.phone || 'N/A'}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Institute: ${data.studentInfo.institute}`, margin, yPos);
-    yPos += 15;
-
-    // Performance Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 7;
-    doc.text(
-      `Total Score: ${data.summary.totalScore} out of ${data.summary.totalPossibleScore}`,
-      margin,
-      yPos,
+  private buildStudentReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Student Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Name', value: data.studentInfo.name },
+        { label: 'Email', value: data.studentInfo.email },
+        { label: 'Phone', value: data.studentInfo.phone },
+        { label: 'Institute', value: data.studentInfo.institute },
+      ]),
     );
-    yPos += 15;
 
-    // Subject Performance
-    if (data.subjectPerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Subject Performance', margin, yPos);
-      yPos += 10;
-
-      // Table headers
-      doc.setFontSize(10);
-      const headers = [
-        'Subject',
-        'Total Tests',
-        'Completed',
-        'Average Score',
-        'Total Score',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      // Table rows
-      data.subjectPerformance.forEach((subject: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(subject.subject, margin, yPos);
-        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
-        doc.text(
-          subject.completedTests.toString(),
-          margin + 2 * colWidth,
-          yPos,
-        );
-        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
-        doc.text(
-          `${subject.totalScore}/${subject.totalPossibleScore}`,
-          margin + 4 * colWidth,
-          yPos,
-        );
-        yPos += 7;
-      });
-    }
-  }
-
-  private async buildSubjectReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Subject Information
-    doc.setFontSize(16);
-    doc.text('Subject Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Name: ${data.subjectInfo.name}`, margin, yPos);
-    yPos += 15;
-
-    // Performance Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 7;
-    doc.text(
-      `Total Score: ${data.summary.totalScore}/${data.summary.totalPossibleScore}`,
-      margin,
-      yPos,
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Completed', value: String(data.summary.completedTests ?? 0) },
+        { label: 'Total Score', value: String(data.summary.totalScore ?? 0) },
+        { label: 'Possible', value: String(data.summary.totalPossibleScore ?? 0) },
+        { label: 'Overall %', value: `${data.summary.averageScore ?? 0}%` },
+      ]),
     );
-    yPos += 15;
 
-    // Test Performance
-    if (data.testPerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Test Performance', margin, yPos);
-      yPos += 10;
+    if (data.subjectPerformance?.length) {
+      this.addSectionHeader(content, 'Subject Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Subject', 'Tests', 'Score', 'Possible', '%'],
+          data.subjectPerformance.map((s: any) => [
+            s.subject,
+            s.totalTests,
+            s.totalScore,
+            s.totalPossibleScore,
+            `${s.averageScore}%`,
+          ]),
+        ),
+      );
+    }
 
-      doc.setFontSize(10);
-      const headers = ['Test Name', 'Attempts', 'Completed', 'Avg Score'];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.testPerformance.forEach((test: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(test.test, margin, yPos);
-        doc.text(test.attempts.toString(), margin + colWidth, yPos);
-        doc.text(test.completed.toString(), margin + 2 * colWidth, yPos);
-        doc.text(`${test.averageScore}%`, margin + 3 * colWidth, yPos);
-        yPos += 7;
-      });
+    if (data.testResults?.length) {
+      this.addSectionHeader(content, 'Recent Test Results');
+      content.push(
+        this.tableService.buildTable(
+          ['Test Name', 'Subject', 'Type', 'Score', '%'],
+          data.testResults.map((r: any) => [
+            r.testName,
+            r.subject,
+            r.testType,
+            r.score,
+            r.percentage,
+          ]),
+        ),
+      );
     }
   }
 
-  private async buildCourseReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Course Information
-    doc.setFontSize(16);
-    doc.text('Course Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Name: ${data.courseInfo.name}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Code: ${data.courseInfo.code}`, margin, yPos);
-    yPos += 15;
-
-    // Performance Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 7;
-    doc.text(
-      `Total Score: ${data.summary.totalScore}/${data.summary.totalPossibleScore}`,
-      margin,
-      yPos,
+  private buildSubjectReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Subject Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Subject', value: data.subjectInfo.name },
+        { label: 'Code', value: data.subjectInfo.code },
+        { label: 'Course', value: data.subjectInfo.course },
+        { label: 'Package', value: data.subjectInfo.package },
+      ]),
     );
-    yPos += 7;
-    doc.text(`Number of Subjects: ${data.summary.subjectCount}`, margin, yPos);
-    yPos += 15;
 
-    // Subject Performance
-    if (data.subjectPerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Subject Performance', margin, yPos);
-      yPos += 10;
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Students Attempted', value: String(data.summary.totalStudents ?? 0) },
+        { label: 'Avg Score', value: `${data.summary.averageScore ?? 0}%` },
+        { label: 'Highest', value: String(data.summary.highestScore ?? '-') },
+        { label: 'Lowest', value: String(data.summary.lowestScore ?? '-') },
+      ]),
+    );
 
-      doc.setFontSize(10);
-      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
+    if (data.testPerformance?.length) {
+      this.addSectionHeader(content, 'Test Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Test Name', 'Type', 'Date', 'Avg %', 'Attempted'],
+          data.testPerformance.map((t: any) => [
+            t.test || t.testName,
+            t.testType,
+            t.date ? new Date(t.date).toLocaleDateString() : '-',
+            `${t.averageScore ?? t.avgPercentage}%`,
+            t.studentsAttempted ?? t.attempts,
+          ]),
+        ),
+      );
+    }
 
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
+    if (data.studentResults?.length) {
+      this.addSectionHeader(content, 'Student Results');
+      content.push(
+        this.tableService.buildTable(
+          ['Student', 'Test', 'Type', 'Score', '%'],
+          data.studentResults.map((r: any) => [
+            r.studentName || r.student?.name,
+            r.testName,
+            r.testType,
+            r.totalScore ?? r.score,
+            r.percentage,
+          ]),
+        ),
+      );
+    }
 
-      data.subjectPerformance.forEach((subject: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
+    this.addDistributionSections(content, data);
+  }
 
-        doc.text(subject.name, margin, yPos);
-        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
-        doc.text(
-          subject.completedTests.toString(),
-          margin + 2 * colWidth,
-          yPos,
-        );
-        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
-        yPos += 7;
-      });
+  private buildCourseReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Course Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Course', value: data.courseInfo.name },
+        { label: 'Code', value: data.courseInfo.code },
+      ]),
+    );
+
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Total Students', value: String(data.summary.totalStudents ?? 0) },
+        { label: 'Attempted', value: String(data.summary.totalAttempted ?? 0) },
+        { label: 'Completed', value: String(data.summary.totalCompleted ?? 0) },
+        { label: 'Avg %', value: `${data.summary.averageScore ?? data.summary.avgPercentage}%` },
+      ]),
+    );
+
+    if (data.subjectPerformance?.length) {
+      this.addSectionHeader(content, 'Subject Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Subject', 'Tests', 'Avg Score', 'Avg %'],
+          data.subjectPerformance.map((s: any) => [
+            s.subjectName || s.subject,
+            s.totalTests,
+            s.avgScore,
+            `${s.averageScore ?? s.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    if (data.studentPerformance?.length) {
+      this.addSectionHeader(content, 'Student Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Student', 'Tests', 'Avg Score', 'Avg %'],
+          data.studentPerformance.map((s: any) => [
+            s.studentName || s.student?.name,
+            s.totalTests,
+            s.avgScore,
+            `${s.averageScore ?? s.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    this.addDistributionSections(content, data);
+  }
+
+  private buildPackageReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Package Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Package', value: data.packageInfo.name },
+        { label: 'Code', value: data.packageInfo.code },
+        { label: 'Description', value: data.packageInfo.description },
+      ]),
+    );
+
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Total Courses', value: String(data.summary.totalCourses ?? 0) },
+        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Attempted', value: String(data.summary.testsAttempted ?? data.summary.totalAttempted ?? 0) },
+        { label: 'Completed', value: String(data.summary.testsCompleted ?? data.summary.totalCompleted ?? 0) },
+        { label: 'Avg %', value: `${data.summary.averageScore ?? 0}%` },
+      ]),
+    );
+
+    if (data.coursePerformance?.length) {
+      this.addSectionHeader(content, 'Course Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Course', 'Attempted', 'Completed', 'Avg %', 'Students'],
+          data.coursePerformance.map((c: any) => [
+            c.courseName || c.course,
+            c.testsAttempted ?? c.totalTests,
+            c.testsCompleted ?? c.completedTests,
+            `${c.averageScore ?? c.avgPercentage}%`,
+            c.studentCount ?? '-',
+          ]),
+        ),
+      );
+    }
+
+    if (data.studentPerformance?.length) {
+      this.addSectionHeader(content, 'Student Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Student', 'Tests', 'Avg Score', 'Avg %'],
+          data.studentPerformance.map((s: any) => [
+            s.studentName || s.student?.name,
+            s.totalTests,
+            s.avgScore,
+            `${s.averageScore ?? s.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    this.addDistributionSections(content, data);
+  }
+
+  private buildTestReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Test Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Test Name', value: data.testInfo.name },
+        { label: 'Subject', value: data.testInfo.subject },
+        { label: 'Type', value: data.testInfo.testType },
+        { label: 'Total Marks', value: String(data.testInfo.totalMarks ?? '-') },
+        { label: 'Duration', value: data.testInfo.duration ? `${data.testInfo.duration} min` : '-' },
+        { label: 'Date', value: data.testInfo.date ? new Date(data.testInfo.date).toLocaleDateString() : '-' },
+      ]),
+    );
+
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Students', value: String(data.summary.totalStudents ?? data.summary.totalTests ?? 0) },
+        { label: 'Avg Score', value: `${data.summary.averageScore ?? 0}%` },
+        { label: 'Highest', value: String(data.summary.highestScore ?? '-') },
+        { label: 'Lowest', value: String(data.summary.lowestScore ?? '-') },
+        { label: 'Avg Time', value: data.summary.avgTimeTaken ?? '-' },
+      ]),
+    );
+
+    if (data.questionAnalysis?.length) {
+      this.addSectionHeader(content, 'Question Analysis');
+      content.push(
+        this.tableService.buildTable(
+          ['Q#', 'Attempts', 'Correct', 'Wrong', 'Avg Time'],
+          data.questionAnalysis.map((q: any, i: number) => [
+            q.questionNo ?? (i + 1).toString(),
+            q.attempts ?? q.totalAttempts,
+            q.correct,
+            q.incorrect,
+            q.averageTime ?? q.avgTime,
+          ]),
+        ),
+      );
+    }
+
+    if (data.studentResults?.length) {
+      this.addSectionHeader(content, 'Student Results');
+      content.push(
+        this.tableService.buildTable(
+          ['Rank', 'Student', 'Score', '%', 'Time'],
+          data.studentResults.map((r: any, i: number) => [
+            r.rank ?? (i + 1).toString(),
+            r.studentName || r.student?.name,
+            r.score,
+            r.percentage,
+            r.timeTaken ?? '-',
+          ]),
+        ),
+      );
+    }
+
+    this.addDistributionSections(content, data);
+  }
+
+  private buildInstituteReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'Institute Information');
+    content.push(
+      this.headerFooter.buildInfoCard([
+        { label: 'Institute', value: data.instituteInfo.name },
+        { label: 'Email', value: data.instituteInfo.email },
+        { label: 'Phone', value: data.instituteInfo.phone },
+        { label: 'Total Students', value: String(data.summary.totalStudents ?? 0) },
+      ]),
+    );
+
+    this.addSectionHeader(content, 'Performance Summary');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Courses', value: String(data.summary.totalCourses ?? 0) },
+        { label: 'Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Attempted', value: String(data.summary.testAttempts ?? data.summary.totalAttempted ?? 0) },
+        { label: 'Completed', value: String(data.summary.totalCompleted ?? 0) },
+        { label: 'Avg %', value: `${data.summary.averageScore ?? 0}%` },
+      ]),
+    );
+
+    if (data.coursePerformance?.length) {
+      this.addSectionHeader(content, 'Course Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Course', 'Attempted', 'Completed', 'Students', 'Avg %'],
+          data.coursePerformance.map((c: any) => [
+            c.courseName || c.course,
+            c.testsAttempted ?? c.totalTests,
+            c.testsCompleted ?? c.completedTests,
+            c.studentCount ?? '-',
+            `${c.averageScore ?? c.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    if (data.subjectPerformance?.length) {
+      this.addSectionHeader(content, 'Subject Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Subject', 'Tests', 'Avg %'],
+          data.subjectPerformance.map((s: any) => [
+            s.subjectName || s.subject,
+            s.totalTests ?? s.testsAttempted ?? s.totalAttempted,
+            `${s.averageScore ?? s.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    this.addDistributionSections(content, data);
+  }
+
+  private buildOverallReport(data: any, content: Content[]): void {
+    this.addSectionHeader(content, 'System Overview');
+    content.push(
+      this.headerFooter.buildSummaryCard([
+        { label: 'Total Institutes', value: String(data.summary.totalInstitutes ?? 0) },
+        { label: 'Total Students', value: String(data.summary.totalStudents ?? 0) },
+        { label: 'Total Courses', value: String(data.summary.totalCourses ?? 0) },
+        { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
+        { label: 'Total Results', value: String(data.summary.testAttempts ?? data.summary.totalResults ?? 0) },
+        { label: 'System Avg %', value: `${data.summary.averageScore ?? 0}%` },
+      ]),
+    );
+
+    if (data.institutePerformance?.length) {
+      this.addSectionHeader(content, 'Institute Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Institute', 'Attempted', 'Completed', 'Students', 'Avg %'],
+          data.institutePerformance.map((i: any) => [
+            i.instituteName || i.institute,
+            i.testsAttempted ?? i.totalTests,
+            i.testsCompleted ?? i.completedTests,
+            i.studentCount ?? '-',
+            `${i.averageScore ?? i.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    if (data.subjectPerformance?.length) {
+      this.addSectionHeader(content, 'Subject Performance');
+      content.push(
+        this.tableService.buildTable(
+          ['Subject', 'Tests', 'Avg %'],
+          data.subjectPerformance.map((s: any) => [
+            s.subjectName || s.subject,
+            s.totalTests ?? s.testsAttempted,
+            `${s.averageScore ?? s.avgPercentage}%`,
+          ]),
+        ),
+      );
+    }
+
+    this.addDistributionSections(content, data);
+  }
+
+  private addDistributionSections(content: Content[], data: any): void {
+    if (!data.testTypeDistributions?.length) return;
+
+    for (const dist of data.testTypeDistributions) {
+      this.addSectionHeader(content, `Test Type Performance Distribution (${dist.subjectName})`);
+      content.push(
+        this.tableService.buildDistributionTable(
+          dist.distributions.map((d: any) => ({
+            testType: d.testType,
+            ranges: [d.range0to40, d.range41to60, d.range61to80, d.range81to100],
+          })),
+        ),
+      );
     }
   }
 
-  private async buildPackageReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Package Information
-    doc.setFontSize(16);
-    doc.text('Package Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Description: ${data.packageInfo.description}`, margin, yPos);
-    yPos += 15;
-
-    // Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Tests Attempted: ${data.summary.testsAttempted}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Tests Completed: ${data.summary.testsCompleted}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 15;
-
-    // Course Performance
-    if (data.coursePerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Course Performance', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = [
-        'Course',
-        'Tests Attempted',
-        'Completed',
-        'Avg Score',
-        'Students',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.coursePerformance.forEach((course: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(course.course, margin, yPos);
-        doc.text(course.testsAttempted.toString(), margin + colWidth, yPos);
-        doc.text(course.testsCompleted.toString(), margin + 2 * colWidth, yPos);
-        doc.text(course.averageScore, margin + 3 * colWidth, yPos);
-        doc.text(course.studentCount.toString(), margin + 4 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-  }
-
-  private async buildTestReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Test Information
-    doc.setFontSize(16);
-    doc.text('Test Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Name: ${data.testInfo.name}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Subject: ${data.testInfo.subject || '-'}`, margin, yPos);
-    yPos += 15;
-
-    // Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Attempts: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Completed Tests: ${data.summary.completedTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 15;
-
-    // Question Analysis
-    if (data.questionAnalysis?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Question Analysis', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = [
-        'Question',
-        'Attempts',
-        'Correct',
-        'Correct %',
-        'Avg Time',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.questionAnalysis.forEach((question: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(question.questionId, margin, yPos);
-        doc.text(question.attempts.toString(), margin + colWidth, yPos);
-        doc.text(question.correct.toString(), margin + 2 * colWidth, yPos);
-        doc.text(question.correctPercentage, margin + 3 * colWidth, yPos);
-        doc.text(question.averageTime, margin + 4 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-
-    // Student Results
-    if (data.studentResults?.length > 0) {
-      doc.addPage();
-      yPos = 20;
-
-      doc.setFontSize(16);
-      doc.text('Student Results', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = [
-        'Student',
-        'Score',
-        'Percentage',
-        'Correct',
-        'Incorrect',
-        'Avg Time',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.studentResults.forEach((result: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(result.student.name, margin, yPos);
-        doc.text(result.score.toString(), margin + colWidth, yPos);
-        doc.text(result.percentage.toString(), margin + 2 * colWidth, yPos);
-        doc.text(result.correctAnswers.toString(), margin + 3 * colWidth, yPos);
-        doc.text(
-          result.incorrectAnswers.toString(),
-          margin + 4 * colWidth,
-          yPos,
-        );
-        doc.text(result.averageTimePerQuestion, margin + 5 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-  }
-
-  private async buildInstituteReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Institute Information
-    doc.setFontSize(16);
-    doc.text('Institute Information', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Name: ${data.instituteInfo.name}`, margin, yPos);
-    yPos += 15;
-
-    // Summary
-    doc.setFontSize(16);
-    doc.text('Performance Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Students: ${data.summary.totalStudents}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Test Attempts: ${data.summary.testAttempts}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 15;
-
-    // Course Performance
-    if (data.coursePerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Course Performance', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = [
-        'Course',
-        'Tests Attempted',
-        'Completed',
-        'Students',
-        'Avg Score',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.coursePerformance.forEach((course: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(course.courseName, margin, yPos);
-        doc.text(course.testsAttempted.toString(), margin + colWidth, yPos);
-        doc.text(course.testsCompleted.toString(), margin + 2 * colWidth, yPos);
-        doc.text(course.studentCount.toString(), margin + 3 * colWidth, yPos);
-        doc.text(course.averageScore.toString(), margin + 4 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-
-    // Subject Performance
-    if (data.subjectPerformance?.length > 0) {
-      doc.addPage();
-      yPos = 20;
-
-      doc.setFontSize(16);
-      doc.text('Subject Performance', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.subjectPerformance.forEach((subject: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(subject.subject, margin, yPos);
-        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
-        doc.text(
-          subject.completedTests.toString(),
-          margin + 2 * colWidth,
-          yPos,
-        );
-        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-  }
-
-  private async buildOverallReport(doc: jsPDF, data: any): Promise<void> {
-    await Promise.resolve();
-    let yPos = 60;
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.width;
-
-    // System Summary
-    doc.setFontSize(16);
-    doc.text('System Summary', margin, yPos);
-    yPos += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Total Institutes: ${data.summary.totalInstitutes}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Students: ${data.summary.totalStudents}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Courses: ${data.summary.totalCourses}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Total Tests: ${data.summary.totalTests}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Test Attempts: ${data.summary.testAttempts}`, margin, yPos);
-    yPos += 7;
-    doc.text(`Average Score: ${data.summary.averageScore}%`, margin, yPos);
-    yPos += 15;
-
-    // Institute Performance
-    if (data.institutePerformance?.length > 0) {
-      doc.setFontSize(16);
-      doc.text('Institute Performance', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = [
-        'Institute',
-        'Tests Attempted',
-        'Completed',
-        'Students',
-        'Avg Score',
-      ];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.institutePerformance.forEach((institute: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(institute.institute, margin, yPos);
-        doc.text(institute.testsAttempted.toString(), margin + colWidth, yPos);
-        doc.text(
-          institute.testsCompleted.toString(),
-          margin + 2 * colWidth,
-          yPos,
-        );
-        doc.text(
-          institute.studentCount.toString(),
-          margin + 3 * colWidth,
-          yPos,
-        );
-        doc.text(institute.averageScore, margin + 4 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
-
-    // Subject Performance
-    if (data.subjectPerformance?.length > 0) {
-      doc.addPage();
-      yPos = 20;
-
-      doc.setFontSize(16);
-      doc.text('Subject Performance', margin, yPos);
-      yPos += 10;
-
-      doc.setFontSize(10);
-      const headers = ['Subject', 'Total Tests', 'Completed', 'Avg Score'];
-      const colWidth = (pageWidth - 2 * margin) / headers.length;
-
-      headers.forEach((header, i) => {
-        doc.text(header, margin + i * colWidth, yPos);
-      });
-      yPos += 7;
-
-      data.subjectPerformance.forEach((subject: any) => {
-        if (yPos > doc.internal.pageSize.height - 20) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.text(subject.subject, margin, yPos);
-        doc.text(subject.totalTests.toString(), margin + colWidth, yPos);
-        doc.text(
-          subject.completedTests.toString(),
-          margin + 2 * colWidth,
-          yPos,
-        );
-        doc.text(`${subject.averageScore}%`, margin + 3 * colWidth, yPos);
-        yPos += 7;
-      });
-    }
+  private addSectionHeader(content: Content[], text: string): void {
+    content.push({ text, style: 'sectionHeader' });
   }
 }

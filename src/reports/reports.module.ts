@@ -3,6 +3,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 import { PdfReportService } from './services/pdf-report.service';
+import { PdfConfigService } from './services/pdf-config.service';
+import { PdfHeaderFooterService } from './services/pdf-header-footer.service';
+import { PdfTableService } from './services/pdf-table.service';
 import { ExcelReportService } from './services/excel-report.service';
 import { ReportGeneratorService } from './services/report-generator.service';
 import { Result, ResultSchema } from '../results/schemas/result.schema';
@@ -41,6 +44,9 @@ import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
   providers: [
     ReportsService,
     PdfReportService,
+    PdfConfigService,
+    PdfHeaderFooterService,
+    PdfTableService,
     ExcelReportService,
     ReportGeneratorService,
     ResultsService,
