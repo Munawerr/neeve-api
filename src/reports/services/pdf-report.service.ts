@@ -62,26 +62,28 @@ export class PdfReportService {
   }
 
   private buildStudentReport(data: any, content: Content[]): void {
-    this.addSectionHeader(content, 'Student Information');
-    content.push(this.buildInfoTable([
+    // 1. Student Information Card
+    content.push(this.buildInfoCard('Student Information', [
       { label: 'Name', value: data.studentInfo.name },
       { label: 'Email', value: data.studentInfo.email },
       { label: 'Phone', value: data.studentInfo.phone },
       { label: 'Institute', value: data.studentInfo.institute },
     ]));
 
-    this.addSectionHeader(content, 'Performance Summary');
+    // 2. Performance Summary — metric grid
     const summary = data.summary || {};
-    content.push(this.buildSummaryGrid([
+    content.push(this.buildMetricGrid([
       { label: 'Total Tests', value: String(summary.totalTests ?? 0) },
       { label: 'Completed', value: String(summary.completedTests ?? 0) },
+      { label: 'Overall %', value: `${summary.averageScore ?? 0}%` },
       { label: 'Total Score', value: String(summary.totalScore ?? 0) },
       { label: 'Possible', value: String(summary.totalPossibleScore ?? 0) },
-      { label: 'Overall %', value: `${summary.averageScore ?? 0}%` },
+      { label: 'Rank', value: summary.rank != null ? String(summary.rank) : 'N/A' },
     ]));
 
+    // 3. Subject-wise Performance
     if (data.subjectPerformance?.length) {
-      this.addSectionHeader(content, 'Subject-wise Performance');
+      content.push({ text: 'Subject-wise Performance', style: 'sectionHeader' });
       content.push(
         this.tableService.buildTable(
           ['Subject', 'Tests', 'Score', 'Possible', '%'],
@@ -92,12 +94,14 @@ export class PdfReportService {
             s.totalPossibleScore,
             `${s.averageScore}%`,
           ]),
+          { widths: ['*', 'auto', 'auto', 'auto', 'auto'] },
         ),
       );
     }
 
+    // 4. Recent Test Results
     if (data.testResults?.length) {
-      this.addSectionHeader(content, 'Recent Test Results');
+      content.push({ text: 'Recent Test Results', style: 'sectionHeader' });
       content.push(
         this.tableService.buildTable(
           ['Test Name', 'Subject', 'Type', 'Score', '%'],
@@ -108,46 +112,101 @@ export class PdfReportService {
             r.score,
             r.percentage,
           ]),
+          { widths: ['*', 'auto', 'auto', 'auto', 'auto'] },
         ),
       );
     }
   }
 
-  private buildInfoTable(items: { label: string; value: string }[]): Content {
-    const rows = items.map((item) => [
-      { text: `${item.label}:`, bold: true, color: PDF_COLORS.body, fontSize: FONT_SIZES.body },
-      { text: item.value || '-', color: PDF_COLORS.black, fontSize: FONT_SIZES.body, margin: [0, 0, 0, 2] },
+  private buildInfoCard(title: string, items: { label: string; value: string }[]): Content {
+    const headerRow: any = {
+      text: title,
+      style: 'subsectionHeader',
+      color: PDF_COLORS.white,
+      fillColor: PDF_COLORS.primary,
+      margin: [8, 6, 8, 6],
+      colSpan: 2,
+    };
+    const dataRows = items.map((item) => [
+      {
+        text: `${item.label}:`,
+        bold: true,
+        color: PDF_COLORS.body,
+        fontSize: FONT_SIZES.body,
+        margin: [8, 4, 4, 4],
+      },
+      {
+        text: item.value || '-',
+        color: PDF_COLORS.black,
+        fontSize: FONT_SIZES.body,
+        margin: [4, 4, 8, 4],
+      },
     ]);
     return {
-      table: { widths: [80, '*'], body: rows },
-      layout: 'lightHorizontalLines',
-      margin: [0, 0, 0, 8],
+      table: {
+        widths: [100, '*'],
+        body: [[headerRow, {}], ...dataRows],
+      },
+      layout: {
+        hLineWidth: (i: number, node: any) => (i === 0 || i === 1 || i === node.table.body.length ? 0.5 : 0),
+        vLineWidth: () => 0.5,
+        hLineColor: () => PDF_COLORS.border,
+        vLineColor: () => PDF_COLORS.border,
+        paddingLeft: () => 0,
+        paddingRight: () => 0,
+        paddingTop: () => 0,
+        paddingBottom: () => 0,
+      },
+      margin: [0, 0, 0, 14],
     } as any;
   }
 
-  private buildSummaryGrid(items: { label: string; value: string }[]): Content {
+  private buildMetricGrid(items: { label: string; value: string }[]): Content {
+    const cell = (label: string, value: string) => ({
+      stack: [
+        { text: label, fontSize: 8, color: PDF_COLORS.body, alignment: 'center', margin: [0, 4, 0, 0] },
+        { text: value, fontSize: 16, bold: true, color: PDF_COLORS.primary, alignment: 'center', margin: [0, 2, 0, 6] },
+      ],
+      fillColor: PDF_COLORS.white,
+      border: [true, true, true, true],
+      borderColor: [PDF_COLORS.border, PDF_COLORS.border, PDF_COLORS.border, PDF_COLORS.border],
+    });
+
     const rows: any[][] = [];
-    for (let i = 0; i < items.length; i += 2) {
-      const left = items[i];
-      const right = items[i + 1];
-      rows.push([
-        { text: `${left.label}: ${left.value}`, fontSize: FONT_SIZES.body, margin: [0, 1, 0, 1] },
-        right
-          ? { text: `${right.label}: ${right.value}`, fontSize: FONT_SIZES.body, margin: [0, 1, 0, 1] }
-          : { text: '', fontSize: FONT_SIZES.body },
-      ]);
+    for (let i = 0; i < items.length; i += 3) {
+      const row = [];
+      for (let j = 0; j < 3; j++) {
+        const idx = i + j;
+        if (idx < items.length) {
+          const item = items[idx];
+          row.push(cell(item.label, item.value));
+        } else {
+          row.push({ text: '', border: [false, false, false, false] });
+        }
+      }
+      rows.push(row);
     }
+
     return {
-      table: { widths: ['*', '*'], body: rows },
-      layout: 'noBorders',
-      margin: [0, 0, 0, 8],
+      table: { widths: ['*', '*', '*'], body: rows },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0.5,
+        hLineColor: () => PDF_COLORS.border,
+        vLineColor: () => PDF_COLORS.border,
+        paddingLeft: () => 0,
+        paddingRight: () => 0,
+        paddingTop: () => 0,
+        paddingBottom: () => 0,
+      },
+      margin: [0, 0, 0, 14],
     } as any;
   }
 
   private buildSubjectReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Subject Information');
     content.push(
-      this.headerFooter.buildInfoCard([
+      this.headerFooter.buildInfoCard('Subject Information', [
         { label: 'Subject', value: data.subjectInfo.name },
         { label: 'Code', value: data.subjectInfo.code },
         { label: 'Course', value: data.subjectInfo.course },
@@ -204,7 +263,7 @@ export class PdfReportService {
   private buildCourseReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Course Information');
     content.push(
-      this.headerFooter.buildInfoCard([
+      this.headerFooter.buildInfoCard('Course Information', [
         { label: 'Course', value: data.courseInfo.name },
         { label: 'Code', value: data.courseInfo.code },
       ]),
@@ -257,7 +316,7 @@ export class PdfReportService {
   private buildPackageReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Package Information');
     content.push(
-      this.headerFooter.buildInfoCard([
+      this.headerFooter.buildInfoCard('Package Information', [
         { label: 'Package', value: data.packageInfo.name },
         { label: 'Code', value: data.packageInfo.code },
         { label: 'Description', value: data.packageInfo.description },
@@ -312,7 +371,7 @@ export class PdfReportService {
   private buildTestReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Test Information');
     content.push(
-      this.headerFooter.buildInfoCard([
+      this.headerFooter.buildInfoCard('Test Information', [
         { label: 'Test Name', value: data.testInfo.name },
         { label: 'Subject', value: data.testInfo.subject },
         { label: 'Type', value: data.testInfo.testType },
@@ -371,7 +430,7 @@ export class PdfReportService {
   private buildInstituteReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'Institute Information');
     content.push(
-      this.headerFooter.buildInfoCard([
+      this.headerFooter.buildInfoCard('Institute Information', [
         { label: 'Institute', value: data.instituteInfo.name },
         { label: 'Email', value: data.instituteInfo.email },
         { label: 'Phone', value: data.instituteInfo.phone },

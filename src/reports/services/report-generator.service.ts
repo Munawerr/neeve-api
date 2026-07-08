@@ -129,31 +129,57 @@ export class ReportGeneratorService {
       );
     }
 
-    // Get student's test results
-    const query: any = { student: report.student };
-
+    // Build date filter
+    const dateFilter: any = {};
     if (report.dateRange) {
-      query.startedAt = {
-        $gte: report.dateRange.startDate,
-        $lte: report.dateRange.endDate,
-      };
+      if (report.dateRange.startDate) {
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      }
+      if (report.dateRange.endDate) {
+        dateFilter.$lte = new Date(report.dateRange.endDate);
+      }
     }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
 
-    const results = await this.resultModel
+    // Fetch non-bulk results
+    const query: any = { student: report.student, isBulkUploaded: { $ne: true } };
+    if (hasDateFilter) query.startedAt = dateFilter;
+    const regularResults = await this.resultModel
       .find(query)
       .populate('test', 'title')
       .populate('subject', 'title')
       .exec();
 
+    // Fetch bulk-uploaded results separately (CSV / update-report-card)
+    const bulkQuery: any = { student: report.student, isBulkUploaded: true, status: ResultStatus.FINISHED };
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    // Combine: regular results plus bulk results (deduplicated per subject — keep latest)
+    const seenSubjects = new Set<string>();
+    const combinedBulk: any[] = [];
+    for (const br of bulkResults) {
+      const subjId = (br.subject as any)?._id?.toString?.() ?? (br.subject as any)?.toString?.() ?? '';
+      if (!seenSubjects.has(subjId)) {
+        seenSubjects.add(subjId);
+        combinedBulk.push(br);
+      }
+    }
+    const allResults = [...regularResults, ...combinedBulk];
+
     // Calculate performance metrics
-    const totalTests = results.length;
-    const completedTests = results.filter(
+    const totalTests = allResults.length;
+    const completedTests = allResults.filter(
       (r) => r.status === 'finished',
     ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
 
-    results.forEach((result) => {
+    allResults.forEach((result) => {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
@@ -164,13 +190,12 @@ export class ReportGeneratorService {
       totalPossibleScore > 0 ? (totalScore / totalPossibleScore) * 100 : 0;
 
     // Group results by subject for subject-wise performance
-    const subjectPerformance: any[] = [];
     const subjectMap = new Map();
 
-    results.forEach((result) => {
-      const subject: any = result.toObject().subject;
-      const subjectId = subject?._id;
-      const subjectName = subject?.title || 'Unknown';
+    allResults.forEach((result) => {
+      const subj = (result as any).subject;
+      const subjectId = subj?._id?.toString?.() ?? subj?.toString?.() ?? 'unknown';
+      const subjectName = subj?.title || 'Unknown';
 
       if (!subjectMap.has(subjectId)) {
         subjectMap.set(subjectId, {
@@ -195,19 +220,47 @@ export class ReportGeneratorService {
       }
     });
 
+    const subjectPerformance: any[] = [];
     subjectMap.forEach((data) => {
-      const averageScore =
+      const avgScore =
         data.totalPossibleScore > 0
           ? (data.totalScore / data.totalPossibleScore) * 100
           : 0;
-
       subjectPerformance.push({
         ...data,
-        averageScore: averageScore.toFixed(2),
+        averageScore: avgScore.toFixed(2),
       });
     });
 
     const studentInstitute: any = student.institute;
+
+    // Build test results — all individual entries
+    const testResults = allResults.map((result: any) => {
+      const isBulk = result.isBulkUploaded === true;
+      const subjTitle = result.subject?.title || 'Unknown';
+      return {
+        testName: isBulk ? subjTitle : result.test?.title || 'Unknown',
+        subject: subjTitle,
+        status: result.status,
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        score: result.marksSummary ? result.marksSummary.obtainedMarks : 'N/A',
+        totalMarks: result.marksSummary
+          ? result.marksSummary.totalMarks
+          : 'N/A',
+        percentage: result.marksSummary
+          ? (
+              (result.marksSummary.obtainedMarks /
+                result.marksSummary.totalMarks) *
+              100
+            ).toFixed(2)
+          : 'N/A',
+        testType: result.testType || 'mock',
+        isBulkUploaded: isBulk,
+        reportCardLink: result.reportCardLink || null,
+        timeTaken: result.timeTaken || null,
+      };
+    });
 
     return {
       studentInfo: {
@@ -223,33 +276,10 @@ export class ReportGeneratorService {
         averageScore: averageScore.toFixed(2),
         totalScore,
         totalPossibleScore,
+        rank: allResults.find((r: any) => r.marksSummary?.rank != null)?.marksSummary?.rank ?? null,
       },
       subjectPerformance,
-      testResults: results.map((result: any) => {
-        const isBulk = result.isBulkUploaded === true;
-        return {
-          testName: isBulk ? 'Bulk Upload Entry' : result.test?.title || 'Unknown',
-          subject: result.subject?.title || 'Unknown',
-          status: result.status,
-          startedAt: result.startedAt,
-          finishedAt: result.finishedAt,
-          score: result.marksSummary ? result.marksSummary.obtainedMarks : 'N/A',
-          totalMarks: result.marksSummary
-            ? result.marksSummary.totalMarks
-            : 'N/A',
-          percentage: result.marksSummary
-            ? (
-                (result.marksSummary.obtainedMarks /
-                  result.marksSummary.totalMarks) *
-                100
-              ).toFixed(2)
-            : 'N/A',
-          testType: result.testType || 'mock',
-          isBulkUploaded: isBulk,
-          reportCardLink: result.reportCardLink || null,
-          timeTaken: result.timeTaken || null,
-        };
-      }),
+      testResults,
     };
   }
 

@@ -53,6 +53,6 @@ import { Topic, TopicSchema } from 'src/topics/schemas/topic.schema';
     UsersService,
     S3Service,
   ],
-  exports: [ReportsService],
+  exports: [ReportsService, PdfReportService],
 })
 export class ReportsModule {}
