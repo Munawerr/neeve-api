@@ -93,6 +93,12 @@ export class PdfConfigService implements OnModuleInit {
         fontSize: FONT_SIZES.body,
         color: PDF_COLORS.black,
       },
+      sectionCaption: {
+        fontSize: FONT_SIZES.small,
+        color: PDF_COLORS.body,
+        italics: true,
+        margin: [0, -4, 0, 6],
+      },
       smallText: {
         fontSize: FONT_SIZES.small,
         color: PDF_COLORS.body,

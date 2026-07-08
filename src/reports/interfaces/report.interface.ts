@@ -92,11 +92,11 @@ export interface SubjectReportData {
 
 export interface CourseReportData {
   courseInfo: CourseInfo;
-  summary: PerformanceSummary;
-  // subjects: SubjectInfo[];
-  // tests: TestInfo[];
+  summary: any;
   studentPerformance: any[];
   subjectPerformance: any[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }
 
 export interface TestReportData {
