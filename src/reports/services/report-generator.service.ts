@@ -609,6 +609,7 @@ export class ReportGeneratorService {
         .populate({
           path: 'tests',
           model: 'Test',
+          populate: { path: 'subject', model: 'Subject' },
         })
         .exec();
 

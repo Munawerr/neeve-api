@@ -292,14 +292,15 @@ export class PdfReportService {
     content.push(this.buildMetricGrid([
       { label: 'Total Tests', value: String(summary.totalTests ?? 0) },
       { label: 'Total Students', value: String(summary.totalStudents ?? 0) },
-      { label: 'Attempted', value: String(summary.totalAttempted ?? 0) },
-      { label: 'Completed', value: String(summary.totalCompleted ?? 0) },
+      { label: 'Tests Attempted', value: String(summary.totalAttempted ?? 0) },
+      { label: 'Tests Completed', value: String(summary.totalCompleted ?? 0) },
       { label: 'Avg Score', value: String(summary.avgScore ?? 0) },
       { label: 'Avg Percentage', value: `${summary.avgPercentage ?? 0}%` },
     ]));
 
     if (data.subjectPerformance?.length) {
       content.push({ text: 'Subject Performance', style: 'sectionHeader' });
+      content.push({ text: 'How students performed in each subject across all tests in this course', style: 'sectionCaption' });
       content.push(
         this.tableService.buildTable(
           ['Subject', 'Tests', 'Avg Score', 'Avg %'],
@@ -314,20 +315,30 @@ export class PdfReportService {
       );
     }
 
-    if (data.studentPerformance?.length) {
-      content.push({ text: 'Top Performers', style: 'sectionHeader' });
+    if (data.leaderboard?.entries?.length) {
+      content.push({ text: 'Leaderboard', style: 'sectionHeader' });
+      content.push({ text: 'Top 3 students ranked by their average position across all test types', style: 'sectionCaption' });
+      const headers = ['Student', ...data.leaderboard.testTypes.map((tt: string) => this.formatTestType(tt))];
+      const colWidths = ['*', ...data.leaderboard.testTypes.map(() => 'auto')];
       content.push(
         this.tableService.buildTable(
-          ['Student', 'Tests', 'Avg Score', 'Avg %'],
-          data.studentPerformance.map((s: any) => [
-            s.studentName || s.student?.name,
-            s.totalTests,
-            s.avgScore,
-            `${s.avgPercentage}%`,
+          headers,
+          data.leaderboard.entries.map((e: any) => [
+            e.studentName,
+            ...data.leaderboard.testTypes.map((tt: string) => e.testTypeRanks[tt]),
           ]),
-          { widths: ['*', 'auto', 'auto', 'auto'] },
+          { widths: colWidths },
         ),
       );
+
+      if (data.leaderboard.analytics?.totalStudents > 0) {
+        content.push({
+          text: `Total Students: ${data.leaderboard.analytics.totalStudents}`,
+          fontSize: FONT_SIZES.small,
+          color: PDF_COLORS.body,
+          margin: [0, 2, 0, 8],
+        } as any);
+      }
     }
 
     this.addDistributionSections(content, data);
