@@ -48,6 +48,7 @@ export class PdfTableService {
         color: PDF_COLORS.black,
         fillColor: isAlt ? alternateRowColor : undefined,
         alignment: cellIndex === 0 ? 'left' : 'center',
+        noWrap: cellIndex !== 0,
         margin: [4, 3, 4, 3],
         border: [false, false, false, false],
       }));

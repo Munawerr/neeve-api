@@ -135,12 +135,14 @@ export class PdfReportService {
         bold: true,
         color: PDF_COLORS.body,
         fontSize: FONT_SIZES.body,
+        noWrap: false,
         margin: [8, 4, 4, 4],
       },
       {
         text: item.value || '-',
         color: PDF_COLORS.black,
         fontSize: FONT_SIZES.body,
+        noWrap: false,
         margin: [4, 4, 8, 4],
       },
     ]);
@@ -411,88 +413,114 @@ export class PdfReportService {
   }
 
   private buildTestReport(data: any, content: Content[]): void {
-    this.addSectionHeader(content, 'Test Information');
-    content.push(
-      this.headerFooter.buildInfoCard('Test Information', [
-        { label: 'Test Name', value: data.testInfo.name },
-        { label: 'Subject', value: data.testInfo.subject },
-        { label: 'Type', value: this.formatTestType(data.testInfo.testType) },
-        { label: 'Total Marks', value: String(data.testInfo.totalMarks ?? '-') },
-        { label: 'Duration', value: data.testInfo.duration ? `${data.testInfo.duration} min` : '-' },
-        { label: 'Date', value: data.testInfo.date ? new Date(data.testInfo.date).toLocaleDateString() : '-' },
-      ]),
-    );
+    const isAggregated = data.testInfo.testsCount != null;
 
-    this.addSectionHeader(content, 'Performance Summary');
-    content.push(
-      this.headerFooter.buildSummaryCard([
-        { label: 'Students', value: String(data.summary.totalStudents ?? data.summary.totalTests ?? 0) },
-        { label: 'Avg Score', value: `${data.summary.averageScore ?? 0}%` },
-        { label: 'Highest', value: String(data.summary.highestScore ?? '-') },
-        { label: 'Lowest', value: String(data.summary.lowestScore ?? '-') },
-        { label: 'Avg Time', value: data.summary.avgTimeTaken ?? '-' },
-      ]),
-    );
+    if (isAggregated) {
+      const subjectsText = data.testInfo.subjectsCovered?.length
+        ? data.testInfo.subjectsCovered.join(', ')
+        : '-';
+      content.push(
+        this.headerFooter.buildInfoCard('Test Information', [
+          { label: 'Test Type', value: data.testInfo.name },
+          { label: 'Tests Found', value: String(data.testInfo.testsCount) },
+          { label: 'Subjects', value: subjectsText },
+        ]),
+      );
+    } else {
+      content.push(
+        this.headerFooter.buildInfoCard('Test Information', [
+          { label: 'Test Name', value: data.testInfo.name },
+          { label: 'Subject', value: data.testInfo.subject },
+          { label: 'Type', value: this.formatTestType(data.testInfo.testType) },
+          { label: 'Total Marks', value: String(data.testInfo.totalMarks ?? '-') },
+          { label: 'Duration', value: data.testInfo.duration ? `${data.testInfo.duration} min` : '-' },
+          { label: 'Date', value: data.testInfo.date ? new Date(data.testInfo.date).toLocaleDateString() : '-' },
+        ]),
+      );
+    }
+
+    const summary = data.summary || {};
+    content.push(this.buildMetricGrid([
+      { label: 'Total Students', value: String(summary.totalStudents ?? 0) },
+      { label: 'Total Attempts', value: String(summary.totalAttempts ?? 0) },
+      { label: 'Avg Score', value: String(summary.avgScore ?? 0) },
+      { label: 'Avg Percentage', value: `${summary.avgPercentage ?? 0}%` },
+      { label: 'Highest Score', value: String(summary.highestScore ?? '-') },
+      { label: 'Lowest Score', value: String(summary.lowestScore ?? '-') },
+    ]));
 
     if (data.questionAnalysis?.length) {
-      this.addSectionHeader(content, 'Question Analysis');
+      const caption = isAggregated
+        ? 'How students performed on each question across all tests of this type'
+        : 'How students performed on each question in this test';
+      content.push({ text: 'Question Analysis', style: 'sectionHeader' });
+      content.push({ text: caption, style: 'sectionCaption' });
       content.push(
         this.tableService.buildTable(
-          ['Q#', 'Attempts', 'Correct', 'Wrong', 'Avg Time'],
-          data.questionAnalysis.map((q: any, i: number) => [
-            q.questionNo ?? (i + 1).toString(),
-            q.attempts ?? q.totalAttempts,
+          ['Q#', 'Attempts', 'Correct', 'Wrong', 'Avg Time (s)'],
+          data.questionAnalysis.map((q: any) => [
+            q.questionNo ?? '-',
+            q.totalAttempts ?? q.attempts,
             q.correct,
             q.incorrect,
-            q.averageTime ?? q.avgTime,
+            q.avgTime ?? '-',
           ]),
+          { widths: ['auto', 'auto', 'auto', 'auto', 'auto'] },
         ),
       );
     }
 
-    if (data.studentResults?.length) {
-      this.addSectionHeader(content, 'Student Results');
+    if (data.leaderboard?.entries?.length) {
+      content.push({ text: 'Leaderboard', style: 'sectionHeader' });
+      content.push({ text: 'Top 3 students ranked by their average position across all test types', style: 'sectionCaption' });
+      const headers = ['Student', ...data.leaderboard.testTypes.map((tt: string) => this.formatTestType(tt))];
+      const colWidths = ['*', ...data.leaderboard.testTypes.map(() => 'auto')];
       content.push(
         this.tableService.buildTable(
-          ['Rank', 'Student', 'Score', '%', 'Time'],
-          data.studentResults.map((r: any, i: number) => [
-            r.rank ?? (i + 1).toString(),
-            r.studentName || r.student?.name,
-            r.score,
-            r.percentage,
-            r.timeTaken ?? '-',
+          headers,
+          data.leaderboard.entries.map((e: any) => [
+            e.studentName,
+            ...data.leaderboard.testTypes.map((tt: string) => e.testTypeRanks[tt]),
           ]),
+          { widths: colWidths },
         ),
       );
+
+      if (data.leaderboard.analytics?.totalStudents > 0) {
+        content.push({
+          text: `Total Students: ${data.leaderboard.analytics.totalStudents}`,
+          fontSize: FONT_SIZES.small,
+          color: PDF_COLORS.body,
+          margin: [0, 2, 0, 8],
+        } as any);
+      }
     }
 
     this.addDistributionSections(content, data);
   }
 
   private buildInstituteReport(data: any, content: Content[]): void {
-    this.addSectionHeader(content, 'Institute Information');
     content.push(
-      this.headerFooter.buildInfoCard('Institute Information', [
+      this.buildInfoCard('Institute Information', [
         { label: 'Institute', value: data.instituteInfo.name },
-        { label: 'Email', value: data.instituteInfo.email },
-        { label: 'Phone', value: data.instituteInfo.phone },
-        { label: 'Total Students', value: String(data.summary.totalStudents ?? 0) },
+        { label: 'Email', value: data.instituteInfo.email || '-' },
+        { label: 'Phone', value: data.instituteInfo.phone || '-' },
       ]),
     );
 
-    this.addSectionHeader(content, 'Performance Summary');
-    content.push(
-      this.headerFooter.buildSummaryCard([
-        { label: 'Courses', value: String(data.summary.totalCourses ?? 0) },
-        { label: 'Tests', value: String(data.summary.totalTests ?? 0) },
-        { label: 'Attempted', value: String(data.summary.testAttempts ?? data.summary.totalAttempted ?? 0) },
-        { label: 'Completed', value: String(data.summary.totalCompleted ?? 0) },
-        { label: 'Avg %', value: `${data.summary.averageScore ?? 0}%` },
-      ]),
-    );
+    const summary = data.summary || {};
+    content.push(this.buildMetricGrid([
+      { label: 'Total Students', value: String(summary.totalStudents ?? 0) },
+      { label: 'Total Courses', value: String(summary.totalCourses ?? 0) },
+      { label: 'Total Tests', value: String(summary.totalTests ?? 0) },
+      { label: 'Tests Attempted', value: String(summary.testAttempts ?? 0) },
+      { label: 'Tests Completed', value: String(summary.totalCompleted ?? 0) },
+      { label: 'Avg Percentage', value: `${summary.avgPercentage ?? 0}%` },
+    ]));
 
     if (data.coursePerformance?.length) {
-      this.addSectionHeader(content, 'Course Performance');
+      content.push({ text: 'Course Performance', style: 'sectionHeader' });
+      content.push({ text: 'How students performed across the courses in this institute', style: 'sectionCaption' });
       content.push(
         this.tableService.buildTable(
           ['Course', 'Attempted', 'Completed', 'Students', 'Avg %'],
@@ -503,12 +531,14 @@ export class PdfReportService {
             c.studentCount ?? '-',
             `${c.averageScore ?? c.avgPercentage}%`,
           ]),
+          { widths: ['*', 'auto', 'auto', 'auto', 'auto'] },
         ),
       );
     }
 
     if (data.subjectPerformance?.length) {
-      this.addSectionHeader(content, 'Subject Performance');
+      content.push({ text: 'Subject Performance', style: 'sectionHeader' });
+      content.push({ text: 'How students performed in each subject across all tests', style: 'sectionCaption' });
       content.push(
         this.tableService.buildTable(
           ['Subject', 'Tests', 'Avg %'],
@@ -517,8 +547,35 @@ export class PdfReportService {
             s.totalTests ?? s.testsAttempted ?? s.totalAttempted,
             `${s.averageScore ?? s.avgPercentage}%`,
           ]),
+          { widths: ['*', 'auto', 'auto'] },
         ),
       );
+    }
+
+    if (data.leaderboard?.entries?.length) {
+      content.push({ text: 'Leaderboard', style: 'sectionHeader' });
+      content.push({ text: 'Top 3 students ranked by their average position across all test types', style: 'sectionCaption' });
+      const headers = ['Student', ...data.leaderboard.testTypes.map((tt: string) => this.formatTestType(tt))];
+      const colWidths = ['*', ...data.leaderboard.testTypes.map(() => 'auto')];
+      content.push(
+        this.tableService.buildTable(
+          headers,
+          data.leaderboard.entries.map((e: any) => [
+            e.studentName,
+            ...data.leaderboard.testTypes.map((tt: string) => e.testTypeRanks[tt]),
+          ]),
+          { widths: colWidths },
+        ),
+      );
+
+      if (data.leaderboard.analytics?.totalStudents > 0) {
+        content.push({
+          text: `Total Students: ${data.leaderboard.analytics.totalStudents}`,
+          fontSize: FONT_SIZES.small,
+          color: PDF_COLORS.body,
+          margin: [0, 2, 0, 8],
+        } as any);
+      }
     }
 
     this.addDistributionSections(content, data);
@@ -526,22 +583,51 @@ export class PdfReportService {
 
   private buildOverallReport(data: any, content: Content[]): void {
     this.addSectionHeader(content, 'System Overview');
+    content.push({ text: 'High-level summary of the entire platform', style: 'sectionCaption' });
     content.push(
-      this.headerFooter.buildSummaryCard([
+      this.buildMetricGrid([
         { label: 'Total Institutes', value: String(data.summary.totalInstitutes ?? 0) },
         { label: 'Total Students', value: String(data.summary.totalStudents ?? 0) },
         { label: 'Total Courses', value: String(data.summary.totalCourses ?? 0) },
         { label: 'Total Tests', value: String(data.summary.totalTests ?? 0) },
-        { label: 'Total Results', value: String(data.summary.testAttempts ?? data.summary.totalResults ?? 0) },
-        { label: 'System Avg %', value: `${data.summary.averageScore ?? 0}%` },
+        { label: 'Tests Attempted', value: String(data.summary.testAttempts ?? 0) },
+        { label: 'Tests Completed', value: String(data.summary.totalCompleted ?? 0) },
+        { label: 'System Avg %', value: `${data.summary.avgPercentage ?? data.summary.averageScore ?? 0}%` },
       ]),
     );
 
-    if (data.institutePerformance?.length) {
-      this.addSectionHeader(content, 'Institute Performance');
+    if (data.leaderboard?.entries?.length) {
+      this.addSectionHeader(content, 'Leaderboard');
+      content.push({ text: 'Top-performing students across the platform', style: 'sectionCaption' });
+      const headers = ['Student', ...data.leaderboard.testTypes.map((tt: string) => this.formatTestType(tt))];
+      const colWidths = ['*', ...data.leaderboard.testTypes.map(() => 'auto')];
       content.push(
         this.tableService.buildTable(
-          ['Institute', 'Attempted', 'Completed', 'Students', 'Avg %'],
+          headers,
+          data.leaderboard.entries.map((e: any) => [
+            e.studentName,
+            ...data.leaderboard.testTypes.map((tt: string) => e.testTypeRanks[tt]),
+          ]),
+          { widths: colWidths },
+        ),
+      );
+
+      if (data.leaderboard.analytics?.totalStudents > 0) {
+        content.push({
+          text: `Total Students: ${data.leaderboard.analytics.totalStudents}`,
+          fontSize: FONT_SIZES.small,
+          color: PDF_COLORS.body,
+          margin: [0, 2, 0, 8],
+        } as any);
+      }
+    }
+
+    if (data.institutePerformance?.length) {
+      this.addSectionHeader(content, 'Institute Performance');
+      content.push({ text: 'Performance breakdown by institute', style: 'sectionCaption' });
+      content.push(
+        this.tableService.buildTable(
+          ['Institute', 'Attempted Tests', 'Completed Tests', 'Students', 'Avg %'],
           data.institutePerformance.map((i: any) => [
             i.instituteName || i.institute,
             i.testsAttempted ?? i.totalTests,
@@ -555,6 +641,7 @@ export class PdfReportService {
 
     if (data.subjectPerformance?.length) {
       this.addSectionHeader(content, 'Subject Performance');
+      content.push({ text: 'Average scores across subjects', style: 'sectionCaption' });
       content.push(
         this.tableService.buildTable(
           ['Subject', 'Tests', 'Avg %'],

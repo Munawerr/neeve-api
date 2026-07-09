@@ -66,6 +66,9 @@ export class Report extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Test' })
   test: MongooseSchema.Types.ObjectId;
 
+  @Prop()
+  testType: string;
+
   @Prop({ type: () => DateRange })
   dateRange?: DateRange;
 

@@ -394,24 +394,6 @@ export class ReportGeneratorService {
       });
     });
 
-    // Map student results
-    const studentResults = allResults.map((result: any) => {
-      const isBulk = result.isBulkUploaded === true;
-      const studentObj = result.student as any;
-      return {
-        studentName: studentObj?.full_name || studentObj?.title || 'Unknown',
-        email: studentObj?.email || '',
-        testName: isBulk ? (result.subject as any)?.title || 'Bulk Entry' : result.test?.title || 'Unknown',
-        testType: result.testType || 'mock',
-        totalScore: result.marksSummary?.obtainedMarks ?? 'N/A',
-        possibleScore: result.marksSummary?.totalMarks ?? 'N/A',
-        percentage: result.marksSummary
-          ? ((result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100).toFixed(1)
-          : 'N/A',
-        rank: result.marksSummary?.rank ?? null,
-      };
-    });
-
     // Compute test type distributions for this subject
     const testTypeDistributions = await this.computeTestTypeDistributions(
       [report.subject.toString()],
@@ -433,7 +415,6 @@ export class ReportGeneratorService {
         lowestScore: lowestScore === Infinity ? '-' : lowestScore.toFixed(1),
       },
       testPerformance,
-      studentResults,
       testTypeDistributions,
       leaderboard: this.computeLeaderboard(bulkResults),
     };
@@ -745,56 +726,6 @@ export class ReportGeneratorService {
       }),
     );
 
-    // Group student performance by student (sorted by avg score descending)
-    const studentMap = new Map();
-
-    allResults.forEach((result: any) => {
-      const studentId = result.student?._id.toString();
-      const studentObj = result.student as any;
-      const studentName = studentObj?.full_name || studentObj?.title || 'Unknown';
-
-      if (!studentMap.has(studentId)) {
-        studentMap.set(studentId, {
-          studentName,
-          totalTests: 0,
-          completedTests: 0,
-          totalScore: 0,
-          totalPossibleScore: 0,
-        });
-      }
-
-      const studentData = studentMap.get(studentId);
-      studentData.totalTests++;
-
-      if (result.status === ResultStatus.FINISHED) {
-        studentData.completedTests++;
-      }
-
-      if (result.marksSummary) {
-        studentData.totalScore += result.marksSummary.obtainedMarks;
-        studentData.totalPossibleScore += result.marksSummary.totalMarks;
-      }
-    });
-
-    const studentPerformance: any[] = [];
-    studentMap.forEach((data) => {
-      const avgScore = data.totalPossibleScore > 0
-        ? (data.totalScore / data.totalPossibleScore).toFixed(1)
-        : '0';
-      const avgPercentage = data.totalPossibleScore > 0
-        ? ((data.totalScore / data.totalPossibleScore) * 100).toFixed(1)
-        : '0';
-
-      studentPerformance.push({
-        studentName: data.studentName,
-        totalTests: data.totalTests,
-        avgScore,
-        avgPercentage,
-      });
-    });
-
-    studentPerformance.sort((a, b) => parseFloat(b.avgPercentage) - parseFloat(a.avgPercentage));
-
     // Compute test type distributions for subjects in this course
     const testTypeDistributions = await this.computeTestTypeDistributions(
       subjectIds,
@@ -820,7 +751,6 @@ export class ReportGeneratorService {
         avgPercentage,
       },
       subjectPerformance,
-      studentPerformance,
       testTypeDistributions,
       leaderboard,
     };
@@ -1015,7 +945,16 @@ export class ReportGeneratorService {
   }
 
   private async getTestReportData(report: Report): Promise<TestReportData> {
-    const test = await this.testModel.findById(report.test).lean();
+    // Test-type aggregation mode
+    if ((report as any).testType) {
+      return this.getTestTypeAggregatedReportData(report);
+    }
+
+    // Fallback to single-test mode
+    const test = await this.testModel
+      .findById(report.test)
+      .populate('subject')
+      .lean();
 
     if (!test) {
       throw new NotFoundException(
@@ -1023,55 +962,68 @@ export class ReportGeneratorService {
       );
     }
 
-    // Build query to filter results
-    const query: any = { test: report.test };
+    const subjectId = ((test.subject as any)?._id?.toString?.() ?? test.subject?.toString?.()) as string;
+    const totalMarks = (test.marksPerQuestion ?? 0) * ((test.questions as any[])?.length ?? 0);
 
-    if (report.institute) {
-      query.institute = report.institute;
-    }
-
+    const dateFilter: any = {};
     if (report.dateRange) {
-      query.startedAt = {
-        $gte: report.dateRange.startDate,
-        $lte: report.dateRange.endDate,
-      };
+      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
     }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
 
-    // Get results for this test
-    const results = await this.resultModel
+    const query: any = { test: report.test, isBulkUploaded: { $ne: true } };
+    if (report.institute) query.institute = report.institute;
+    if (hasDateFilter) query.startedAt = dateFilter;
+
+    const regularResults = await this.resultModel
       .find(query)
-      .populate('student', 'name email')
+      .populate('student', 'full_name email')
       .populate({
         path: 'questionResults',
         select: 'question answer isCorrect timeTaken',
       })
       .exec();
 
-    // Calculate overall metrics
-    const totalAttempts = results.length;
-    const completedAttempts = results.filter(
+    const totalAttempts = regularResults.length;
+    const completedAttempts = regularResults.filter(
       (r) => r.status === ResultStatus.FINISHED,
     ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
+    let highestScore = 0;
+    let lowestScore = Infinity;
+    let totalTimeTaken = 0;
+    let timeCount = 0;
 
-    results.forEach((result) => {
+    regularResults.forEach((result) => {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
+        const pct = result.marksSummary.totalMarks > 0
+          ? (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100
+          : 0;
+        if (pct > highestScore) highestScore = pct;
+        if (pct < lowestScore) lowestScore = pct;
+      }
+      if (result.finishedAt && result.startedAt) {
+        totalTimeTaken += (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
+        timeCount++;
       }
     });
 
-    const averageScore =
+    const avgPercentage =
       totalPossibleScore > 0
-        ? ((totalScore / totalPossibleScore) * 100).toFixed(2)
+        ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
 
-    // Question-level analysis
+    const avgTimeTaken = timeCount > 0
+      ? `${(totalTimeTaken / timeCount).toFixed(0)} min`
+      : '-';
+
     const questionMap = new Map();
 
-    // Populate question map with all questions from test
-    results.forEach((result) => {
+    regularResults.forEach((result) => {
       if (!result.questionResults) return;
 
       result.questionResults.forEach((qr: any) => {
@@ -1079,12 +1031,11 @@ export class ReportGeneratorService {
 
         if (!questionMap.has(questionId)) {
           questionMap.set(questionId, {
-            questionId,
+            questionNo: questionMap.size + 1,
             attempts: 0,
             correct: 0,
             incorrect: 0,
             totalTime: 0,
-            averageTime: 0,
           });
         }
 
@@ -1106,68 +1057,299 @@ export class ReportGeneratorService {
     const questionAnalysis: any[] = [];
     questionMap.forEach((data) => {
       const avgTime = data.attempts > 0 ? data.totalTime / data.attempts : 0;
-      const correctPercentage =
-        data.attempts > 0 ? (data.correct / data.attempts) * 100 : 0;
 
       questionAnalysis.push({
-        questionId: data.questionId,
-        attempts: data.attempts,
+        questionNo: data.questionNo,
+        totalAttempts: data.attempts,
         correct: data.correct,
         incorrect: data.incorrect,
-        correctPercentage: correctPercentage.toFixed(2) + '%',
-        averageTime: avgTime.toFixed(2) + 's',
+        avgTime: avgTime.toFixed(0),
       });
     });
 
-    // Student results
-    const studentResults = results.map((result: any) => ({
-      testName: result.test?.title || 'Unknown',
-      subject: result.subject?.title || 'Unknown',
-      student: {
-        id: result.student?._id,
-        name: result.student?.full_name || 'Unknown',
-        email: result.student?.email || 'Unknown',
-      },
-      status: result.status,
-      startedAt: result.startedAt,
-      finishedAt: result.finishedAt,
-      score: result.marksSummary ? result.marksSummary.obtainedMarks : 'N/A',
-      totalMarks: result.marksSummary ? result.marksSummary.totalMarks : 'N/A',
-      percentage: result.marksSummary
-        ? (
-            (result.marksSummary.obtainedMarks /
-              result.marksSummary.totalMarks) *
-            100
-          ).toFixed(2) + '%'
-        : 'N/A',
-      correctAnswers: result.marksSummary
-        ? result.marksSummary.correctAnswers
-        : 'N/A',
-      incorrectAnswers: result.marksSummary
-        ? result.marksSummary.incorrectAnswers
-        : 'N/A',
-      averageTimePerQuestion: result.marksSummary
-        ? result.marksSummary.averageTimePerQuestion.toFixed(2) + 's'
-        : 'N/A',
-    }));
+    const bulkQuery: any = {
+      subject: subjectId,
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
+    if (report.institute) bulkQuery.institute = report.institute;
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
 
-    const testSubject: any = test.subject;
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    const testTypeDistributions = await this.computeTestTypeDistributions(
+      [subjectId],
+      report.dateRange,
+      report.institute?.toString(),
+    );
+
+    const leaderboard = this.computeLeaderboard(bulkResults);
+
+    const uniqueStudents = new Set(regularResults.map((r: any) =>
+      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
+    ));
 
     return {
       testInfo: {
         id: test._id as string,
         name: test.title,
-        subject: testSubject?.title,
+        subject: (test.subject as any)?.title || 'Unknown',
+        testType: test.testType,
+        totalMarks,
+        duration: test.testDuration,
+        date: (test as any).createdAt
+          ? new Date((test as any).createdAt).toLocaleDateString()
+          : undefined,
       },
       summary: {
-        totalTests: totalAttempts,
-        completedTests: completedAttempts,
-        averageScore,
-        totalScore,
-        totalPossibleScore,
+        totalStudents: uniqueStudents.size,
+        totalAttempts,
+        completedAttempts,
+        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgPercentage,
+        highestScore: lowestScore === Infinity ? '-' : highestScore.toFixed(1),
+        lowestScore: lowestScore === Infinity ? '-' : lowestScore.toFixed(1),
+        avgTimeTaken,
       },
       questionAnalysis,
-      studentResults,
+      studentResults: [],
+      testTypeDistributions,
+      leaderboard,
+    };
+  }
+
+  private async getTestTypeAggregatedReportData(report: Report): Promise<TestReportData> {
+    const testType = (report as any).testType;
+
+    let testTypeTests: any[] = [];
+    if (report.course) {
+      const course = await this.courseModel.findById(report.course);
+      if (course) {
+        const user: any = await this.userModel.findById(report.institute).populate('packages').exec();
+        let packageId: any = null;
+        const reportCourseId = report.course.toString();
+        if (user) {
+          for (let x = 0; x < user.packages.length; x++) {
+            const courseId = user.packages[x].course.toString();
+            if (courseId === reportCourseId) {
+              packageId = user.toObject().packages[x]._id.toString();
+              break;
+            }
+          }
+
+          const topics = await this.topicModel
+            .find({ package: packageId, isParent: true })
+            .populate({
+              path: 'tests',
+              model: 'Test',
+              match: { testType },
+              populate: { path: 'subject', model: 'Subject' },
+            })
+            .exec();
+
+          testTypeTests = topics
+            .map((topic) => (topic.tests as any[]) || [])
+            .flat()
+            .filter(Boolean);
+        }
+      }
+    }
+
+    // Fall back to global search if course-based lookup found nothing
+    if (!testTypeTests?.length) {
+      testTypeTests = await this.testModel
+        .find({ testType })
+        .populate('subject')
+        .lean();
+    }
+
+    if (!testTypeTests.length) {
+      const label =
+        ({ mock: 'Mock Test', practice: 'Practice Test', test: 'Assessment Test', screening: 'Screening Test' } as Record<string, string>)[testType as string] || (testType as string);
+      throw new NotFoundException(
+        `No ${label} tests found in the system. Create a test of type "${testType}" first.`,
+      );
+    }
+
+    const testIds = testTypeTests.map((t) => t._id);
+    const subjectIds = [
+      ...new Set(
+        testTypeTests.map((t: any) =>
+          (t.subject as any)?._id?.toString?.() ?? t.subject?.toString?.()
+        ).filter(Boolean),
+      ),
+    ];
+    const subjectTitles = [
+      ...new Set(
+        testTypeTests.map((t: any) =>
+          (t.subject as any)?.title || 'Unknown',
+        ),
+      ),
+    ];
+    const dateFilter: any = {};
+    if (report.dateRange) {
+      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+    }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
+
+    const regularQuery: any = {
+      test: { $in: testIds },
+      isBulkUploaded: { $ne: true },
+    };
+    if (report.institute) regularQuery.institute = report.institute;
+    if (hasDateFilter) regularQuery.startedAt = dateFilter;
+
+    const regularResults = await this.resultModel
+      .find(regularQuery)
+      .populate('student', 'full_name email')
+      .populate('test', 'title testType')
+      .populate('subject', 'title')
+      .populate({
+        path: 'questionResults',
+        select: 'question answer isCorrect timeTaken',
+      })
+      .exec();
+
+    const bulkQuery: any = {
+      subject: { $in: subjectIds },
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
+    if (report.institute) bulkQuery.institute = report.institute;
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
+
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    const totalAttempts = regularResults.length;
+    const completedAttempts = regularResults.filter(
+      (r) => r.status === ResultStatus.FINISHED,
+    ).length;
+    let totalScore = 0;
+    let totalPossibleScore = 0;
+    let highestScore = 0;
+    let lowestScore = Infinity;
+    let totalTimeTaken = 0;
+    let timeCount = 0;
+
+    regularResults.forEach((result) => {
+      if (result.marksSummary) {
+        totalScore += result.marksSummary.obtainedMarks;
+        totalPossibleScore += result.marksSummary.totalMarks;
+        const pct = result.marksSummary.totalMarks > 0
+          ? (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100
+          : 0;
+        if (pct > highestScore) highestScore = pct;
+        if (pct < lowestScore) lowestScore = pct;
+      }
+      if (result.finishedAt && result.startedAt) {
+        totalTimeTaken += (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
+        timeCount++;
+      }
+    });
+
+    const avgPercentage =
+      totalPossibleScore > 0
+        ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
+        : '0';
+
+    const avgTimeTaken = timeCount > 0
+      ? `${(totalTimeTaken / timeCount).toFixed(0)} min`
+      : '-';
+
+    const questionMap = new Map();
+
+    regularResults.forEach((result) => {
+      if (!result.questionResults) return;
+
+      result.questionResults.forEach((qr: any) => {
+        const questionId = qr.question.toString();
+
+        if (!questionMap.has(questionId)) {
+          questionMap.set(questionId, {
+            questionNo: questionMap.size + 1,
+            attempts: 0,
+            correct: 0,
+            incorrect: 0,
+            totalTime: 0,
+          });
+        }
+
+        const questionData = questionMap.get(questionId);
+        questionData.attempts++;
+
+        if (qr.isCorrect) {
+          questionData.correct++;
+        } else {
+          questionData.incorrect++;
+        }
+
+        if (qr.timeTaken) {
+          questionData.totalTime += qr.timeTaken;
+        }
+      });
+    });
+
+    const questionAnalysis: any[] = [];
+    questionMap.forEach((data) => {
+      const avgTime = data.attempts > 0 ? data.totalTime / data.attempts : 0;
+
+      questionAnalysis.push({
+        questionNo: data.questionNo,
+        totalAttempts: data.attempts,
+        correct: data.correct,
+        incorrect: data.incorrect,
+        avgTime: avgTime.toFixed(0),
+      });
+    });
+
+    const testTypeDistributions = await this.computeTestTypeDistributions(
+      subjectIds,
+      report.dateRange,
+      report.institute?.toString(),
+    );
+
+    const leaderboard = this.computeLeaderboard(bulkResults);
+
+    const uniqueStudents = new Set(regularResults.map((r: any) =>
+      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
+    ));
+
+    const testTypeLabel =
+      ({ mock: 'Mock Test', practice: 'Practice Test', test: 'Assessment Test', screening: 'Screening Test' } as Record<string, string>)[testType as string] || (testType as string);
+
+    return {
+      testInfo: {
+        id: testType,
+        name: testTypeLabel,
+        testType,
+        testsCount: testTypeTests.length,
+        subjectsCovered: subjectTitles,
+      },
+      summary: {
+        totalStudents: uniqueStudents.size,
+        totalAttempts,
+        completedAttempts,
+        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgPercentage,
+        highestScore: lowestScore === Infinity ? '-' : highestScore.toFixed(1),
+        lowestScore: lowestScore === Infinity ? '-' : lowestScore.toFixed(1),
+        avgTimeTaken,
+      },
+      questionAnalysis,
+      studentResults: [],
+      testTypeDistributions,
+      leaderboard,
     };
   }
 
@@ -1205,61 +1387,92 @@ export class ReportGeneratorService {
       .lean();
 
     // Get courses offered by this institute
-    const courses = await this.getInstituteCourses(report.institute.toString());
+    let courses = await this.getInstituteCourses(report.institute.toString());
 
     // Get tests for all courses of this institute
-    const courseIds = courses.map((course) => course._id);
-    const tests = await this.testModel
+    let courseIds = courses.map((course) => course._id);
+    let tests = await this.testModel
       .find({
         course: { $in: courseIds },
       })
       .populate('subject')
       .lean();
 
+    // Build date filter
+    const dateFilter: any = {};
+    if (report.dateRange) {
+      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+    }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
+
     // Build query for test results
     const query: any = { institute: report.institute };
-
-    if (report.dateRange) {
-      query.startedAt = {
-        $gte: report.dateRange.startDate,
-        $lte: report.dateRange.endDate,
-      };
-    }
+    if (hasDateFilter) query.startedAt = dateFilter;
 
     // Get all results for this institute
     const results = await this.resultModel
       .find(query)
-      .populate('test', 'title')
+      .populate('test', 'title course')
       .populate('subject', 'title')
       .populate('student', 'full_name')
       .exec();
+
+    // If no courses found via packages, try to fetch courses from results' tests
+    if (courses.length === 0 && results.length > 0) {
+      const resultCourseIds = [...new Set(
+        results.map((r: any) => (r.test as any)?.course?.toString?.()).filter(Boolean),
+      )];
+      if (resultCourseIds.length > 0) {
+        courses = await this.courseModel.find({ _id: { $in: resultCourseIds } }).lean() as any[];
+        courseIds = courses.map((c) => c._id);
+        tests = await this.testModel
+          .find({ course: { $in: courseIds } })
+          .populate('subject')
+          .lean();
+      }
+    }
 
     // Calculate overall metrics
     const totalAttempts = results.length;
     let totalScore = 0;
     let totalPossibleScore = 0;
+    let totalCompleted = 0;
 
     results.forEach((result) => {
+      if (result.status === ResultStatus.FINISHED) totalCompleted++;
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
       }
     });
 
-    const averageScore =
+    const avgPercentage =
       totalPossibleScore > 0
         ? ((totalScore / totalPossibleScore) * 100).toFixed(2)
         : '0';
+
+    // Collect subject IDs from results directly
+    const subjectIds: string[] = [];
+    const subjectTitleMap = new Map<string, string>();
+    for (const r of results) {
+      const subjId = (r.subject as any)?._id?.toString?.();
+      const subjName = (r.subject as any)?.title || 'Unknown';
+      if (subjId && !subjectIds.includes(subjId)) {
+        subjectIds.push(subjId);
+        subjectTitleMap.set(subjId, subjName);
+      }
+    }
 
     // Course performance analysis
     const courseMap = new Map();
 
     results.forEach((result: any) => {
-      const testId = result.test?._id.toString();
-      const test: any = tests.find((t) => t._id.toString() === testId);
-      if (!test || !test.course) return;
+      const testObj = result.test as any;
+      if (!testObj) return;
+      const courseId = testObj.course?.toString?.();
+      if (!courseId) return;
 
-      const courseId = test.course.toString();
       const course = courses.find((c: any) => c._id.toString() === courseId);
       const courseName = course?.title || 'Unknown';
 
@@ -1394,21 +1607,51 @@ export class ReportGeneratorService {
       });
     });
 
+    // Fetch bulk-uploaded results for leaderboard
+    const bulkQuery: any = {
+      subject: { $in: subjectIds },
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
+    if (report.institute) bulkQuery.institute = report.institute;
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
+
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    const testTypeDistributions = await this.computeTestTypeDistributions(
+      subjectIds,
+      report.dateRange,
+      report.institute?.toString(),
+    );
+
+    const leaderboard = this.computeLeaderboard(bulkResults);
+
     return {
       instituteInfo: {
         id: institute._id as string,
         name: institute.full_name,
+        email: (institute as any).email,
+        phone: (institute as any).phone,
       },
       summary: {
         totalStudents: students.length,
         totalCourses: courses.length,
         totalTests: tests.length,
         testAttempts: totalAttempts,
-        averageScore,
+        totalCompleted,
+        averageScore: avgPercentage,
+        avgPercentage,
       },
       coursePerformance,
       subjectPerformance,
       testPerformance,
+      testTypeDistributions,
+      leaderboard,
     };
   }
 
@@ -1427,15 +1670,17 @@ export class ReportGeneratorService {
     const totalCourses = await this.courseModel.countDocuments({});
     const totalTests = await this.testModel.countDocuments({});
 
+    // Build date filter
+    const dateFilter: any = {};
+    if (report.dateRange) {
+      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+    }
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
+
     // Build query for results
     const query: any = {};
-
-    if (report.dateRange) {
-      query.startedAt = {
-        $gte: report.dateRange.startDate,
-        $lte: report.dateRange.endDate,
-      };
-    }
+    if (hasDateFilter) query.startedAt = dateFilter;
 
     // Get all results based on query
     const results = await this.resultModel
@@ -1449,18 +1694,29 @@ export class ReportGeneratorService {
     const totalAttempts = results.length;
     let totalScore = 0;
     let totalPossibleScore = 0;
+    let totalCompleted = 0;
 
     results.forEach((result) => {
+      if (result.status === ResultStatus.FINISHED) totalCompleted++;
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
       }
     });
 
-    const averageScore =
+    const avgPercentage =
       totalPossibleScore > 0
         ? ((totalScore / totalPossibleScore) * 100).toFixed(2)
         : '0';
+
+    // Collect subject IDs from results for distributions and bulk queries
+    const subjectIds: string[] = [];
+    for (const r of results) {
+      const subjId = (r.subject as any)?._id?.toString?.();
+      if (subjId && !subjectIds.includes(subjId)) {
+        subjectIds.push(subjId);
+      }
+    }
 
     // Institute performance analysis
     const instituteMap = new Map();
@@ -1596,6 +1852,28 @@ export class ReportGeneratorService {
       });
     });
 
+    // Fetch bulk-uploaded results for leaderboard
+    const bulkQuery: any = {
+      subject: { $in: subjectIds },
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
+    if (hasDateFilter) bulkQuery.startedAt = dateFilter;
+
+    const bulkResults = await this.resultModel
+      .find(bulkQuery)
+      .populate('student', 'full_name email')
+      .populate('subject', 'title')
+      .sort({ _id: -1 })
+      .exec();
+
+    const testTypeDistributions = await this.computeTestTypeDistributions(
+      subjectIds,
+      report.dateRange,
+    );
+
+    const leaderboard = this.computeLeaderboard(bulkResults);
+
     return {
       summary: {
         totalInstitutes,
@@ -1603,11 +1881,15 @@ export class ReportGeneratorService {
         totalCourses,
         totalTests,
         testAttempts: totalAttempts,
-        averageScore,
+        totalCompleted,
+        averageScore: avgPercentage,
+        avgPercentage,
       },
       institutePerformance,
       subjectPerformance,
       testPerformance,
+      testTypeDistributions,
+      leaderboard,
     };
   }
 }

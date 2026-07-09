@@ -107,8 +107,19 @@ export class ReportsService {
       }
 
       case ReportType.TEST: {
-        const test = await this.testModel.findById(reportDto.test);
-        name = `${test?.title || 'Test'}${dateRange} - Test Report`;
+        if (reportDto.testType) {
+          const testTypeLabel =
+            {
+              mock: 'Mock Test',
+              practice: 'Practice Test',
+              test: 'Assessment Test',
+              screening: 'Screening Test',
+            }[reportDto.testType] || reportDto.testType;
+          name = `${testTypeLabel}${dateRange} - Test Report`;
+        } else {
+          const test = await this.testModel.findById(reportDto.test);
+          name = `${test?.title || 'Test'}${dateRange} - Test Report`;
+        }
         break;
       }
 
@@ -162,8 +173,10 @@ export class ReportsService {
         }
         break;
       case ReportType.TEST:
-        if (!createReportDto.test) {
-          throw new BadRequestException('Test ID is required for test reports');
+        if (!createReportDto.test && !createReportDto.testType) {
+          throw new BadRequestException(
+            'Test ID or Test Type is required for test reports',
+          );
         }
         break;
       case ReportType.INSTITUTE:
@@ -238,6 +251,9 @@ export class ReportsService {
     }
     if (filterReportDto.test) {
       query.test = filterReportDto.test;
+    }
+    if (filterReportDto.testType) {
+      query.testType = filterReportDto.testType;
     }
 
     // Date range filtering

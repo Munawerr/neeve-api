@@ -24,7 +24,7 @@ export class PdfHeaderFooterService {
           body: [
             [
               logo
-                ? { image: logo, width: 40, height: 40, alignment: 'left' }
+                ? { image: logo, width: 40, height: 40, alignment: 'left', fillColor: PDF_COLORS.white }
                 : { text: '', alignment: 'left' },
               {
                 stack: [
@@ -130,12 +130,14 @@ export class PdfHeaderFooterService {
         bold: true,
         color: PDF_COLORS.body,
         fontSize: FONT_SIZES.body,
+        noWrap: false,
         margin: [8, 4, 4, 4],
       },
       {
         text: item.value || '-',
         color: PDF_COLORS.black,
         fontSize: FONT_SIZES.body,
+        noWrap: false,
         margin: [4, 4, 8, 4],
       },
     ]);
