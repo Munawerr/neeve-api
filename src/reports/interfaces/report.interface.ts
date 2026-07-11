@@ -87,54 +87,73 @@ export interface SubjectReportData {
   subjectInfo: SubjectInfo;
   summary: PerformanceSummary;
   testPerformance: TestPerformance[];
-  studentResults: TestResult[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }
 
 export interface CourseReportData {
   courseInfo: CourseInfo;
-  summary: PerformanceSummary;
-  // subjects: SubjectInfo[];
-  // tests: TestInfo[];
-  studentPerformance: any[];
+  summary: any;
   subjectPerformance: any[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }
 
 export interface TestReportData {
   testInfo: {
     id: string;
     name: string;
-    subject: string;
+    subject?: string;
+    testType?: string;
+    totalMarks?: number;
+    duration?: number;
+    date?: string;
+    testsCount?: number;
+    subjectsCovered?: string[];
   };
   summary: {
-    totalTests: number;
-    completedTests: number;
-    averageScore: string;
-    totalScore: number;
-    totalPossibleScore: number;
+    totalStudents: number;
+    totalAttempts: number;
+    completedAttempts: number;
+    avgScore: string;
+    avgPercentage: string;
+    highestScore: string;
+    lowestScore: string;
+    avgTimeTaken: string;
   };
   questionAnalysis: Array<{
-    questionId: string;
-    attempts: number;
+    questionNo: number;
+    totalAttempts: number;
     correct: number;
     incorrect: number;
-    correctPercentage: string;
-    averageTime: string;
+    avgTime: string;
   }>;
-  studentResults: TestResult[];
+  studentResults: any[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }
 
 export interface InstituteReportData {
-  instituteInfo: InstituteInfo;
+  instituteInfo: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  };
   summary: {
     totalStudents: number;
     totalCourses: number;
     totalTests: number;
     testAttempts: number;
+    totalCompleted: number;
     averageScore: string;
+    avgPercentage: string;
   };
   coursePerformance: any[];
   subjectPerformance: SubjectPerformance[];
   testPerformance: TestPerformance[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }
 
 export interface OverallReportData {
@@ -144,9 +163,13 @@ export interface OverallReportData {
     totalCourses: number;
     totalTests: number;
     testAttempts: number;
+    totalCompleted: number;
     averageScore: string;
+    avgPercentage: string;
   };
   institutePerformance: any[];
   subjectPerformance: SubjectPerformance[];
   testPerformance: TestPerformance[];
+  testTypeDistributions: any[];
+  leaderboard: any;
 }

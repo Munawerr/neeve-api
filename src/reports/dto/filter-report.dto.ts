@@ -5,6 +5,7 @@ import {
   IsString,
   IsMongoId,
   IsDateString,
+  IsIn,
 } from 'class-validator';
 import {
   ReportFormat,
@@ -76,6 +77,14 @@ export class FilterReportDto {
   @IsOptional()
   @IsMongoId()
   test?: string;
+
+  @ApiPropertyOptional({
+    description: 'Test type for aggregated test reports',
+    example: 'mock',
+  })
+  @IsOptional()
+  @IsIn(['mock', 'practice', 'test', 'screening'])
+  testType?: string;
 
   @ApiPropertyOptional({ description: 'Start date for filtering reports' })
   @IsOptional()

@@ -69,6 +69,7 @@ export class LiveClassesService {
       : baseQuery;
     const liveClasses = await this.liveClassModel
       .find(query)
+      .sort({ date: -1, startTime: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate({

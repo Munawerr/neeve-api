@@ -7,6 +7,7 @@ import {
   ValidateNested,
   IsObject,
   IsMongoId,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReportFormat, ReportType } from '../schemas/report.schema';
@@ -85,6 +86,14 @@ export class CreateReportDto {
   @IsOptional()
   @IsMongoId()
   test?: string;
+
+  @ApiPropertyOptional({
+    description: 'Test type for aggregated test reports (replaces individual test selection)',
+    example: 'mock',
+  })
+  @IsOptional()
+  @IsIn(['mock', 'practice', 'test', 'screening'])
+  testType?: string;
 
   @ApiPropertyOptional({ description: 'Date range for report data' })
   @IsOptional()

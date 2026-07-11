@@ -15,7 +15,6 @@ import { TestsService } from 'src/tests/tests.service';
 import { Package, PackageSchema } from 'src/packages/schemas/package.schema';
 import { Role, RoleSchema } from 'src/roles/schemas/role.schema';
 import { S3Service } from 'src/s3/s3.service';
-import { PdfReportService } from './../reports/services/pdf-report.service';
 import {
   Question,
   QuestionSchema,
@@ -27,10 +26,12 @@ import {
 } from 'src/auth/schemas/login-history.schema';
 import { LoginHistoryService } from 'src/auth/login-history.service';
 import { SubjectsModule } from 'src/subjects/subjects.module';
+import { ReportsModule } from 'src/reports/reports.module';
 
 @Module({
   imports: [
     SubjectsModule,
+    ReportsModule,
     MongooseModule.forFeature([
       { name: Result.name, schema: ResultSchema },
       { name: QuestionResult.name, schema: QuestionResultSchema },
@@ -50,7 +51,6 @@ import { SubjectsModule } from 'src/subjects/subjects.module';
     UsersService,
     TestsService,
     S3Service,
-    PdfReportService,
     LoginHistoryService,
   ],
 })
