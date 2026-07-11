@@ -29,9 +29,14 @@ export class AssignmentsController {
   constructor(private readonly assignmentsService: AssignmentsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new assignment for a subject in a package' })
+  @ApiOperation({
+    summary: 'Create a new assignment for a subject in a package',
+  })
   @ApiBody({ type: CreateAssignmentDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Assignment created successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Assignment created successfully',
+  })
   @SetMetadata('permissions', ['edit_topics'])
   async create(@Body() dto: CreateAssignmentDto) {
     const assignment = await this.assignmentsService.create(dto);
@@ -46,7 +51,10 @@ export class AssignmentsController {
   @ApiOperation({ summary: 'Get all assignments for a subject in a package' })
   @ApiParam({ name: 'subjectId', required: true })
   @ApiParam({ name: 'packageId', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Assignments retrieved successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Assignments retrieved successfully',
+  })
   async findBySubjectAndPackage(
     @Param('subjectId') subjectId: string,
     @Param('packageId') packageId: string,
@@ -65,7 +73,10 @@ export class AssignmentsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Soft-delete an assignment' })
   @ApiParam({ name: 'id', required: true })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Assignment deleted successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Assignment deleted successfully',
+  })
   @SetMetadata('permissions', ['edit_topics'])
   async remove(@Param('id') id: string) {
     const result = await this.assignmentsService.remove(id);

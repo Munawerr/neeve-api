@@ -11,8 +11,6 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
-  ForbiddenException,
-  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -167,9 +165,10 @@ function levenshteinDistance(a: string, b: string): number {
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -216,7 +215,10 @@ function matchSubject(csvHeader: string, subjects: Subject[]): Subject | null {
   let bestScore = 0;
   let bestSubject: Subject | null = null;
   for (const subject of subjects) {
-    const score = jaccardSimilarity(normalizeForMatch(subject.title), normHeader);
+    const score = jaccardSimilarity(
+      normalizeForMatch(subject.title),
+      normHeader,
+    );
     if (score > bestScore) {
       bestScore = score;
       bestSubject = subject;
@@ -228,8 +230,14 @@ function matchSubject(csvHeader: string, subjects: Subject[]): Subject | null {
   let bestLevScore = Infinity;
   let bestLevSubject: Subject | null = null;
   for (const subject of subjects) {
-    const dist = levenshteinDistance(normHeader, normalizeForMatch(subject.title));
-    const maxLen = Math.max(normHeader.length, normalizeForMatch(subject.title).length);
+    const dist = levenshteinDistance(
+      normHeader,
+      normalizeForMatch(subject.title),
+    );
+    const maxLen = Math.max(
+      normHeader.length,
+      normalizeForMatch(subject.title).length,
+    );
     const normalizedDist = maxLen > 0 ? dist / maxLen : 1;
     if (normalizedDist < bestLevScore) {
       bestLevScore = normalizedDist;
@@ -252,7 +260,9 @@ export class ResultsController {
     private readonly subjectsService: SubjectsService,
   ) {}
 
-  private getNormalizedMarksPerQuestion(value: number | string | undefined): number {
+  private getNormalizedMarksPerQuestion(
+    value: number | string | undefined,
+  ): number {
     const numericValue = Number(value);
     if (!Number.isFinite(numericValue)) {
       return 0;
@@ -319,12 +329,10 @@ export class ResultsController {
     }),
   )
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Parse a CSV file for bulk report card upload (admin only)' })
-  async parseBulkUploadCSV(
-    @UploadedFile() file: Express.Multer.File,
-    @Request() req: any,
-  ) {
-
+  @ApiOperation({
+    summary: 'Parse a CSV file for bulk report card upload (admin only)',
+  })
+  async parseBulkUploadCSV(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       return { status: HttpStatus.BAD_REQUEST, message: 'No file uploaded' };
     }
@@ -343,7 +351,10 @@ export class ResultsController {
     const cols = detectColumns(headers);
 
     // Pre-fetch all subjects and all students once
-    const { subjects: allSubjects } = await this.subjectsService.findAll(1, 10000);
+    const { subjects: allSubjects } = await this.subjectsService.findAll(
+      1,
+      10000,
+    );
 
     const preview = await Promise.all(
       rows.slice(1).map(async (row, rowIndex) => {
@@ -370,7 +381,8 @@ export class ResultsController {
         let matchedStudent: any = null;
         const trimmedEmail = csvEmail.trim().toLowerCase();
         if (trimmedEmail) {
-          matchedStudent = await this.usersService.findByEmailCaseInsensitive(trimmedEmail);
+          matchedStudent =
+            await this.usersService.findByEmailCaseInsensitive(trimmedEmail);
         }
         if (!matchedStudent) {
           const trimmedPhone = csvPhone.trim();
@@ -449,15 +461,17 @@ export class ResultsController {
   @Post('bulk-upload/submit')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Submit confirmed bulk upload rows to save to DB (admin only)' })
+  @ApiOperation({
+    summary: 'Submit confirmed bulk upload rows to save to DB (admin only)',
+  })
   @ApiBody({ type: BulkUploadSubmitDto })
-  async submitBulkUpload(
-    @Body() submitDto: BulkUploadSubmitDto,
-    @Request() req: any,
-  ) {
-
+  async submitBulkUpload(@Body() submitDto: BulkUploadSubmitDto) {
     // Validate input structure
-    if (!submitDto || !Array.isArray(submitDto.rows) || submitDto.rows.length === 0) {
+    if (
+      !submitDto ||
+      !Array.isArray(submitDto.rows) ||
+      submitDto.rows.length === 0
+    ) {
       return {
         status: HttpStatus.BAD_REQUEST,
         message: 'No rows provided in the request body',
@@ -467,7 +481,11 @@ export class ResultsController {
 
     const results = {
       success: 0,
-      failed: [] as Array<{ studentId: string; subjectId: string; error: string }>,
+      failed: [] as Array<{
+        studentId: string;
+        subjectId: string;
+        error: string;
+      }>,
       warnings: [] as Array<{ studentId: string; message: string }>,
     };
 
@@ -482,11 +500,15 @@ export class ResultsController {
         continue;
       }
 
-      if (!Array.isArray(row.subjectResults) || row.subjectResults.length === 0) {
+      if (
+        !Array.isArray(row.subjectResults) ||
+        row.subjectResults.length === 0
+      ) {
         results.failed.push({
           studentId: row.studentId,
           subjectId: '',
-          error: 'No subject results found for this student. Ensure subjects in the CSV match subjects in the database.',
+          error:
+            'No subject results found for this student. Ensure subjects in the CSV match subjects in the database.',
         });
         continue;
       }
@@ -494,7 +516,11 @@ export class ResultsController {
       // Validate each subject result has required fields
       let hasInvalidSubjectResult = false;
       for (const sr of row.subjectResults) {
-        if (!sr.subjectId || typeof sr.obtained !== 'number' || typeof sr.total !== 'number') {
+        if (
+          !sr.subjectId ||
+          typeof sr.obtained !== 'number' ||
+          typeof sr.total !== 'number'
+        ) {
           hasInvalidSubjectResult = true;
           break;
         }
@@ -503,7 +529,8 @@ export class ResultsController {
         results.failed.push({
           studentId: row.studentId,
           subjectId: '',
-          error: 'One or more subject results have missing or invalid fields (subjectId, obtained, total)',
+          error:
+            'One or more subject results have missing or invalid fields (subjectId, obtained, total)',
         });
         continue;
       }
@@ -519,7 +546,8 @@ export class ResultsController {
       }
 
       const instituteId =
-        (student as any).institute?.toString() || (student as any)._id?.toString();
+        (student as any).institute?.toString() ||
+        (student as any)._id?.toString();
 
       for (const sr of row.subjectResults) {
         try {
@@ -1004,7 +1032,8 @@ export class ResultsController {
           this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+        const averageMarks =
+          totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -1193,7 +1222,8 @@ export class ResultsController {
           this.getNormalizedMarksPerQuestion(result.marksPerQuestion);
 
         const obtainedMarks = result.marksSummary.obtainedMarks;
-        const averageMarks = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+        const averageMarks =
+          totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         const correctAnswers = result.marksSummary.correctAnswers;
         const incorrectAnswers = result.marksSummary.incorrectAnswers;
         const averageTimePerQuestion =
@@ -1427,11 +1457,10 @@ export class ResultsController {
       }
       const bulkUploadedSubjectResults = Array.from(subjectMap.values());
 
-      const reportCardLink =
-        bulkResults.find((r) => (r as any).reportCardLink)
-          ? (bulkResults.find((r) => (r as any).reportCardLink) as any)
-              .reportCardLink
-          : null;
+      const reportCardLink = bulkResults.find((r) => (r as any).reportCardLink)
+        ? (bulkResults.find((r) => (r as any).reportCardLink) as any)
+            .reportCardLink
+        : null;
 
       bulkUploadPayload = {
         hasBulkUploadedData: true,
@@ -1495,8 +1524,10 @@ export class ResultsController {
     @Param('studentId') studentId: string,
     @Param('subjectId') subjectId: string,
   ) {
-    const results =
-      await this.resultsService.findSubjectHistory(studentId, subjectId);
+    const results = await this.resultsService.findSubjectHistory(
+      studentId,
+      subjectId,
+    );
 
     const student = await this.usersService.getStudentUser(studentId);
     const subject = await this.subjectsService.findOne(subjectId);
@@ -1526,9 +1557,7 @@ export class ResultsController {
               regNo: student.regNo,
             }
           : null,
-        subject: subject
-          ? { _id: subject._id, title: subject.title }
-          : null,
+        subject: subject ? { _id: subject._id, title: subject.title } : null,
         history,
       },
     };

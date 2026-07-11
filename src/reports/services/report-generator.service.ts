@@ -142,7 +142,10 @@ export class ReportGeneratorService {
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     // Fetch non-bulk results
-    const query: any = { student: report.student, isBulkUploaded: { $ne: true } };
+    const query: any = {
+      student: report.student,
+      isBulkUploaded: { $ne: true },
+    };
     if (hasDateFilter) query.startedAt = dateFilter;
     const regularResults = await this.resultModel
       .find(query)
@@ -151,7 +154,11 @@ export class ReportGeneratorService {
       .exec();
 
     // Fetch bulk-uploaded results separately (CSV / update-report-card)
-    const bulkQuery: any = { student: report.student, isBulkUploaded: true, status: ResultStatus.FINISHED };
+    const bulkQuery: any = {
+      student: report.student,
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
     if (hasDateFilter) bulkQuery.startedAt = dateFilter;
     const bulkResults = await this.resultModel
       .find(bulkQuery)
@@ -163,7 +170,10 @@ export class ReportGeneratorService {
     const seenSubjects = new Set<string>();
     const combinedBulk: any[] = [];
     for (const br of bulkResults) {
-      const subjId = (br.subject as any)?._id?.toString?.() ?? (br.subject as any)?.toString?.() ?? '';
+      const subjId =
+        (br.subject as any)?._id?.toString?.() ??
+        (br.subject as any)?.toString?.() ??
+        '';
       if (!seenSubjects.has(subjId)) {
         seenSubjects.add(subjId);
         combinedBulk.push(br);
@@ -193,8 +203,9 @@ export class ReportGeneratorService {
     const subjectMap = new Map();
 
     allResults.forEach((result) => {
-      const subj = (result as any).subject;
-      const subjectId = subj?._id?.toString?.() ?? subj?.toString?.() ?? 'unknown';
+      const subj = result.subject;
+      const subjectId =
+        subj?._id?.toString?.() ?? subj?.toString?.() ?? 'unknown';
       const subjectName = subj?.title || 'Unknown';
 
       if (!subjectMap.has(subjectId)) {
@@ -276,7 +287,9 @@ export class ReportGeneratorService {
         averageScore: averageScore.toFixed(2),
         totalScore,
         totalPossibleScore,
-        rank: allResults.find((r: any) => r.marksSummary?.rank != null)?.marksSummary?.rank ?? null,
+        rank:
+          allResults.find((r: any) => r.marksSummary?.rank != null)
+            ?.marksSummary?.rank ?? null,
       },
       subjectPerformance,
       testResults,
@@ -295,13 +308,18 @@ export class ReportGeneratorService {
     // Build date filter
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     // Fetch regular results for this subject
-    const query: any = { subject: report.subject, isBulkUploaded: { $ne: true } };
+    const query: any = {
+      subject: report.subject,
+      isBulkUploaded: { $ne: true },
+    };
     if (report.institute) query.institute = report.institute;
     if (hasDateFilter) query.startedAt = dateFilter;
 
@@ -313,7 +331,11 @@ export class ReportGeneratorService {
       .exec();
 
     // Fetch bulk-uploaded results for this subject
-    const bulkQuery: any = { subject: report.subject, isBulkUploaded: true, status: ResultStatus.FINISHED };
+    const bulkQuery: any = {
+      subject: report.subject,
+      isBulkUploaded: true,
+      status: ResultStatus.FINISHED,
+    };
     if (report.institute) bulkQuery.institute = report.institute;
     if (hasDateFilter) bulkQuery.startedAt = dateFilter;
 
@@ -329,9 +351,6 @@ export class ReportGeneratorService {
 
     // Calculate overall performance
     const totalTests = allResults.length;
-    const completedTests = allResults.filter(
-      (r) => r.status === 'finished',
-    ).length;
     let totalScore = 0;
     let totalPossibleScore = 0;
     let highestScore = 0;
@@ -341,23 +360,35 @@ export class ReportGeneratorService {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
-        const pct = result.marksSummary.totalMarks > 0
-          ? (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100
-          : 0;
+        const pct =
+          result.marksSummary.totalMarks > 0
+            ? (result.marksSummary.obtainedMarks /
+                result.marksSummary.totalMarks) *
+              100
+            : 0;
         if (pct > highestScore) highestScore = pct;
         if (pct < lowestScore) lowestScore = pct;
       }
     });
 
-    const averageScore = totalPossibleScore > 0 ? (totalScore / totalPossibleScore) * 100 : 0;
-    const uniqueStudents = new Set(allResults.map((r: any) => (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()));
+    const averageScore =
+      totalPossibleScore > 0 ? (totalScore / totalPossibleScore) * 100 : 0;
+    const uniqueStudents = new Set(
+      allResults.map(
+        (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+      ),
+    );
 
     // Group results by test for test performance
     const testMap = new Map<string, any>();
     allResults.forEach((result: any) => {
       const isBulk = result.isBulkUploaded === true;
-      const testKey = isBulk ? `bulk_${(result.subject as any)?._id?.toString?.() ?? 'unknown'}` : (result.test as any)?._id?.toString?.() ?? 'unknown';
-      const testName = isBulk ? (result.subject as any)?.title || 'Bulk Entry' : result.test?.title || 'Unknown';
+      const testKey = isBulk
+        ? `bulk_${result.subject?._id?.toString?.() ?? 'unknown'}`
+        : (result.test?._id?.toString?.() ?? 'unknown');
+      const testName = isBulk
+        ? result.subject?.title || 'Bulk Entry'
+        : result.test?.title || 'Unknown';
       const testType = result.testType || 'mock';
 
       if (!testMap.has(testKey)) {
@@ -383,11 +414,19 @@ export class ReportGeneratorService {
 
     const testPerformance: any[] = [];
     testMap.forEach((td) => {
-      const avgPct = td.totalPossibleScore > 0 ? (td.totalScore / td.totalPossibleScore) * 100 : 0;
+      const avgPct =
+        td.totalPossibleScore > 0
+          ? (td.totalScore / td.totalPossibleScore) * 100
+          : 0;
       testPerformance.push({
         testName: td.testName,
         testType: td.testType,
-        date: td.date ? new Date(td.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }) : '-',
+        date: td.date
+          ? new Date(td.date).toLocaleDateString('en-US', {
+              month: '2-digit',
+              day: '2-digit',
+            })
+          : '-',
         avgScore: avgPct.toFixed(1),
         avgPercentage: avgPct.toFixed(1),
         studentsAttempted: td.attempts,
@@ -425,7 +464,7 @@ export class ReportGeneratorService {
     const studentRankMap = new Map<string, Map<string, number>>();
 
     for (const br of bulkResults) {
-      const studentName = (br.student as any)?.full_name || 'Unknown';
+      const studentName = br.student?.full_name || 'Unknown';
       const testType = br.testType || 'mock';
       const rank = br.marksSummary?.rank;
       if (rank == null) continue;
@@ -456,7 +495,11 @@ export class ReportGeneratorService {
       testTypes,
       entries,
       analytics: {
-        totalStudents: new Set(bulkResults.map((r: any) => (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.())).size,
+        totalStudents: new Set(
+          bulkResults.map(
+            (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+          ),
+        ).size,
       },
     };
   }
@@ -474,7 +517,8 @@ export class ReportGeneratorService {
     if (instituteId) query.institute = instituteId;
     if (dateRange) {
       query.startedAt = {};
-      if (dateRange.startDate) query.startedAt.$gte = new Date(dateRange.startDate);
+      if (dateRange.startDate)
+        query.startedAt.$gte = new Date(dateRange.startDate);
       if (dateRange.endDate) query.startedAt.$lte = new Date(dateRange.endDate);
     }
 
@@ -487,24 +531,36 @@ export class ReportGeneratorService {
     // Group by (studentId, subjectId, testType) → compute avg percentage
     const groupMap = new Map<string, { total: number; count: number }>();
     for (const r of results) {
-      const subjId = ((r.subject as any)?._id?.toString?.() ?? r.subject?.toString?.() ?? 'unknown');
-      const key = `${r.student}_${subjId}_${r.testType || 'mock'}`;
+      const subjId =
+        (r.subject as any)?._id?.toString?.() ??
+        r.subject?.toString?.() ??
+        'unknown';
+      const key = `${String(r.student)}_${subjId}_${r.testType || 'mock'}`;
       if (!groupMap.has(key)) groupMap.set(key, { total: 0, count: 0 });
       const g = groupMap.get(key)!;
       if ((r.marksSummary as any)?.totalMarks > 0) {
-        const pct = ((r.marksSummary as any).obtainedMarks / (r.marksSummary as any).totalMarks) * 100;
+        const pct =
+          ((r.marksSummary as any).obtainedMarks /
+            (r.marksSummary as any).totalMarks) *
+          100;
         g.total += pct;
         g.count++;
       }
     }
 
     // Bucket students per (subjectId, testType)
-    const subjectBuckets = new Map<string, Map<string, {
-      range0to40: Set<string>;
-      range41to60: Set<string>;
-      range61to80: Set<string>;
-      range81to100: Set<string>;
-    }>>();
+    const subjectBuckets = new Map<
+      string,
+      Map<
+        string,
+        {
+          range0to40: Set<string>;
+          range41to60: Set<string>;
+          range61to80: Set<string>;
+          range81to100: Set<string>;
+        }
+      >
+    >();
 
     for (const [key, val] of groupMap) {
       const [studentId, subjId, testType] = key.split('_');
@@ -514,7 +570,12 @@ export class ReportGeneratorService {
       if (!subjectBuckets.has(subjId)) subjectBuckets.set(subjId, new Map());
       const ttMap = subjectBuckets.get(subjId)!;
       if (!ttMap.has(testType)) {
-        ttMap.set(testType, { range0to40: new Set(), range41to60: new Set(), range61to80: new Set(), range81to100: new Set() });
+        ttMap.set(testType, {
+          range0to40: new Set(),
+          range41to60: new Set(),
+          range61to80: new Set(),
+          range81to100: new Set(),
+        });
       }
       const bucket = ttMap.get(testType)!;
       if (avgPct < 40) bucket.range0to40.add(studentId);
@@ -527,7 +588,10 @@ export class ReportGeneratorService {
     const distributions: any[] = [];
     const subjectNames = new Map<string, string>();
     for (const r of results) {
-      const subjId = ((r.subject as any)?._id?.toString?.() ?? r.subject?.toString?.() ?? 'unknown');
+      const subjId =
+        (r.subject as any)?._id?.toString?.() ??
+        r.subject?.toString?.() ??
+        'unknown';
       const subjName = (r.subject as any)?.title || 'Unknown';
       if (!subjectNames.has(subjId)) subjectNames.set(subjId, subjName);
     }
@@ -613,8 +677,10 @@ export class ReportGeneratorService {
     // Build date filter
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
@@ -672,9 +738,11 @@ export class ReportGeneratorService {
         ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
 
-    const uniqueStudents = new Set(allResults.map((r: any) =>
-      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
-    ));
+    const uniqueStudents = new Set(
+      allResults.map(
+        (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+      ),
+    );
 
     // Group performance by subject
     const subjectMap = new Map();
@@ -717,12 +785,16 @@ export class ReportGeneratorService {
         subjectName: subject.name,
         code: '',
         totalTests: subject.totalTests,
-        avgScore: subject.totalPossibleScore > 0
-          ? (subject.totalScore / subject.totalPossibleScore).toFixed(1)
-          : '0',
-        avgPercentage: subject.totalPossibleScore > 0
-          ? ((subject.totalScore / subject.totalPossibleScore) * 100).toFixed(1)
-          : '0',
+        avgScore:
+          subject.totalPossibleScore > 0
+            ? (subject.totalScore / subject.totalPossibleScore).toFixed(1)
+            : '0',
+        avgPercentage:
+          subject.totalPossibleScore > 0
+            ? ((subject.totalScore / subject.totalPossibleScore) * 100).toFixed(
+                1,
+              )
+            : '0',
       }),
     );
 
@@ -747,7 +819,10 @@ export class ReportGeneratorService {
         totalStudents: uniqueStudents.size,
         totalAttempted,
         totalCompleted,
-        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgScore:
+          totalPossibleScore > 0
+            ? (totalScore / totalPossibleScore).toFixed(1)
+            : '0',
         avgPercentage,
       },
       subjectPerformance,
@@ -786,14 +861,21 @@ export class ReportGeneratorService {
     // Build date filter
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     // Get unique subject IDs from tests
     const subjectIds = [
-      ...new Set(tests.map((test: any) => test.subject?._id?.toString?.() ?? test.subject?.toString?.())),
+      ...new Set(
+        tests.map(
+          (test: any) =>
+            test.subject?._id?.toString?.() ?? test.subject?.toString?.(),
+        ),
+      ),
     ].filter(Boolean);
 
     // Fetch regular results for tests in this package
@@ -850,16 +932,20 @@ export class ReportGeneratorService {
         ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
 
-    const uniqueStudents = new Set(allResults.map((r: any) =>
-      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
-    ));
+    const uniqueStudents = new Set(
+      allResults.map(
+        (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+      ),
+    );
 
     // Course-wise performance analysis
     const courseMap = new Map();
 
     allResults.forEach((result: any) => {
       const testId = result.test?._id?.toString?.();
-      const test: any = testId ? tests.find((t) => t._id.toString() === testId) : null;
+      const test: any = testId
+        ? tests.find((t) => t._id.toString() === testId)
+        : null;
       if (!test || !test.course) return;
 
       const courseId = test.course._id.toString();
@@ -879,7 +965,9 @@ export class ReportGeneratorService {
 
       const courseData = courseMap.get(courseId);
       courseData.testsAttempted++;
-      courseData.students.add((result.student as any)?._id?.toString?.() ?? (result.student as any)?.toString?.());
+      courseData.students.add(
+        result.student?._id?.toString?.() ?? result.student?.toString?.(),
+      );
 
       if (result.status === ResultStatus.FINISHED) {
         courseData.testsCompleted++;
@@ -935,7 +1023,10 @@ export class ReportGeneratorService {
         totalAttempted,
         totalCompleted,
         totalStudents: uniqueStudents.size,
-        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgScore:
+          totalPossibleScore > 0
+            ? (totalScore / totalPossibleScore).toFixed(1)
+            : '0',
         avgPercentage,
       },
       coursePerformance,
@@ -962,13 +1053,17 @@ export class ReportGeneratorService {
       );
     }
 
-    const subjectId = ((test.subject as any)?._id?.toString?.() ?? test.subject?.toString?.()) as string;
-    const totalMarks = (test.marksPerQuestion ?? 0) * ((test.questions as any[])?.length ?? 0);
+    const subjectId = ((test.subject as any)?._id?.toString?.() ??
+      test.subject?.toString?.()) as string;
+    const totalMarks =
+      (test.marksPerQuestion ?? 0) * ((test.questions as any[])?.length ?? 0);
 
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
@@ -1000,14 +1095,18 @@ export class ReportGeneratorService {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
-        const pct = result.marksSummary.totalMarks > 0
-          ? (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100
-          : 0;
+        const pct =
+          result.marksSummary.totalMarks > 0
+            ? (result.marksSummary.obtainedMarks /
+                result.marksSummary.totalMarks) *
+              100
+            : 0;
         if (pct > highestScore) highestScore = pct;
         if (pct < lowestScore) lowestScore = pct;
       }
       if (result.finishedAt && result.startedAt) {
-        totalTimeTaken += (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
+        totalTimeTaken +=
+          (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
         timeCount++;
       }
     });
@@ -1017,9 +1116,8 @@ export class ReportGeneratorService {
         ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
 
-    const avgTimeTaken = timeCount > 0
-      ? `${(totalTimeTaken / timeCount).toFixed(0)} min`
-      : '-';
+    const avgTimeTaken =
+      timeCount > 0 ? `${(totalTimeTaken / timeCount).toFixed(0)} min` : '-';
 
     const questionMap = new Map();
 
@@ -1090,9 +1188,11 @@ export class ReportGeneratorService {
 
     const leaderboard = this.computeLeaderboard(bulkResults);
 
-    const uniqueStudents = new Set(regularResults.map((r: any) =>
-      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
-    ));
+    const uniqueStudents = new Set(
+      regularResults.map(
+        (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+      ),
+    );
 
     return {
       testInfo: {
@@ -1110,7 +1210,10 @@ export class ReportGeneratorService {
         totalStudents: uniqueStudents.size,
         totalAttempts,
         completedAttempts,
-        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgScore:
+          totalPossibleScore > 0
+            ? (totalScore / totalPossibleScore).toFixed(1)
+            : '0',
         avgPercentage,
         highestScore: lowestScore === Infinity ? '-' : highestScore.toFixed(1),
         lowestScore: lowestScore === Infinity ? '-' : lowestScore.toFixed(1),
@@ -1123,14 +1226,19 @@ export class ReportGeneratorService {
     };
   }
 
-  private async getTestTypeAggregatedReportData(report: Report): Promise<TestReportData> {
+  private async getTestTypeAggregatedReportData(
+    report: Report,
+  ): Promise<TestReportData> {
     const testType = (report as any).testType;
 
     let testTypeTests: any[] = [];
     if (report.course) {
       const course = await this.courseModel.findById(report.course);
       if (course) {
-        const user: any = await this.userModel.findById(report.institute).populate('packages').exec();
+        const user: any = await this.userModel
+          .findById(report.institute)
+          .populate('packages')
+          .exec();
         let packageId: any = null;
         const reportCourseId = report.course.toString();
         if (user) {
@@ -1170,7 +1278,14 @@ export class ReportGeneratorService {
 
     if (!testTypeTests.length) {
       const label =
-        ({ mock: 'Mock Test', practice: 'Practice Test', test: 'Assessment Test', screening: 'Screening Test' } as Record<string, string>)[testType as string] || (testType as string);
+        (
+          {
+            mock: 'Mock Test',
+            practice: 'Practice Test',
+            test: 'Assessment Test',
+            screening: 'Screening Test',
+          } as Record<string, string>
+        )[testType as string] || (testType as string);
       throw new NotFoundException(
         `No ${label} tests found in the system. Create a test of type "${testType}" first.`,
       );
@@ -1179,22 +1294,22 @@ export class ReportGeneratorService {
     const testIds = testTypeTests.map((t) => t._id);
     const subjectIds = [
       ...new Set(
-        testTypeTests.map((t: any) =>
-          (t.subject as any)?._id?.toString?.() ?? t.subject?.toString?.()
-        ).filter(Boolean),
+        testTypeTests
+          .map(
+            (t: any) => t.subject?._id?.toString?.() ?? t.subject?.toString?.(),
+          )
+          .filter(Boolean),
       ),
     ];
     const subjectTitles = [
-      ...new Set(
-        testTypeTests.map((t: any) =>
-          (t.subject as any)?.title || 'Unknown',
-        ),
-      ),
+      ...new Set(testTypeTests.map((t: any) => t.subject?.title || 'Unknown')),
     ];
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
@@ -1246,14 +1361,18 @@ export class ReportGeneratorService {
       if (result.marksSummary) {
         totalScore += result.marksSummary.obtainedMarks;
         totalPossibleScore += result.marksSummary.totalMarks;
-        const pct = result.marksSummary.totalMarks > 0
-          ? (result.marksSummary.obtainedMarks / result.marksSummary.totalMarks) * 100
-          : 0;
+        const pct =
+          result.marksSummary.totalMarks > 0
+            ? (result.marksSummary.obtainedMarks /
+                result.marksSummary.totalMarks) *
+              100
+            : 0;
         if (pct > highestScore) highestScore = pct;
         if (pct < lowestScore) lowestScore = pct;
       }
       if (result.finishedAt && result.startedAt) {
-        totalTimeTaken += (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
+        totalTimeTaken +=
+          (result.finishedAt.getTime() - result.startedAt.getTime()) / 60000;
         timeCount++;
       }
     });
@@ -1263,9 +1382,8 @@ export class ReportGeneratorService {
         ? ((totalScore / totalPossibleScore) * 100).toFixed(1)
         : '0';
 
-    const avgTimeTaken = timeCount > 0
-      ? `${(totalTimeTaken / timeCount).toFixed(0)} min`
-      : '-';
+    const avgTimeTaken =
+      timeCount > 0 ? `${(totalTimeTaken / timeCount).toFixed(0)} min` : '-';
 
     const questionMap = new Map();
 
@@ -1321,12 +1439,21 @@ export class ReportGeneratorService {
 
     const leaderboard = this.computeLeaderboard(bulkResults);
 
-    const uniqueStudents = new Set(regularResults.map((r: any) =>
-      (r.student as any)?._id?.toString?.() ?? (r.student as any)?.toString?.()
-    ));
+    const uniqueStudents = new Set(
+      regularResults.map(
+        (r: any) => r.student?._id?.toString?.() ?? r.student?.toString?.(),
+      ),
+    );
 
     const testTypeLabel =
-      ({ mock: 'Mock Test', practice: 'Practice Test', test: 'Assessment Test', screening: 'Screening Test' } as Record<string, string>)[testType as string] || (testType as string);
+      (
+        {
+          mock: 'Mock Test',
+          practice: 'Practice Test',
+          test: 'Assessment Test',
+          screening: 'Screening Test',
+        } as Record<string, string>
+      )[testType as string] || (testType as string);
 
     return {
       testInfo: {
@@ -1340,7 +1467,10 @@ export class ReportGeneratorService {
         totalStudents: uniqueStudents.size,
         totalAttempts,
         completedAttempts,
-        avgScore: totalPossibleScore > 0 ? (totalScore / totalPossibleScore).toFixed(1) : '0',
+        avgScore:
+          totalPossibleScore > 0
+            ? (totalScore / totalPossibleScore).toFixed(1)
+            : '0',
         avgPercentage,
         highestScore: lowestScore === Infinity ? '-' : highestScore.toFixed(1),
         lowestScore: lowestScore === Infinity ? '-' : lowestScore.toFixed(1),
@@ -1401,8 +1531,10 @@ export class ReportGeneratorService {
     // Build date filter
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
@@ -1420,11 +1552,15 @@ export class ReportGeneratorService {
 
     // If no courses found via packages, try to fetch courses from results' tests
     if (courses.length === 0 && results.length > 0) {
-      const resultCourseIds = [...new Set(
-        results.map((r: any) => (r.test as any)?.course?.toString?.()).filter(Boolean),
-      )];
+      const resultCourseIds = [
+        ...new Set(
+          results.map((r: any) => r.test?.course?.toString?.()).filter(Boolean),
+        ),
+      ];
       if (resultCourseIds.length > 0) {
-        courses = await this.courseModel.find({ _id: { $in: resultCourseIds } }).lean() as any[];
+        courses = (await this.courseModel
+          .find({ _id: { $in: resultCourseIds } })
+          .lean()) as any[];
         courseIds = courses.map((c) => c._id);
         tests = await this.testModel
           .find({ course: { $in: courseIds } })
@@ -1468,7 +1604,7 @@ export class ReportGeneratorService {
     const courseMap = new Map();
 
     results.forEach((result: any) => {
-      const testObj = result.test as any;
+      const testObj = result.test;
       if (!testObj) return;
       const courseId = testObj.course?.toString?.();
       if (!courseId) return;
@@ -1673,8 +1809,10 @@ export class ReportGeneratorService {
     // Build date filter
     const dateFilter: any = {};
     if (report.dateRange) {
-      if (report.dateRange.startDate) dateFilter.$gte = new Date(report.dateRange.startDate);
-      if (report.dateRange.endDate) dateFilter.$lte = new Date(report.dateRange.endDate);
+      if (report.dateRange.startDate)
+        dateFilter.$gte = new Date(report.dateRange.startDate);
+      if (report.dateRange.endDate)
+        dateFilter.$lte = new Date(report.dateRange.endDate);
     }
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 

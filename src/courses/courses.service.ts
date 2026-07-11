@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Schema as MongooseSchema } from 'mongoose';
 import { Course } from './schemas/course.schema';
@@ -15,7 +19,12 @@ type DeleteGuardResult =
   | { deleted: true }
   | {
       deleted: false;
-      blockedBy: Array<{ type: string; id: string; name: string; actionHint: string }>;
+      blockedBy: Array<{
+        type: string;
+        id: string;
+        name: string;
+        actionHint: string;
+      }>;
     };
 
 @Injectable()
@@ -74,7 +83,9 @@ export class CoursesService {
   }
 
   findOne(id: string): Promise<Course | null> {
-    return this.courseModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
+    return this.courseModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .exec();
   }
 
   findByIds(ids: string[]): Promise<Course[]> {
@@ -152,7 +163,13 @@ export class CoursesService {
         path: 'packages',
         model: 'Package',
         match: { isDeleted: { $ne: true } },
-        populate: [{ path: 'course', model: 'Course', match: { isDeleted: { $ne: true } } }],
+        populate: [
+          {
+            path: 'course',
+            model: 'Course',
+            match: { isDeleted: { $ne: true } },
+          },
+        ],
       })
       .exec();
 
@@ -187,7 +204,9 @@ export class CoursesService {
         .find({ _id: { $in: courseIds }, isDeleted: { $ne: true } })
         .lean();
     } else {
-      courses = await this.courseModel.find({ isDeleted: { $ne: true } }).lean();
+      courses = await this.courseModel
+        .find({ isDeleted: { $ne: true } })
+        .lean();
     }
 
     const coursesWithAttempts: any[] = [];

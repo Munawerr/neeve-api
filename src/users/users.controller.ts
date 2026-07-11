@@ -355,9 +355,15 @@ export class UsersController {
           loggedInUserId,
           true,
         );
-        if (loggedInUser && Array.isArray(loggedInUser.packages) && loggedInUser.packages.length > 0) {
+        if (
+          loggedInUser &&
+          Array.isArray(loggedInUser.packages) &&
+          loggedInUser.packages.length > 0
+        ) {
           // Merge packages; student's own packages take priority.
-          const existingIds = new Set(sourcePackages.map(packageDocId).filter(Boolean));
+          const existingIds = new Set(
+            sourcePackages.map(packageDocId).filter(Boolean),
+          );
           for (const pkg of loggedInUser.packages) {
             const pid = packageDocId(pkg);
             if (pid && !existingIds.has(pid)) {
@@ -562,7 +568,9 @@ export class UsersController {
   @Put('institute/:id/restore')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Restore deleted institute user (super admin only)' })
+  @ApiOperation({
+    summary: 'Restore deleted institute user (super admin only)',
+  })
   async restoreInstituteUser(@Param('id') id: string) {
     const item = await this.usersService.restoreUser(id);
     return {

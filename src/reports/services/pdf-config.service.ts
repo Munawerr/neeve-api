@@ -55,7 +55,13 @@ export class PdfConfigService implements OnModuleInit {
       const logoBuffer = readFileSync(logoPath);
       this.logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
     } catch {
-      const altPath = join(process.cwd(), 'src', 'reports', 'assets', 'logo.png');
+      const altPath = join(
+        process.cwd(),
+        'src',
+        'reports',
+        'assets',
+        'logo.png',
+      );
       try {
         const logoBuffer = readFileSync(altPath);
         this.logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;

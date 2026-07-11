@@ -76,7 +76,15 @@ export class UsersService {
 
   async findByEmailCaseInsensitive(email: string): Promise<User | null> {
     return this.userModel
-      .findOne({ email: { $regex: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }, isDeleted: { $ne: true } })
+      .findOne({
+        email: {
+          $regex: new RegExp(
+            '^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$',
+            'i',
+          ),
+        },
+        isDeleted: { $ne: true },
+      })
       .populate('role')
       .populate('packages')
       .populate('institute')
@@ -415,13 +423,15 @@ export class UsersService {
       });
       return { studentCount, testResultsCount };
     } else if (_user.role && _user.role.slug === 'student') {
-      const testResults = (await this.resultModel
-        .find({
-          student: user._id,
-          status: ResultStatus.FINISHED,
-        })
-        .populate('test')
-        .exec()).filter((r: any) => r.test != null);
+      const testResults = (
+        await this.resultModel
+          .find({
+            student: user._id,
+            status: ResultStatus.FINISHED,
+          })
+          .populate('test')
+          .exec()
+      ).filter((r: any) => r.test != null);
 
       // Get unique test results (best attempt for each test)
       const uniqueResults = testResults.reduce(
@@ -453,7 +463,8 @@ export class UsersService {
           );
           return (
             sum +
-            effectiveQuestionCount * Math.abs(Number(result.marksPerQuestion) || 0)
+            effectiveQuestionCount *
+              Math.abs(Number(result.marksPerQuestion) || 0)
           );
         },
         0,
@@ -468,13 +479,15 @@ export class UsersService {
         totalScore > 0 ? Math.max(0, (acquiredScore / totalScore) * 100) : 0;
 
       // Get all other students' results
-      const allStudentResults = (await this.resultModel
-        .find({
-          status: ResultStatus.FINISHED,
-          student: { $ne: user._id },
-        })
-        .populate('test')
-        .exec()).filter((r: any) => r.test != null);
+      const allStudentResults = (
+        await this.resultModel
+          .find({
+            status: ResultStatus.FINISHED,
+            student: { $ne: user._id },
+          })
+          .populate('test')
+          .exec()
+      ).filter((r: any) => r.test != null);
 
       // Group results by student
       const studentResults = allStudentResults.reduce(
@@ -926,7 +939,9 @@ export class UsersService {
 
     const actorRoleSlug = actor?.role;
     const targetRoleSlug =
-      typeof user.role === 'string' ? user.role : (user.role as unknown as Role)?.slug;
+      typeof user.role === 'string'
+        ? user.role
+        : (user.role as unknown as Role)?.slug;
 
     if (actorRoleSlug !== 'admin' && actorRoleSlug !== 'super-admin') {
       if (actorRoleSlug !== 'institute') {
@@ -991,7 +1006,10 @@ export class UsersService {
     return this.userModel
       .find({
         role: {
-          $nin: [await this.getStudentRoleId(), await this.getInstituteRoleId()],
+          $nin: [
+            await this.getStudentRoleId(),
+            await this.getInstituteRoleId(),
+          ],
         },
         isDeleted: true,
       })
@@ -1047,7 +1065,10 @@ export class UsersService {
   }
 
   async findRoleById(roleId: string): Promise<Role | null> {
-    return await this.roleModel.findOne({ _id: roleId, isDeleted: { $ne: true } });
+    return await this.roleModel.findOne({
+      _id: roleId,
+      isDeleted: { $ne: true },
+    });
   }
 
   async updateRole(
@@ -1055,11 +1076,9 @@ export class UsersService {
     updateRoleDto: UpdateRoleDto,
   ): Promise<Role | null> {
     return this.roleModel
-      .findOneAndUpdate(
-        { _id: id, isDeleted: { $ne: true } },
-        updateRoleDto,
-        { new: true },
-      )
+      .findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, updateRoleDto, {
+        new: true,
+      })
       .exec();
   }
 
@@ -1085,7 +1104,8 @@ export class UsersService {
             type: 'User',
             id,
             name: `${linkedUsersCount} active user(s)`,
-            actionHint: 'Update users to another role before deleting this role.',
+            actionHint:
+              'Update users to another role before deleting this role.',
           },
         ],
       });

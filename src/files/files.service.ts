@@ -21,7 +21,12 @@ export class FilesService {
     return this.fileModel.find().exec();
   }
 
-  async update(id: string, updateData: Record<string, string>): Promise<File | null> {
-    return this.fileModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+  async update(
+    id: string,
+    updateData: Record<string, string>,
+  ): Promise<File | null> {
+    return this.fileModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .exec();
   }
 }

@@ -21,7 +21,9 @@ export class SuperAdminGuard implements CanActivate {
     const isSuperAdmin = roleSlug === 'super-admin' || roleSlug === 'admin';
 
     if (!isSuperAdmin) {
-      throw new ForbiddenException('Only super admin can access archive resources');
+      throw new ForbiddenException(
+        'Only super admin can access archive resources',
+      );
     }
 
     return true;

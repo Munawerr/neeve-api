@@ -62,7 +62,8 @@ export class PdfTableService {
         headerRows: 1,
       },
       layout: {
-        hLineWidth: (i: number) => (i === 0 || i === 1 || i === body.length ? 0.5 : 0),
+        hLineWidth: (i: number) =>
+          i === 0 || i === 1 || i === body.length ? 0.5 : 0,
         vLineWidth: () => 0,
         hLineColor: () => borderColor,
         paddingLeft: () => 4,
@@ -80,8 +81,17 @@ export class PdfTableService {
       margin?: number[];
     },
   ): Content {
-    const headers = ['Test Type', '0% - 40%', '41% - 60%', '61% - 80%', '81% - 100%'];
-    const data = rows.map((row) => [row.testType, ...row.ranges.map((r) => r.toString())]);
+    const headers = [
+      'Test Type',
+      '0% - 40%',
+      '41% - 60%',
+      '61% - 80%',
+      '81% - 100%',
+    ];
+    const data = rows.map((row) => [
+      row.testType,
+      ...row.ranges.map((r) => r.toString()),
+    ]);
     return this.buildTable(headers, data, {
       widths: ['*', 'auto', 'auto', 'auto', 'auto'],
       ...options,
