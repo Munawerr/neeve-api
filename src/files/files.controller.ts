@@ -130,7 +130,8 @@ export class FilesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'One-time migration: enrich existing file records with Drive metadata',
+    summary:
+      'One-time migration: enrich existing file records with Drive metadata',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -154,14 +155,18 @@ export class FilesController {
     const driveFiles = allFiles.filter((f) => isGoogleDriveUrl(f.fileUrl));
     const pendingFiles = driveFiles.filter((f) => !f.thumbnailUrl);
     const skipped = driveFiles.length - pendingFiles.length;
-    console.log(`[enrich] Filtered to ${driveFiles.length} Google Drive files, ${skipped} already enriched, ${pendingFiles.length} pending`);
+    console.log(
+      `[enrich] Filtered to ${driveFiles.length} Google Drive files, ${skipped} already enriched, ${pendingFiles.length} pending`,
+    );
 
     let updated = 0;
     let failed = 0;
 
     for (const file of pendingFiles) {
       const fileId = extractGoogleDriveFileId(file.fileUrl);
-      console.log(`[enrich] Processing file _id=${file._id} fileId=${fileId} name="${file.fileName}"`);
+      console.log(
+        `[enrich] Processing file _id=${String(file._id)} fileId=${String(fileId)} name="${String(file.fileName)}"`,
+      );
 
       if (!fileId) {
         console.log(`[enrich] No fileId extracted, skipping`);
@@ -182,7 +187,9 @@ export class FilesController {
         continue;
       }
 
-      console.log(`[enrich] Drive returned name="${metadata.name}" thumb="${metadata.thumbnailLink}"`);
+      console.log(
+        `[enrich] Drive returned name="${metadata.name}" thumb="${metadata.thumbnailLink}"`,
+      );
 
       const updates: Record<string, string> = {};
       if (metadata.name && file.fileName !== metadata.name) {
@@ -196,17 +203,23 @@ export class FilesController {
         try {
           await this.filesService.update(String(file._id), updates);
           updated++;
-          console.log(`[enrich] Updated file ${file._id}: ${JSON.stringify(updates)}`);
+          console.log(
+            `[enrich] Updated file ${String(file._id)}: ${JSON.stringify(updates)}`,
+          );
         } catch (err) {
-          console.log(`[enrich] Update failed for ${file._id}: ${err}`);
+          console.log(
+            `[enrich] Update failed for ${String(file._id)}: ${String(err)}`,
+          );
           failed++;
         }
       } else {
-        console.log(`[enrich] No updates needed for ${file._id}`);
+        console.log(`[enrich] No updates needed for ${String(file._id)}`);
       }
     }
 
-    console.log(`[enrich] Done: ${updated}/${pendingFiles.length} updated, ${failed} failed, ${skipped} skipped`);
+    console.log(
+      `[enrich] Done: ${updated}/${pendingFiles.length} updated, ${failed} failed, ${skipped} skipped`,
+    );
 
     return {
       status: HttpStatus.OK,
@@ -214,6 +227,4 @@ export class FilesController {
       data: { total: driveFiles.length, updated, failed, skipped },
     };
   }
-
-
 }

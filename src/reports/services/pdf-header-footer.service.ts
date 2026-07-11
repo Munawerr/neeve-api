@@ -6,17 +6,25 @@ import { PdfConfigService, PDF_COLORS, FONT_SIZES } from './pdf-config.service';
 export class PdfHeaderFooterService {
   constructor(private config: PdfConfigService) {}
 
-  buildHeader(reportName: string, dateRange?: { startDate?: string; endDate?: string }): DynamicContent {
-    return (currentPage: number, pageCount: number, pageSize: { width: number; height: number; orientation: PageOrientation }) => {
+  buildHeader(
+    reportName: string,
+    dateRange?: { startDate?: string; endDate?: string },
+  ): DynamicContent {
+    return (
+      currentPage: number,
+      pageCount: number,
+      pageSize: { width: number; height: number; orientation: PageOrientation },
+    ) => {
       const headerContent: any[] = [];
       const pageWidth = pageSize.width;
       const margin = 40;
 
       const logo = this.config.getLogo();
 
-      const periodText = dateRange?.startDate || dateRange?.endDate
-        ? this.formatDateRange(dateRange)
-        : 'Period: All Time';
+      const periodText =
+        dateRange?.startDate || dateRange?.endDate
+          ? this.formatDateRange(dateRange)
+          : 'Period: All Time';
 
       const headerTable: any = {
         table: {
@@ -24,7 +32,13 @@ export class PdfHeaderFooterService {
           body: [
             [
               logo
-                ? { image: logo, width: 40, height: 40, alignment: 'left', fillColor: PDF_COLORS.white }
+                ? {
+                    image: logo,
+                    width: 40,
+                    height: 40,
+                    alignment: 'left',
+                    fillColor: PDF_COLORS.white,
+                  }
                 : { text: '', alignment: 'left' },
               {
                 stack: [
@@ -115,7 +129,10 @@ export class PdfHeaderFooterService {
     };
   }
 
-  buildInfoCard(title: string, items: { label: string; value: string }[]): Content {
+  buildInfoCard(
+    title: string,
+    items: { label: string; value: string }[],
+  ): Content {
     const headerRow: any = {
       text: title,
       style: 'subsectionHeader',
@@ -147,7 +164,8 @@ export class PdfHeaderFooterService {
         body: [[headerRow, {}], ...dataRows],
       },
       layout: {
-        hLineWidth: (i: number, node: any) => (i === 0 || i === 1 || i === node.table.body.length ? 0.5 : 0),
+        hLineWidth: (i: number, node: any) =>
+          i === 0 || i === 1 || i === node.table.body.length ? 0.5 : 0,
         vLineWidth: () => 0.5,
         hLineColor: () => PDF_COLORS.border,
         vLineColor: () => PDF_COLORS.border,
@@ -189,7 +207,10 @@ export class PdfHeaderFooterService {
     } as any;
   }
 
-  private formatDateRange(dateRange?: { startDate?: string; endDate?: string }): string {
+  private formatDateRange(dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  }): string {
     const fmt = (d?: string) =>
       d
         ? new Date(d).toLocaleDateString('en-US', {

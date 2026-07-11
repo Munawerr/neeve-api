@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Class } from './schemas/class.schema';
@@ -75,16 +79,16 @@ export class ClassesService {
   }
 
   findOne(id: string): Promise<Class | null> {
-    return this.classModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
+    return this.classModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .exec();
   }
 
   update(id: string, updateClassDto: UpdateClassDto): Promise<Class | null> {
     return this.classModel
-      .findOneAndUpdate(
-        { _id: id, isDeleted: { $ne: true } },
-        updateClassDto,
-        { new: true },
-      )
+      .findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, updateClassDto, {
+        new: true,
+      })
       .exec();
   }
 
@@ -123,7 +127,10 @@ export class ClassesService {
   }
 
   async findDeleted(): Promise<Class[]> {
-    return this.classModel.find({ isDeleted: true }).sort({ deletedAt: -1 }).exec();
+    return this.classModel
+      .find({ isDeleted: true })
+      .sort({ deletedAt: -1 })
+      .exec();
   }
 
   async restore(id: string): Promise<Class | null> {

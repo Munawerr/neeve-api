@@ -88,7 +88,8 @@ export class CreateReportDto {
   test?: string;
 
   @ApiPropertyOptional({
-    description: 'Test type for aggregated test reports (replaces individual test selection)',
+    description:
+      'Test type for aggregated test reports (replaces individual test selection)',
     example: 'mock',
   })
   @IsOptional()

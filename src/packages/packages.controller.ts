@@ -96,7 +96,10 @@ export class PackagesController {
       };
     }
 
-    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
+    const code = await this.packagesService.generateUniqueCode(
+      courseEntity.code,
+      classEntity.code,
+    );
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const packageEntity = await this.packagesService.create({
@@ -282,7 +285,10 @@ export class PackagesController {
         message: 'Course, class, and subjects not found',
       };
     }
-    const code = await this.packagesService.generateUniqueCode(courseEntity.code, classEntity.code);
+    const code = await this.packagesService.generateUniqueCode(
+      courseEntity.code,
+      classEntity.code,
+    );
     const description = `${courseEntity.title} ${classEntity.title} - ${subjectEntities.map((s) => s.title).join(', ')}`;
 
     const updatedPackage = await this.packagesService.update(id, {
@@ -334,7 +340,9 @@ export class PackagesController {
   @Put(':id/restore')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Restore a soft deleted package (super admin only)' })
+  @ApiOperation({
+    summary: 'Restore a soft deleted package (super admin only)',
+  })
   async restore(@Param('id') id: string) {
     const item = await this.packagesService.restore(id);
     return {

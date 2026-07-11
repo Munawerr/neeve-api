@@ -56,7 +56,8 @@ export class TopicsController {
     description: 'Topic created successfully',
   })
   async create(@Body() createTopicDto: CreateTopicDto) {
-    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
+    const normalizedTopicDto =
+      await this.normalizeTopicResources(createTopicDto);
     const topic = await this.topicsService.create({
       ...normalizedTopicDto,
       isParent: true,
@@ -332,8 +333,12 @@ export class TopicsController {
     @Param('id') id: string,
     @Body() updateTopicDto: UpdateTopicDto,
   ) {
-    const normalizedTopicDto = await this.normalizeTopicResources(updateTopicDto);
-    const updatedTopic = await this.topicsService.update(id, normalizedTopicDto);
+    const normalizedTopicDto =
+      await this.normalizeTopicResources(updateTopicDto);
+    const updatedTopic = await this.topicsService.update(
+      id,
+      normalizedTopicDto,
+    );
     return {
       status: HttpStatus.OK,
       message: 'Topic updated successfully',
@@ -433,7 +438,8 @@ export class TopicsController {
         message: 'Topic not found',
       };
     }
-    const normalizedTopicDto = await this.normalizeTopicResources(createTopicDto);
+    const normalizedTopicDto =
+      await this.normalizeTopicResources(createTopicDto);
     const subTopic = await this.topicsService.create({
       ...normalizedTopicDto,
       isParent: false,
@@ -481,9 +487,7 @@ export class TopicsController {
 
     try {
       this.logger.log(`[${traceId}] Bulk upload request received`);
-      this.logger.log(
-        `[${traceId}] File received: ${file ? 'yes' : 'no'}`,
-      );
+      this.logger.log(`[${traceId}] File received: ${file ? 'yes' : 'no'}`);
 
       // Check if file exists
       if (!file) {
@@ -571,7 +575,9 @@ export class TopicsController {
           }
         });
       } else {
-        this.logger.warn(`[${traceId}] Worksheet 1 not found in uploaded workbook`);
+        this.logger.warn(
+          `[${traceId}] Worksheet 1 not found in uploaded workbook`,
+        );
       }
 
       const groupedTopicCodes = Object.keys(parentTopics);
@@ -640,16 +646,38 @@ export class TopicsController {
     worksheet.columns = [
       { header: 'Code', key: 'code', width: 20 },
       { header: 'Title', key: 'title', width: 30 },
-      { header: 'Description (Topic Definition)', key: 'description', width: 70 },
-      { header: 'Intro Video URLs (comma separated)', key: 'introVideoUrls', width: 30 },
-      { header: 'Study Notes URLs (comma separated)', key: 'studyNotes', width: 30 },
-      { header: 'Study Plans URLs (comma separated)', key: 'studyPlans', width: 30 },
-      { header: 'Practice Problems URLs (comma separated)', key: 'practiceProblems', width: 30 },
+      {
+        header: 'Description (Topic Definition)',
+        key: 'description',
+        width: 70,
+      },
+      {
+        header: 'Intro Video URLs (comma separated)',
+        key: 'introVideoUrls',
+        width: 30,
+      },
+      {
+        header: 'Study Notes URLs (comma separated)',
+        key: 'studyNotes',
+        width: 30,
+      },
+      {
+        header: 'Study Plans URLs (comma separated)',
+        key: 'studyPlans',
+        width: 30,
+      },
+      {
+        header: 'Practice Problems URLs (comma separated)',
+        key: 'practiceProblems',
+        width: 30,
+      },
     ];
 
     for (const rawTopic of topics) {
       // Convert Mongoose documents to plain JS objects to avoid getter quirks
-      const topic: any = (rawTopic as any).toObject ? (rawTopic as any).toObject() : rawTopic;
+      const topic: any = (rawTopic as any).toObject
+        ? (rawTopic as any).toObject()
+        : rawTopic;
       const subTopics: any[] = topic.subTopics || [];
       const primarySub = subTopics.length > 0 ? subTopics[0] : null;
 
@@ -658,7 +686,10 @@ export class TopicsController {
       // Helper: set a cell to a plain string
       const set = (col: number, val: any) => {
         const cell = row.getCell(col);
-        if (val == null || typeof val !== 'string') { cell.value = ''; return; }
+        if (val == null || typeof val !== 'string') {
+          cell.value = '';
+          return;
+        }
         cell.value = val.trim();
       };
 
@@ -668,14 +699,20 @@ export class TopicsController {
 
       if (primarySub) {
         // introVideoUrls is [String] — already primitive strings
-        set(4, Array.isArray(primarySub.introVideoUrls) ? primarySub.introVideoUrls.join(', ') : '');
+        set(
+          4,
+          Array.isArray(primarySub.introVideoUrls)
+            ? primarySub.introVideoUrls.join(', ')
+            : '',
+        );
         // studyNotes/studyPlans/practiceProblems are populated File[] with fileUrl
         const joinUrls = (arr: any): string => {
           if (!Array.isArray(arr)) return '';
           const parts: string[] = [];
           for (const item of arr) {
             if (item == null) continue;
-            const plain = typeof item.toObject === 'function' ? item.toObject() : item;
+            const plain =
+              typeof item.toObject === 'function' ? item.toObject() : item;
             const u = plain.fileUrl || '';
             if (typeof u === 'string' && u.trim()) parts.push(u.trim());
           }
@@ -685,7 +722,10 @@ export class TopicsController {
         set(6, joinUrls(primarySub.studyPlans));
         set(7, joinUrls(primarySub.practiceProblems));
       } else {
-        set(4, ''); set(5, ''); set(6, ''); set(7, '');
+        set(4, '');
+        set(5, '');
+        set(6, '');
+        set(7, '');
       }
 
       // Additional subtopic rows
@@ -694,19 +734,28 @@ export class TopicsController {
         const sr = worksheet.addRow([]);
         const sets = (col: number, val: any) => {
           const cell = sr.getCell(col);
-          if (val == null || typeof val !== 'string') { cell.value = ''; return; }
+          if (val == null || typeof val !== 'string') {
+            cell.value = '';
+            return;
+          }
           cell.value = val.trim();
         };
         sets(1, topic.code);
         sets(2, sub.title);
         sets(3, sub.description || '');
-        sets(4, Array.isArray(sub.introVideoUrls) ? sub.introVideoUrls.join(', ') : '');
+        sets(
+          4,
+          Array.isArray(sub.introVideoUrls)
+            ? sub.introVideoUrls.join(', ')
+            : '',
+        );
         const joinSubUrls = (arr: any): string => {
           if (!Array.isArray(arr)) return '';
           const parts: string[] = [];
           for (const item of arr) {
             if (item == null) continue;
-            const plain = typeof item.toObject === 'function' ? item.toObject() : item;
+            const plain =
+              typeof item.toObject === 'function' ? item.toObject() : item;
             const u = plain.fileUrl || '';
             if (typeof u === 'string' && u.trim()) parts.push(u.trim());
           }
@@ -746,7 +795,11 @@ export class TopicsController {
     worksheet.columns = [
       { header: 'Code', key: 'code', width: 20 },
       { header: 'Title', key: 'title', width: 30 },
-      { header: 'Description (Topic Definition)', key: 'description', width: 70 },
+      {
+        header: 'Description (Topic Definition)',
+        key: 'description',
+        width: 70,
+      },
       {
         header: 'Intro Video URLs (comma separated)',
         key: 'introVideoUrls',
@@ -828,12 +881,18 @@ export class TopicsController {
       }
 
       // Check for hyperlink property
-      if (valueObject.hyperlink != null && typeof valueObject.hyperlink === 'string') {
+      if (
+        valueObject.hyperlink != null &&
+        typeof valueObject.hyperlink === 'string'
+      ) {
         return String(valueObject.hyperlink).trim();
       }
 
       // Check for result property (formula result)
-      if (valueObject.result != null && typeof valueObject.result !== 'object') {
+      if (
+        valueObject.result != null &&
+        typeof valueObject.result !== 'object'
+      ) {
         return String(valueObject.result).trim();
       }
 
@@ -858,9 +917,9 @@ export class TopicsController {
       .filter((value) => value.length > 0);
   }
 
-  private async normalizeTopicResources<T extends CreateTopicDto | UpdateTopicDto>(
-    topicDto: T,
-  ): Promise<T> {
+  private async normalizeTopicResources<
+    T extends CreateTopicDto | UpdateTopicDto,
+  >(topicDto: T): Promise<T> {
     return {
       ...topicDto,
       code: String(topicDto.code || '-').trim() || '-',

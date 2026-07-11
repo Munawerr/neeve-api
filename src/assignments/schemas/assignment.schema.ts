@@ -6,10 +6,18 @@ export class Assignment extends Document {
   @Prop({ required: true })
   title: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject',
+    required: true,
+  })
   subject: mongoose.Schema.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Package', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package',
+    required: true,
+  })
   package: mongoose.Schema.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })

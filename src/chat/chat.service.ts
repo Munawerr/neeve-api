@@ -17,10 +17,15 @@ export class ChatService {
     'You are an AI instructor specialized in helping students with their studies. Only answer questions related to studies and LMS platform.';
 
   constructor() {
-    this.openai = this.openAiApiKey ? new OpenAI({ apiKey: this.openAiApiKey }) : null;
+    this.openai = this.openAiApiKey
+      ? new OpenAI({ apiKey: this.openAiApiKey })
+      : null;
   }
 
-  async getResponse(input: { query?: string; messages?: ChatMessage[] }): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
+  async getResponse(input: {
+    query?: string;
+    messages?: ChatMessage[];
+  }): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
     const messages = this.normalizeMessages(input);
     let geminiError: unknown;
 
@@ -56,13 +61,17 @@ export class ChatService {
     }
   }
 
-  private normalizeMessages(input: { query?: string; messages?: ChatMessage[] }): ChatMessage[] {
+  private normalizeMessages(input: {
+    query?: string;
+    messages?: ChatMessage[];
+  }): ChatMessage[] {
     if (Array.isArray(input.messages) && input.messages.length > 0) {
       return input.messages
-        .filter((message) =>
-          message &&
-          typeof message.content === 'string' &&
-          ['system', 'user', 'assistant'].includes(message.role),
+        .filter(
+          (message) =>
+            message &&
+            typeof message.content === 'string' &&
+            ['system', 'user', 'assistant'].includes(message.role),
         )
         .map((message) => ({
           role: message.role,
@@ -97,7 +106,9 @@ export class ChatService {
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent`,
       {
-        ...(systemMessages ? { systemInstruction: { parts: [{ text: systemMessages }] } } : {}),
+        ...(systemMessages
+          ? { systemInstruction: { parts: [{ text: systemMessages }] } }
+          : {}),
         contents: geminiMessages,
         generationConfig: {
           temperature: 0.7,
@@ -114,7 +125,10 @@ export class ChatService {
 
     const parts = response.data?.candidates?.[0]?.content?.parts;
     const text = Array.isArray(parts)
-      ? parts.map((part: { text?: string }) => part?.text || '').join('').trim()
+      ? parts
+          .map((part: { text?: string }) => part?.text || '')
+          .join('')
+          .trim()
       : '';
 
     if (!text) {

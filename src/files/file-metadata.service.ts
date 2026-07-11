@@ -10,9 +10,7 @@ import {
 
 @Injectable()
 export class FileMetadataService {
-  constructor(
-    @InjectModel(File.name) private fileModel: Model<File>,
-  ) {}
+  constructor(@InjectModel(File.name) private fileModel: Model<File>) {}
 
   async enrichFileName(url: string): Promise<string> {
     if (isGoogleDriveUrl(url)) {

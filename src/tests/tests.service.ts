@@ -58,7 +58,9 @@ export class TestsService {
   async create(createTestDto: CreateTestDto): Promise<Test> {
     const createdTest = new this.testModel({
       ...createTestDto,
-      marksPerQuestion: this.normalizeMarksValue(createTestDto.marksPerQuestion),
+      marksPerQuestion: this.normalizeMarksValue(
+        createTestDto.marksPerQuestion,
+      ),
     });
     return createdTest.save();
   }
@@ -205,7 +207,10 @@ export class TestsService {
   async remove(
     id: string,
     confirmed = false,
-  ): Promise<{ deleted: true } | { requiresConfirmation: true; message: string; count: number }> {
+  ): Promise<
+    | { deleted: true }
+    | { requiresConfirmation: true; message: string; count: number }
+  > {
     const existingTest = await this.testModel
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .lean();

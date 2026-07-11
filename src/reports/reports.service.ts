@@ -319,7 +319,11 @@ export class ReportsService {
     const userInstituteId =
       (user?.institute as any)?.toString?.() ??
       (user?.institute as any)?.toString?.();
-    if (!isAdmin && creatorId !== userId && reportInstituteId !== userInstituteId) {
+    if (
+      !isAdmin &&
+      creatorId !== userId &&
+      reportInstituteId !== userInstituteId
+    ) {
       throw new ForbiddenException(
         'You do not have permission to view this report',
       );

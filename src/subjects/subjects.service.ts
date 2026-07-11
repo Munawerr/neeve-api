@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Subject } from './schemas/subject.schema';
@@ -50,7 +54,9 @@ export class SubjectsService {
   }
 
   findOne(id: string): Promise<Subject | null> {
-    return this.subjectModel.findOne({ _id: id, isDeleted: { $ne: true } }).exec();
+    return this.subjectModel
+      .findOne({ _id: id, isDeleted: { $ne: true } })
+      .exec();
   }
 
   async findByIds(ids: string[]): Promise<Subject[]> {
@@ -119,24 +125,26 @@ export class SubjectsService {
       throw new NotFoundException('Subject not found');
     }
 
-    const [packageRefs, topicRefs, testRefs, liveClassRefs] = await Promise.all([
-      this.packageModel
-        .find({ subjects: id, isDeleted: { $ne: true } })
-        .select('_id code description')
-        .lean(),
-      this.topicModel
-        .find({ subject: id, isDeleted: { $ne: true } })
-        .select('_id code title')
-        .lean(),
-      this.testModel
-        .find({ subject: id, isDeleted: { $ne: true } })
-        .select('_id title')
-        .lean(),
-      this.liveClassModel
-        .find({ subject: id, isDeleted: { $ne: true } })
-        .select('_id title')
-        .lean(),
-    ]);
+    const [packageRefs, topicRefs, testRefs, liveClassRefs] = await Promise.all(
+      [
+        this.packageModel
+          .find({ subjects: id, isDeleted: { $ne: true } })
+          .select('_id code description')
+          .lean(),
+        this.topicModel
+          .find({ subject: id, isDeleted: { $ne: true } })
+          .select('_id code title')
+          .lean(),
+        this.testModel
+          .find({ subject: id, isDeleted: { $ne: true } })
+          .select('_id title')
+          .lean(),
+        this.liveClassModel
+          .find({ subject: id, isDeleted: { $ne: true } })
+          .select('_id title')
+          .lean(),
+      ],
+    );
 
     const blockedBy = [
       ...packageRefs.map((pkg) => ({
@@ -180,7 +188,10 @@ export class SubjectsService {
   }
 
   async findDeleted(): Promise<Subject[]> {
-    return this.subjectModel.find({ isDeleted: true }).sort({ deletedAt: -1 }).exec();
+    return this.subjectModel
+      .find({ isDeleted: true })
+      .sort({ deletedAt: -1 })
+      .exec();
   }
 
   async restore(id: string): Promise<Subject | null> {

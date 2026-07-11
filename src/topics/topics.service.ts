@@ -198,7 +198,7 @@ export class TopicsService {
       }
 
       this.logger.log(
-        `[${traceId || 'topics-bulk'}] Subject and package resolved for topic code ${code}. subjectId=${subject._id}, packageId=${_package._id}`,
+        `[${traceId || 'topics-bulk'}] Subject and package resolved for topic code ${String(code)}. subjectId=${String(subject._id)}, packageId=${String(_package._id)}`,
       );
 
       const incomingCode = String(parentTopic.code || '').trim();
@@ -223,7 +223,7 @@ export class TopicsService {
         });
         savedParentTopic = await newParentTopic.save();
         this.logger.log(
-          `[${traceId || 'topics-bulk'}] Parent topic created for code ${code}. parentTopicId=${savedParentTopic._id}`,
+          `[${traceId || 'topics-bulk'}] Parent topic created for code ${String(code)}. parentTopicId=${String(savedParentTopic._id)}`,
         );
       } else {
         if (incomingTitle) {
@@ -231,7 +231,7 @@ export class TopicsService {
         }
         await savedParentTopic.save();
         this.logger.log(
-          `[${traceId || 'topics-bulk'}] Parent topic updated for code ${code}. parentTopicId=${savedParentTopic._id}`,
+          `[${traceId || 'topics-bulk'}] Parent topic updated for code ${String(code)}. parentTopicId=${String(savedParentTopic._id)}`,
         );
       }
       upsertedTopics.push(savedParentTopic);
@@ -289,7 +289,7 @@ export class TopicsService {
         ];
         await savedParentTopic.save();
         this.logger.log(
-          `[${traceId || 'topics-bulk'}] Primary subtopic created for code ${code}. subTopicId=${savedSubTopic._id}`,
+          `[${traceId || 'topics-bulk'}] Primary subtopic created for code ${String(code)}. subTopicId=${String(savedSubTopic._id)}`,
         );
       } else {
         if (incomingDescription) {
@@ -326,7 +326,7 @@ export class TopicsService {
 
         await savedSubTopic.save();
         this.logger.log(
-          `[${traceId || 'topics-bulk'}] Primary subtopic updated for code ${code}. subTopicId=${savedSubTopic._id}`,
+          `[${traceId || 'topics-bulk'}] Primary subtopic updated for code ${String(code)}. subTopicId=${String(savedSubTopic._id)}`,
         );
       }
 
@@ -414,11 +414,10 @@ export class TopicsService {
           }
 
           if (subPracticeProblemsIds.length > 0) {
-            savedAdditionalSubTopic.practiceProblems =
-              this.mergeObjectIdArrays(
-                savedAdditionalSubTopic.practiceProblems,
-                subPracticeProblemsIds,
-              );
+            savedAdditionalSubTopic.practiceProblems = this.mergeObjectIdArrays(
+              savedAdditionalSubTopic.practiceProblems,
+              subPracticeProblemsIds,
+            );
           }
 
           await savedAdditionalSubTopic.save();
@@ -436,7 +435,7 @@ export class TopicsService {
 
         upsertedTopics.push(savedAdditionalSubTopic);
         this.logger.log(
-          `[${traceId || 'topics-bulk'}] Additional subtopic created for code ${code}. subTopicId=${savedAdditionalSubTopic._id}, parentSubTopicCount=${savedParentTopic.subTopics.length}`,
+          `[${traceId || 'topics-bulk'}] Additional subtopic created for code ${String(code)}. subTopicId=${String(savedAdditionalSubTopic._id)}, parentSubTopicCount=${savedParentTopic.subTopics.length}`,
         );
       }
 
@@ -475,7 +474,9 @@ export class TopicsService {
     return fileIds;
   }
 
-  private normalizeUrlList(urls: string[] | string | null | undefined): string[] {
+  private normalizeUrlList(
+    urls: string[] | string | null | undefined,
+  ): string[] {
     if (!urls) {
       return [];
     }
@@ -492,7 +493,10 @@ export class TopicsService {
       .filter((url) => url.length > 0);
   }
 
-  private mergeStringArrays(existing: string[] | undefined, incoming: string[]): string[] {
+  private mergeStringArrays(
+    existing: string[] | undefined,
+    incoming: string[],
+  ): string[] {
     const existingValues = (Array.isArray(existing) ? existing : [])
       .map((value) => String(value || '').trim())
       .filter((value) => value.length > 0);
@@ -522,11 +526,9 @@ export class TopicsService {
 
   update(id: string, updateTopicDto: UpdateTopicDto): Promise<Topic | null> {
     return this.topicModel
-      .findOneAndUpdate(
-        { _id: id, isDeleted: { $ne: true } },
-        updateTopicDto,
-        { new: true },
-      )
+      .findOneAndUpdate({ _id: id, isDeleted: { $ne: true } }, updateTopicDto, {
+        new: true,
+      })
       .exec();
   }
 
@@ -561,7 +563,10 @@ export class TopicsService {
   async remove(
     id: string,
     confirmed = false,
-  ): Promise<{ deleted: true } | { requiresConfirmation: true; message: string; count: number }> {
+  ): Promise<
+    | { deleted: true }
+    | { requiresConfirmation: true; message: string; count: number }
+  > {
     const topic = await this.topicModel
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .lean();

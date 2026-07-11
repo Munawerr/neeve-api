@@ -220,7 +220,9 @@ export class SubjectsController {
   @Put(':id/restore')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Restore a soft deleted subject (super admin only)' })
+  @ApiOperation({
+    summary: 'Restore a soft deleted subject (super admin only)',
+  })
   async restore(@Param('id') id: string) {
     const item = await this.subjectsService.restore(id);
     return {

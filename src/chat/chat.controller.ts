@@ -8,7 +8,8 @@ export class ChatController {
   @Post()
   async getChatResponse(
     @Body('query') query?: string,
-    @Body('messages') messages?: Array<{ role: 'user' | 'assistant'; content: string }>,
+    @Body('messages')
+    messages?: Array<{ role: 'user' | 'assistant'; content: string }>,
   ): Promise<{ response: string; provider: 'gemini' | 'openai' }> {
     const sanitizedMessages = messages?.filter(
       (message): message is { role: 'user' | 'assistant'; content: string } =>

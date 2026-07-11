@@ -115,12 +115,11 @@ export class LiveClassesController {
       const requester = req.user as
         | { userId?: string; role?: string }
         | undefined;
-      const count =
-        await this.liveClassesService.countUpcomingLiveClasses(
-          institute,
-          requester?.role,
-          requester?.userId,
-        );
+      const count = await this.liveClassesService.countUpcomingLiveClasses(
+        institute,
+        requester?.role,
+        requester?.userId,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Count of upcoming live classes retrieved successfully',
@@ -221,7 +220,9 @@ export class LiveClassesController {
   @Put(':id/restore')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Restore a soft deleted live class (super admin only)' })
+  @ApiOperation({
+    summary: 'Restore a soft deleted live class (super admin only)',
+  })
   async restore(@Param('id') id: string) {
     const item = await this.liveClassesService.restore(id);
     return {
