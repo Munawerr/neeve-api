@@ -48,6 +48,7 @@ export class PdfConfigService implements OnModuleInit {
       },
     };
     (pdfMake as any).fonts = fontDescriptors;
+    (pdfMake as any).createPdf = pdfMake.createPdf;
 
     try {
       const logoPath = join(__dirname, '..', 'assets', 'logo.png');
