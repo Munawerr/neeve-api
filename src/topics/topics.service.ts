@@ -609,6 +609,43 @@ export class TopicsService {
     return { deleted: true };
   }
 
+  async bulkRemove(
+    ids: string[],
+    confirmed = false,
+  ): Promise<{
+    deleted: string[];
+    requiresConfirmation?: { ids: string[]; message: string };
+  }> {
+    const deleted: string[] = [];
+    const needsConfirmation: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const result = await this.remove(id, confirmed);
+        if ('deleted' in result) {
+          deleted.push(id);
+        } else if ('requiresConfirmation' in result) {
+          needsConfirmation.push(id);
+        }
+      } catch {
+        // Skip topics that are not found or already deleted
+      }
+    }
+
+    if (needsConfirmation.length > 0 && !confirmed) {
+      return {
+        deleted,
+        requiresConfirmation: {
+          ids: needsConfirmation,
+          message:
+            'Some topics include tests with student results. Deleting will archive topics/tests while keeping report history intact.',
+        },
+      };
+    }
+
+    return { deleted };
+  }
+
   async findDeleted(): Promise<Topic[]> {
     return this.topicModel
       .find({ isDeleted: true })

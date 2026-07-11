@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TopicsService } from './topics.service';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
+import { BulkDeleteTopicDto } from './dto/bulk-delete-topic.dto';
 import { Schema as MongooseSchema } from 'mongoose';
 import { FilesService } from '../files/files.service';
 import { FileMetadataService } from '../files/file-metadata.service';
@@ -337,6 +338,30 @@ export class TopicsController {
       status: HttpStatus.OK,
       message: 'Topic updated successfully',
       data: updatedTopic,
+    };
+  }
+
+  @Post('bulk-delete')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk delete topics (admin only)' })
+  @ApiBody({ type: BulkDeleteTopicDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Topics deleted successfully',
+  })
+  async bulkRemove(
+    @Body() bulkDeleteTopicDto: BulkDeleteTopicDto,
+    @Query('confirmed') confirmed: string = 'false',
+  ) {
+    const result = await this.topicsService.bulkRemove(
+      bulkDeleteTopicDto.ids,
+      confirmed === 'true',
+    );
+    return {
+      status: HttpStatus.OK,
+      message: 'Bulk delete operation completed',
+      data: result,
     };
   }
 
