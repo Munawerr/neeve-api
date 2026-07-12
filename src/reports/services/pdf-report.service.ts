@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 
-const pdfMake = require('pdfmake/build/pdfmake');
+const pdfMake = require('pdfmake');
 import { Report, ReportType } from '../schemas/report.schema';
 import {
   PdfConfigService,

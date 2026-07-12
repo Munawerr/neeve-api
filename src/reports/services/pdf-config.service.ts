@@ -3,7 +3,7 @@ import { join } from 'path';
 import { readFileSync } from 'fs';
 import { TFontDictionary } from 'pdfmake/interfaces';
 
-const pdfMake = require('pdfmake/build/pdfmake');
+const pdfMake = require('pdfmake');
 
 export const PDF_COLORS = {
   primary: '#27963c',
