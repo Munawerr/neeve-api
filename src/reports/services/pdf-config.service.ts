@@ -47,8 +47,11 @@ export class PdfConfigService implements OnModuleInit {
         bolditalics: join(fontsDir, 'Roboto-MediumItalic.ttf'),
       },
     };
-    (pdfMake as any).fonts = fontDescriptors;
-    (pdfMake as any).createPdf = pdfMake.createPdf;
+    Object.defineProperty(pdfMake, 'fonts', {
+      value: fontDescriptors,
+      writable: true,
+      configurable: true,
+    });
 
     try {
       const logoPath = join(__dirname, '..', 'assets', 'logo.png');
