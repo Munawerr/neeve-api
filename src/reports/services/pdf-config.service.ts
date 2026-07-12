@@ -1,8 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { join } from 'path';
 import { readFileSync } from 'fs';
-import * as pdfMake from 'pdfmake/build/pdfmake';
 import { TFontDictionary } from 'pdfmake/interfaces';
+
+const pdfMake = require('pdfmake/build/pdfmake');
 
 export const PDF_COLORS = {
   primary: '#27963c',
