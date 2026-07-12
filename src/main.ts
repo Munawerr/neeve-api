@@ -10,7 +10,15 @@ let cachedHttpHandler:
 async function createApp() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      'https://lakshya.neeve.io',
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
   app.use(cookieParser());
 
   await app.init();
