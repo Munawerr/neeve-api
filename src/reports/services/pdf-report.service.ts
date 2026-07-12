@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import * as pdfMake from 'pdfmake';
+import * as pdfMake from 'pdfmake/build/pdfmake';
 import { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { Report, ReportType } from '../schemas/report.schema';
 import {
