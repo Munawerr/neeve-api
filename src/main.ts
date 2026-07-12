@@ -40,16 +40,12 @@ async function createApp() {
   const app = await NestFactory.create(AppModule, { logger: false });
   app.use(cookieParser());
   await app.init();
-
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.use((req: Request, res: Response, next: () => void) => {
-    if (applyCors(req, res)) return;
-    next();
-  });
   return app;
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (applyCors(req, res)) return;
+
   if (!cachedHttpHandler) {
     const app = await createApp();
     cachedHttpHandler = app.getHttpAdapter().getInstance();
