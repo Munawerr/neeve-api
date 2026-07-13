@@ -1515,6 +1515,174 @@ export class ResultsController {
     };
   }
 
+  // Get comprehensive student report card with per-subject analytics and all results
+  @Get('student-report-card/:studentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get comprehensive student report card with per-subject data',
+  })
+  async getStudentReportCard(@Param('studentId') studentId: string) {
+    const { regular, bulk } =
+      await this.resultsService.findAllResultsForStudent(studentId);
+
+    const student = await this.usersService.getStudentUser(studentId);
+    if (!student) {
+      return {
+        status: HttpStatus.EXPECTATION_FAILED,
+        message: 'Student not found',
+      };
+    }
+
+    // Combine all results and group by subject
+    const allResults = [...regular, ...bulk];
+    const subjectMap = new Map<
+      string,
+      {
+        _id: string;
+        title: string;
+        results: any[];
+      }
+    >();
+
+    for (const result of allResults) {
+      const subject: any = result.subject;
+      const subjectId =
+        subject?._id?.toString?.() ?? (result.subject as any)?.toString?.();
+      const subjectTitle = subject?.title ?? 'Unknown Subject';
+
+      if (!subjectId) continue;
+
+      if (!subjectMap.has(subjectId)) {
+        subjectMap.set(subjectId, {
+          _id: subjectId,
+          title: subjectTitle,
+          results: [],
+        });
+      }
+
+      subjectMap.get(subjectId)!.results.push({
+        resultId: result._id,
+        obtainedMarks: result.marksSummary?.obtainedMarks ?? 0,
+        totalMarks: result.marksSummary?.totalMarks ?? 0,
+        averageMarks: result.marksSummary?.averageMarks ?? 0,
+        correctAnswers: result.marksSummary?.correctAnswers ?? 0,
+        incorrectAnswers: result.marksSummary?.incorrectAnswers ?? 0,
+        averageTimePerQuestion:
+          result.marksSummary?.averageTimePerQuestion ?? 0,
+        rank: result.marksSummary?.rank ?? null,
+        totalStudents: result.marksSummary?.totalStudents ?? null,
+        testType: result.testType || 'mock',
+        reportCardLink: (result as any).reportCardLink ?? null,
+        timeTaken: (result as any).timeTaken ?? 0,
+        isBulkUploaded: result.isBulkUploaded ?? false,
+        createdAt: result.startedAt?.toISOString() ?? new Date().toISOString(),
+      });
+    }
+
+    // Compute per-subject analytics and sort results
+    const subjects = Array.from(subjectMap.values()).map((subject) => {
+      const results = subject.results;
+
+      // Sort results: newest first
+      results.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
+      // Compute analytics across all test types
+      const totalMarks = results.reduce((s, r) => s + (r.totalMarks || 0), 0);
+      const obtainedMarks = results.reduce(
+        (s, r) => s + (r.obtainedMarks || 0),
+        0,
+      );
+      const totalCorrect = results.reduce(
+        (s, r) => s + (r.correctAnswers || 0),
+        0,
+      );
+      const totalIncorrect = results.reduce(
+        (s, r) => s + (r.incorrectAnswers || 0),
+        0,
+      );
+      const totalTimePerQ = results.reduce(
+        (s, r) => s + (r.averageTimePerQuestion || 0),
+        0,
+      );
+      const totalTests = results.length;
+      const averageMarks =
+        totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+      const averageTimePerQuestion =
+        totalTests > 0 ? totalTimePerQ / totalTests : 0;
+      const bestScore =
+        results.length > 0
+          ? Math.max(...results.map((r) => r.averageMarks || 0))
+          : 0;
+
+      return {
+        _id: subject._id,
+        title: subject.title,
+        analytics: {
+          totalMarks,
+          obtainedMarks,
+          averageMarks,
+          totalTests,
+          correctAnswers: totalCorrect,
+          incorrectAnswers: totalIncorrect,
+          averageTimePerQuestion,
+          bestScore,
+        },
+        results,
+      };
+    });
+
+    // Compute overall analytics
+    const allTotalMarks = subjects.reduce(
+      (s, sub) => s + sub.analytics.totalMarks,
+      0,
+    );
+    const allObtainedMarks = subjects.reduce(
+      (s, sub) => s + sub.analytics.obtainedMarks,
+      0,
+    );
+    const overallAverageMarks =
+      allTotalMarks > 0 ? (allObtainedMarks / allTotalMarks) * 100 : 0;
+    const correctAnswers = subjects.reduce(
+      (s, sub) => s + sub.analytics.correctAnswers,
+      0,
+    );
+    const incorrectAnswers = subjects.reduce(
+      (s, sub) => s + sub.analytics.incorrectAnswers,
+      0,
+    );
+
+    const percentile = await this.resultsService.calculateOverallPercentile(
+      studentId,
+      overallAverageMarks,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      data: {
+        student: {
+          _id: student._id,
+          full_name: student.full_name,
+          email: student.email,
+          regNo: student.regNo,
+        },
+        overallAnalytics: {
+          totalMarks: allTotalMarks,
+          obtainedMarks: allObtainedMarks,
+          averageMarks: overallAverageMarks,
+          percentile,
+          correctAnswers,
+          incorrectAnswers,
+          totalSubjects: subjects.length,
+        },
+        subjects,
+      },
+    };
+  }
+
   // Get subject result history for a student
   @Get('history/:studentId/:subjectId')
   @UseGuards(JwtAuthGuard)
