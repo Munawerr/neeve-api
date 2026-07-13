@@ -503,4 +503,23 @@ export class ResultsService {
       .sort({ _id: -1 })
       .exec();
   }
+
+  // Fetch all finished results for a student (regular + bulk) with subject populated
+  async findAllResultsForStudent(
+    studentId: string,
+  ): Promise<{ regular: Result[]; bulk: Result[] }> {
+    const regular = await this.resultModel
+      .find({
+        student: studentId,
+        status: ResultStatus.FINISHED,
+        isBulkUploaded: { $ne: true },
+      })
+      .populate('subject')
+      .sort({ _id: -1 })
+      .exec();
+
+    const bulk = await this.findBulkUploadedResultsByStudent(studentId);
+
+    return { regular, bulk };
+  }
 }
