@@ -30,13 +30,22 @@ export class ChatService {
     let geminiError: unknown;
 
     if (this.geminiApiKey) {
+      console.log('[ChatService] Gemini API key found, trying Gemini first');
       try {
         const response = await this.getGeminiResponse(messages);
+        console.log('[ChatService] Gemini responded successfully');
         return { response, provider: 'gemini' };
       } catch (error) {
         geminiError = error;
-        console.error('Gemini request failed, falling back to OpenAI:', error);
+        console.error(
+          '[ChatService] Gemini request failed, falling back to OpenAI:',
+          error instanceof Error ? error.message : error,
+        );
       }
+    } else {
+      console.log(
+        '[ChatService] No Gemini API key configured, skipping Gemini',
+      );
     }
 
     if (geminiError && !this.openAiApiKey) {
@@ -48,6 +57,7 @@ export class ChatService {
 
     try {
       const response = await this.getOpenAiResponse(messages);
+      console.log('[ChatService] OpenAI responded successfully');
       return { response, provider: 'openai' };
     } catch (error) {
       if (geminiError) {
@@ -103,6 +113,9 @@ export class ChatService {
         parts: [{ text: message.content }],
       }));
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent`,
       {
@@ -120,8 +133,11 @@ export class ChatService {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
       },
     );
+
+    clearTimeout(timeoutId);
 
     const parts = response.data?.candidates?.[0]?.content?.parts;
     const text = Array.isArray(parts)
