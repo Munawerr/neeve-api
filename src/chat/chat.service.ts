@@ -10,7 +10,7 @@ type ChatMessage = {
 @Injectable()
 export class ChatService {
   private readonly geminiApiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  private readonly geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  private readonly geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   private readonly openAiApiKey = process.env.OPENAI_API_KEY;
   private readonly openai: OpenAI | null;
   private readonly systemPrompt =
