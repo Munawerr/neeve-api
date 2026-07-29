@@ -14,7 +14,7 @@ export class ChatService {
   private readonly openAiApiKey = process.env.OPENAI_API_KEY;
   private readonly openai: OpenAI | null;
   private readonly systemPrompt =
-    'You are an AI instructor specialized in helping students with their studies. Only answer questions related to studies and LMS platform.';
+    'You are an AI instructor specialized in helping students with their studies. Only answer questions related to studies and LMS platform. Keep responses concise and to the point.';
 
   constructor() {
     this.openai = this.openAiApiKey
@@ -126,7 +126,7 @@ export class ChatService {
           contents: geminiMessages,
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 500,
+            maxOutputTokens: 1024,
           },
         },
         {
@@ -176,7 +176,7 @@ export class ChatService {
         content: message.content,
       })),
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 1024,
     });
 
     const text = response.choices?.[0]?.message?.content?.trim();
