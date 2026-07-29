@@ -10,7 +10,7 @@ type ChatMessage = {
 @Injectable()
 export class ChatService {
   private readonly geminiApiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  private readonly geminiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  private readonly geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   private readonly openAiApiKey = process.env.OPENAI_API_KEY;
   private readonly openai: OpenAI | null;
   private readonly systemPrompt =
@@ -116,42 +116,52 @@ export class ChatService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent`,
-      {
-        ...(systemMessages
-          ? { systemInstruction: { parts: [{ text: systemMessages }] } }
-          : {}),
-        contents: geminiMessages,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 500,
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent`,
+        {
+          ...(systemMessages
+            ? { systemInstruction: { parts: [{ text: systemMessages }] } }
+            : {}),
+          contents: geminiMessages,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500,
+          },
         },
-      },
-      {
-        params: { key: this.geminiApiKey },
-        headers: {
-          'Content-Type': 'application/json',
+        {
+          params: { key: this.geminiApiKey },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
         },
-        signal: controller.signal,
-      },
-    );
+      );
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    const parts = response.data?.candidates?.[0]?.content?.parts;
-    const text = Array.isArray(parts)
-      ? parts
-          .map((part: { text?: string }) => part?.text || '')
-          .join('')
-          .trim()
-      : '';
+      const parts = response.data?.candidates?.[0]?.content?.parts;
+      const text = Array.isArray(parts)
+        ? parts
+            .map((part: { text?: string }) => part?.text || '')
+            .join('')
+            .trim()
+        : '';
 
-    if (!text) {
-      throw new Error('Gemini returned an empty response');
+      if (!text) {
+        throw new Error('Gemini returned an empty response');
+      }
+
+      return text;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.response?.data) {
+        throw new Error(
+          `Gemini API error: ${JSON.stringify(error.response.data)}`,
+        );
+      }
+      throw error;
     }
-
-    return text;
   }
 
   private async getOpenAiResponse(messages: ChatMessage[]): Promise<string> {
