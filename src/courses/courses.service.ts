@@ -515,7 +515,7 @@ export class CoursesService {
       let tests: any[] = [];
 
       let packageId: any = null;
-      const reportCourseId = course._id as string;
+      const reportCourseId = course._id.toString();
       if (user) {
         for (let x = 0; x < user.packages.length; x++) {
           const courseId = user.packages[x].course.toString();

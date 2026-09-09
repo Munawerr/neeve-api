@@ -38,6 +38,10 @@ import {
   LiveClass,
   LiveClassSchema,
 } from './liveClasses/schemas/liveClass.schema';
+import {
+  LiveClassAttendance,
+  LiveClassAttendanceSchema,
+} from './liveClasses/schemas/liveClassAttendance.schema';
 
 import { AppController } from './app.controller';
 
@@ -104,7 +108,7 @@ if (!DB_URL) {
     MongooseModule.forRoot(DB_URL),
     JwtModule.register({
       secret: JWT_SECRET,
-      signOptions: { expiresIn: JWT_EXPIRES_IN },
+      signOptions: { expiresIn: JWT_EXPIRES_IN as any },
     }),
     MongooseModule.forFeature([
       { name: Role.name, schema: RoleSchema },
@@ -119,6 +123,10 @@ if (!DB_URL) {
       { name: Result.name, schema: ResultSchema },
       { name: QuestionResult.name, schema: QuestionResultSchema },
       { name: LiveClass.name, schema: LiveClassSchema },
+      {
+        name: LiveClassAttendance.name,
+        schema: LiveClassAttendanceSchema,
+      },
       { name: Thread.name, schema: ThreadSchema },
       { name: Discussion.name, schema: DiscussionSchema },
     ]), // Add schema

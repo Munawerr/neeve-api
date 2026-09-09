@@ -146,8 +146,14 @@ export class LiveClassesController {
     status: HttpStatus.EXPECTATION_FAILED,
     description: 'Live class not found',
   })
-  async findOne(@Param('id') id: string) {
-    const liveClass = await this.liveClassesService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: Request) {
+    const requester = req.user as
+      | { userId?: string; role?: string }
+      | undefined;
+    const liveClass = await this.liveClassesService.findOne(
+      id,
+      requester?.role,
+    );
     if (!liveClass) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
@@ -202,6 +208,94 @@ export class LiveClassesController {
       message: 'Live class deleted successfully',
       data: result,
     };
+  }
+
+  @Post(':id/join')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Join a live class (students only)' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class joined successfully, session link returned',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Live class is not open yet or has ended',
+  })
+  async join(@Param('id') id: string, @Req() req: Request) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const result = await this.liveClassesService.joinLiveClass(
+        id,
+        requester?.userId || '',
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Live class joined successfully',
+        data: { liveSessionUrl: result.liveSessionUrl },
+      };
+    } catch (error) {
+      const status =
+        error?.status || error?.response?.status || HttpStatus.BAD_REQUEST;
+      const message =
+        error?.message || error?.response?.message || 'Failed to join live class';
+      return {
+        status,
+        message,
+        data: null,
+      };
+    }
+  }
+
+  @Get(':id/attendance')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get attendance of a live class (institute/admin)' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class attendance retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You do not have permission to view attendance',
+  })
+  async getAttendance(
+    @Param('id') id: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Req() req: Request,
+  ) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const hasAccess = await this.liveClassesService.hasAttendanceAccess(
+        requester?.userId || '',
+        id,
+      );
+      if (!hasAccess) {
+        return {
+          status: HttpStatus.FORBIDDEN,
+          message: 'You do not have permission to view attendance',
+          data: null,
+        };
+      }
+      const { attendees, total } =
+        await this.liveClassesService.getAttendance(id, page, limit);
+      return {
+        status: HttpStatus.OK,
+        message: 'Live class attendance retrieved successfully',
+        data: { attendees, total },
+      };
+    } catch (error) {
+      return {
+        status:
+          error?.status || error?.response?.status || HttpStatus.BAD_REQUEST,
+        message:
+          error?.message || error?.response?.message || 'Failed to load attendance',
+        data: null,
+      };
+    }
   }
 
   @Get('archive/deleted')
