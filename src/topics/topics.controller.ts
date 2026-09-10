@@ -303,7 +303,7 @@ export class TopicsController {
 
           // Add subtopic to duplicated parent topic
           duplicatedTopic.subTopics.push(
-            duplicatedSubTopic._id as MongooseSchema.Types.ObjectId,
+            duplicatedSubTopic._id as unknown as MongooseSchema.Types.ObjectId,
           );
         }
       }
@@ -444,7 +444,7 @@ export class TopicsController {
       ...normalizedTopicDto,
       isParent: false,
     });
-    topic.subTopics.push(subTopic._id as MongooseSchema.Types.ObjectId);
+    topic.subTopics.push(subTopic._id as unknown as MongooseSchema.Types.ObjectId);
     await topic.save();
 
     return {
@@ -977,7 +977,7 @@ export class TopicsController {
     );
 
     return createdFiles.map(
-      (file) => file._id as MongooseSchema.Types.ObjectId,
+      (file) => file._id as unknown as MongooseSchema.Types.ObjectId,
     );
   }
 }

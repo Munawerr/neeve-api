@@ -318,7 +318,7 @@ export class TestsService {
         options: options,
       });
 
-      test.questions.push(question._id as MongooseSchema.Types.ObjectId);
+      test.questions.push(question._id as unknown as MongooseSchema.Types.ObjectId);
     }
 
     await test.save();

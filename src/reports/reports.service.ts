@@ -60,7 +60,7 @@ export class ReportsService {
 
     // Start generating the report asynchronously
     this.reportGeneratorService
-      .generateReport(savedReport._id as string)
+      .generateReport(savedReport._id.toString())
       .catch((error) =>
         console.error(`Report generation error: ${error.message}`),
       );
@@ -285,7 +285,7 @@ export class ReportsService {
         .exec(),
     ]);
 
-    return { reports, total };
+    return { reports: reports as unknown as Report[], total };
   }
 
   async findOne(id: string, userId: string, isAdmin: boolean): Promise<Report> {
@@ -360,7 +360,7 @@ export class ReportsService {
 
     // Start generating the report asynchronously
     this.reportGeneratorService
-      .generateReport(report._id as string)
+      .generateReport(report._id.toString())
       .catch((error) =>
         console.error(`Report regeneration error: ${error.message}`),
       );

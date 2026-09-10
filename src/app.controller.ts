@@ -514,7 +514,7 @@ export class AppController {
           },
         };
       } else {
-        const instituteUserId = user._id as string;
+        const instituteUserId = user._id.toString();
         const [
           totalUsers,
           activeUsers,

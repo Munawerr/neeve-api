@@ -20,7 +20,7 @@ export class RawBodyInterceptor implements NestInterceptor {
       request.on('end', () => {
         const rawBody = Buffer.concat(chunks);
         request.rawBody = rawBody;
-        observer.next();
+        observer.next(rawBody);
         observer.complete();
       });
 
