@@ -328,6 +328,24 @@ export class LiveClassesService {
     return { attendees, total };
   }
 
+  async exportAttendance(
+    liveClassId: string,
+  ): Promise<{ liveClass: any; attendees: LiveClassAttendance[] }> {
+    const liveClass = await this.liveClassModel
+      .findOne({ _id: liveClassId, isDeleted: { $ne: true } })
+      .lean();
+    if (!liveClass) {
+      throw new NotFoundException('Live class not found');
+    }
+
+    const attendees = await this.liveClassAttendanceModel
+      .find({ liveClass: liveClassId })
+      .sort({ joinedAt: -1 })
+      .exec();
+
+    return { liveClass, attendees };
+  }
+
   async hasAttendanceAccess(
     userId: string,
     liveClassId: string,

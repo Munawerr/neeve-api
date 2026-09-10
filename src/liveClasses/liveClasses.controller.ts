@@ -11,8 +11,9 @@ import {
   SetMetadata,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LiveClassesService } from './liveClasses.service';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
@@ -295,6 +296,98 @@ export class LiveClassesController {
           error?.message || error?.response?.message || 'Failed to load attendance',
         data: null,
       };
+    }
+  }
+
+  @Get(':id/attendance/export')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download live class attendance as CSV' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class attendance CSV downloaded successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You do not have permission to download attendance',
+  })
+  async exportAttendance(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const hasAccess = await this.liveClassesService.hasAttendanceAccess(
+        requester?.userId || '',
+        id,
+      );
+      if (!hasAccess) {
+        return res.status(HttpStatus.FORBIDDEN).json({
+          status: HttpStatus.FORBIDDEN,
+          message: 'You do not have permission to download attendance',
+          data: null,
+        });
+      }
+
+      const { liveClass, attendees } =
+        await this.liveClassesService.exportAttendance(id);
+
+      const escapeCsv = (value: any): string => {
+        const str = value == null ? '' : String(value);
+        if (/[",\r\n]/.test(str)) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      };
+
+      const lines: string[] = [];
+      lines.push('KEY,VALUE');
+      lines.push(
+        `Live Class Title,${escapeCsv(liveClass.title)}`,
+      );
+      lines.push(
+        `Class Date,${escapeCsv(
+          new Date(liveClass.date).toLocaleDateString('en-GB'),
+        )}`,
+      );
+      lines.push(`Start Time,${escapeCsv(liveClass.startTime)}`);
+      lines.push(`End Time,${escapeCsv(liveClass.endTime)}`);
+      lines.push('');
+      lines.push(
+        'Student Name,Phone,Reg No,Email,First Joined At,Last Joined At,Re-joins',
+      );
+
+      for (const a of attendees) {
+        lines.push(
+          [
+            escapeCsv(a.studentName),
+            escapeCsv(a.studentPhone),
+            escapeCsv(a.studentRegNo),
+            escapeCsv(a.studentEmail),
+            escapeCsv(a.joinedAt ? new Date(a.joinedAt).toISOString() : ''),
+            escapeCsv(
+              a.lastJoinedAt ? new Date(a.lastJoinedAt).toISOString() : '',
+            ),
+            escapeCsv(a.joinCount),
+          ].join(','),
+        );
+      }
+
+      const csv = lines.join('\r\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=live_class_attendance_${id}.csv`,
+      );
+      return res.send(csv);
+    } catch (error) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        status: HttpStatus.BAD_REQUEST,
+        message: error?.message || 'Failed to download attendance',
+        data: null,
+      });
     }
   }
 
