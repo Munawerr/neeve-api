@@ -281,7 +281,7 @@ export class UsersService {
     if (!instituteRole) {
       throw new Error('Institute role not found');
     }
-    return instituteRole._id as MongooseSchema.Types.ObjectId;
+    return instituteRole._id as unknown as MongooseSchema.Types.ObjectId;
   }
 
   async createStudentUser(
@@ -407,7 +407,7 @@ export class UsersService {
     if (!studentRole) {
       throw new Error('Student role not found');
     }
-    return studentRole._id as MongooseSchema.Types.ObjectId;
+    return studentRole._id as unknown as MongooseSchema.Types.ObjectId;
   }
 
   async getUserAnalytics(user: User): Promise<any> {
@@ -590,7 +590,7 @@ export class UsersService {
       const studyTimeData = await this.loginHistoryModel.aggregate([
         {
           $match: {
-            userId: new Types.ObjectId(user._id as string),
+            userId: new Types.ObjectId(user._id.toString()),
             loginTime: {
               $gte: new Date(new Date().getFullYear(), 0, 1),
               $lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59),
@@ -1281,7 +1281,7 @@ export class UsersService {
     const result: any[] = [];
     for (const institute of institutes) {
       const studentCount = await this.countInstituteUsers(
-        institute._id as string,
+        institute._id.toString(),
       );
       result.push({
         institute: institute.full_name,

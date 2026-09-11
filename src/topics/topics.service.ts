@@ -285,7 +285,7 @@ export class TopicsService {
 
         savedSubTopic = await newSubTopic.save();
         savedParentTopic.subTopics = [
-          savedSubTopic._id as MongooseSchema.Types.ObjectId,
+          savedSubTopic._id as unknown as MongooseSchema.Types.ObjectId,
         ];
         await savedParentTopic.save();
         this.logger.log(
@@ -428,7 +428,7 @@ export class TopicsService {
         );
         if (!subTopicAlreadyLinked) {
           savedParentTopic.subTopics.push(
-            savedAdditionalSubTopic._id as MongooseSchema.Types.ObjectId,
+            savedAdditionalSubTopic._id as unknown as MongooseSchema.Types.ObjectId,
           );
           await savedParentTopic.save();
         }
@@ -469,7 +469,7 @@ export class TopicsService {
         fileUrl: url,
         thumbnailUrl: thumbnailUrl || undefined,
       });
-      fileIds.push(file._id as MongooseSchema.Types.ObjectId);
+      fileIds.push(file._id as unknown as MongooseSchema.Types.ObjectId);
     }
     return fileIds;
   }

@@ -810,7 +810,7 @@ export class ReportGeneratorService {
 
     return {
       courseInfo: {
-        id: course._id as string,
+        id: course._id.toString(),
         name: course.title,
         code: course.code,
       },
@@ -1196,7 +1196,7 @@ export class ReportGeneratorService {
 
     return {
       testInfo: {
-        id: test._id as string,
+        id: test._id.toString(),
         name: test.title,
         subject: (test.subject as any)?.title || 'Unknown',
         testType: test.testType,
@@ -1769,7 +1769,7 @@ export class ReportGeneratorService {
 
     return {
       instituteInfo: {
-        id: institute._id as string,
+        id: institute._id.toString(),
         name: institute.full_name,
         email: (institute as any).email,
         phone: (institute as any).phone,

@@ -173,7 +173,7 @@ export class Result extends Document {
   @Prop()
   endTime: Date;
 
-  @Prop({ type: [{ type: QuestionResult }], default: [] })
+  @Prop({ type: [QuestionResult], default: [] })
   questions: QuestionResult[];
 }
 

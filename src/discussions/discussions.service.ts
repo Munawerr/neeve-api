@@ -37,7 +37,7 @@ export class DiscussionsService {
           thread._id.toString(),
           threadCreatorId,
           instituteId,
-          savedDiscussion._id as string,
+          savedDiscussion._id.toString(),
           `New comment added to thread: ${thread.title}`,
         );
       }

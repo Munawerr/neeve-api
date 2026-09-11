@@ -63,7 +63,7 @@ export class TestsController {
     if (test.topic) {
       const topic = await this.topicsService.findOne(test.topic.toString());
 
-      topic?.tests.push(test._id as MongooseSchema.Types.ObjectId);
+      topic?.tests.push(test._id as unknown as MongooseSchema.Types.ObjectId);
       topic?.save();
     }
 
@@ -304,7 +304,7 @@ export class TestsController {
     const test = await this.testsService.findOne(testId);
 
     if (test) {
-      test.questions.push(question._id as MongooseSchema.Types.ObjectId);
+      test.questions.push(question._id as unknown as MongooseSchema.Types.ObjectId);
       await test.save();
     }
 

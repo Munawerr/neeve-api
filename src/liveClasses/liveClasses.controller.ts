@@ -11,8 +11,9 @@ import {
   SetMetadata,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LiveClassesService } from './liveClasses.service';
 import { CreateLiveClassDto } from './dto/create-liveClass.dto';
@@ -146,8 +147,14 @@ export class LiveClassesController {
     status: HttpStatus.EXPECTATION_FAILED,
     description: 'Live class not found',
   })
-  async findOne(@Param('id') id: string) {
-    const liveClass = await this.liveClassesService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: Request) {
+    const requester = req.user as
+      | { userId?: string; role?: string }
+      | undefined;
+    const liveClass = await this.liveClassesService.findOne(
+      id,
+      requester?.role,
+    );
     if (!liveClass) {
       return {
         status: HttpStatus.EXPECTATION_FAILED,
@@ -202,6 +209,186 @@ export class LiveClassesController {
       message: 'Live class deleted successfully',
       data: result,
     };
+  }
+
+  @Post(':id/join')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Join a live class (students only)' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class joined successfully, session link returned',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Live class is not open yet or has ended',
+  })
+  async join(@Param('id') id: string, @Req() req: Request) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const result = await this.liveClassesService.joinLiveClass(
+        id,
+        requester?.userId || '',
+      );
+      return {
+        status: HttpStatus.OK,
+        message: 'Live class joined successfully',
+        data: { liveSessionUrl: result.liveSessionUrl },
+      };
+    } catch (error) {
+      const status =
+        error?.status || error?.response?.status || HttpStatus.BAD_REQUEST;
+      const message =
+        error?.message || error?.response?.message || 'Failed to join live class';
+      return {
+        status,
+        message,
+        data: null,
+      };
+    }
+  }
+
+  @Get(':id/attendance')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get attendance of a live class (institute/admin)' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class attendance retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You do not have permission to view attendance',
+  })
+  async getAttendance(
+    @Param('id') id: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Req() req: Request,
+  ) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const hasAccess = await this.liveClassesService.hasAttendanceAccess(
+        requester?.userId || '',
+        id,
+      );
+      if (!hasAccess) {
+        return {
+          status: HttpStatus.FORBIDDEN,
+          message: 'You do not have permission to view attendance',
+          data: null,
+        };
+      }
+      const { attendees, total } =
+        await this.liveClassesService.getAttendance(id, page, limit);
+      return {
+        status: HttpStatus.OK,
+        message: 'Live class attendance retrieved successfully',
+        data: { attendees, total },
+      };
+    } catch (error) {
+      return {
+        status:
+          error?.status || error?.response?.status || HttpStatus.BAD_REQUEST,
+        message:
+          error?.message || error?.response?.message || 'Failed to load attendance',
+        data: null,
+      };
+    }
+  }
+
+  @Get(':id/attendance/export')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download live class attendance as CSV' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Live class attendance CSV downloaded successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'You do not have permission to download attendance',
+  })
+  async exportAttendance(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const requester = req.user as { userId?: string } | undefined;
+    try {
+      const hasAccess = await this.liveClassesService.hasAttendanceAccess(
+        requester?.userId || '',
+        id,
+      );
+      if (!hasAccess) {
+        return res.status(HttpStatus.FORBIDDEN).json({
+          status: HttpStatus.FORBIDDEN,
+          message: 'You do not have permission to download attendance',
+          data: null,
+        });
+      }
+
+      const { liveClass, attendees } =
+        await this.liveClassesService.exportAttendance(id);
+
+      const escapeCsv = (value: any): string => {
+        const str = value == null ? '' : String(value);
+        if (/[",\r\n]/.test(str)) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      };
+
+      const lines: string[] = [];
+      lines.push('KEY,VALUE');
+      lines.push(
+        `Live Class Title,${escapeCsv(liveClass.title)}`,
+      );
+      lines.push(
+        `Class Date,${escapeCsv(
+          new Date(liveClass.date).toLocaleDateString('en-GB'),
+        )}`,
+      );
+      lines.push(`Start Time,${escapeCsv(liveClass.startTime)}`);
+      lines.push(`End Time,${escapeCsv(liveClass.endTime)}`);
+      lines.push('');
+      lines.push(
+        'Student Name,Phone,Reg No,Email,First Joined At,Last Joined At,Re-joins',
+      );
+
+      for (const a of attendees) {
+        lines.push(
+          [
+            escapeCsv(a.studentName),
+            escapeCsv(a.studentPhone),
+            escapeCsv(a.studentRegNo),
+            escapeCsv(a.studentEmail),
+            escapeCsv(a.joinedAt ? new Date(a.joinedAt).toISOString() : ''),
+            escapeCsv(
+              a.lastJoinedAt ? new Date(a.lastJoinedAt).toISOString() : '',
+            ),
+            escapeCsv(a.joinCount),
+          ].join(','),
+        );
+      }
+
+      const csv = lines.join('\r\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=live_class_attendance_${id}.csv`,
+      );
+      return res.send(csv);
+    } catch (error) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        status: HttpStatus.BAD_REQUEST,
+        message: error?.message || 'Failed to download attendance',
+        data: null,
+      });
+    }
   }
 
   @Get('archive/deleted')
