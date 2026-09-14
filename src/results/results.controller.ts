@@ -1312,7 +1312,7 @@ export class ResultsController {
     // Create a map of test IDs to their skipableQuestionsCount for quick lookup
     const testSkipableCountMap: any = tests.reduce((map: any, test) => {
       if (test) {
-        map[test._id.toString()] = test.skipableQuestionsCount || 0;
+        map[String(test._id)] = test.skipableQuestionsCount || 0;
       }
       return map;
     }, {});

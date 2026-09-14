@@ -60,7 +60,7 @@ export class ReportsService {
 
     // Start generating the report asynchronously
     this.reportGeneratorService
-      .generateReport(savedReport._id.toString())
+      .generateReport(String(savedReport._id))
       .catch((error) =>
         console.error(`Report generation error: ${error.message}`),
       );
@@ -360,7 +360,7 @@ export class ReportsService {
 
     // Start generating the report asynchronously
     this.reportGeneratorService
-      .generateReport(report._id.toString())
+      .generateReport(String(report._id))
       .catch((error) =>
         console.error(`Report regeneration error: ${error.message}`),
       );

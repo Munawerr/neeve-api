@@ -810,7 +810,7 @@ export class ReportGeneratorService {
 
     return {
       courseInfo: {
-        id: course._id.toString(),
+        id: String(course._id),
         name: course.title,
         code: course.code,
       },
