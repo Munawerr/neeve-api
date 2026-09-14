@@ -24,7 +24,7 @@ export class ThreadsService {
     // Validate if the user is an admin when creating a global thread
     if (createThreadDto.isGlobal) {
       const user = await this.usersService.findOne(createThreadDto.user);
-      if (!user || !(await this.isUserAdmin(user._id.toString()))) {
+      if (!user || !(await this.isUserAdmin(String(user._id)))) {
         throw new ForbiddenException('Only admins can create global threads');
       }
     }
@@ -37,7 +37,7 @@ export class ThreadsService {
       }
 
       // Check if user is from the institute or is an admin
-      const isAdmin = await this.isUserAdmin(user._id.toString());
+      const isAdmin = await this.isUserAdmin(String(user._id));
       const isFromInstitute =
         user.institute &&
         user.institute.toString() === createThreadDto.institute;

@@ -56,7 +56,7 @@ export class LiveClassesController {
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all live classes' })
-  @ApiQuery({ name: 'institute', required: true })
+  @ApiQuery({ name: 'institute', required: false })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'search', required: false })
@@ -66,7 +66,7 @@ export class LiveClassesController {
   })
   @SetMetadata('permissions', ['view_live_classes'])
   async findAll(
-    @Query('institute') institute: string,
+    @Query('institute') institute: string = '',
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @Query('search') search: string = '',
@@ -102,14 +102,14 @@ export class LiveClassesController {
   @Get('count/upcoming')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get count of upcoming live classes' })
-  @ApiQuery({ name: 'institute', required: true })
+  @ApiQuery({ name: 'institute', required: false })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Count of upcoming live classes retrieved successfully',
   })
   @SetMetadata('permissions', ['view_live_classes'])
   async getUpcomingLiveClassesCount(
-    @Query('institute') institute: string,
+    @Query('institute') institute: string = '',
     @Req() req: Request,
   ) {
     try {
@@ -239,7 +239,9 @@ export class LiveClassesController {
       const status =
         error?.status || error?.response?.status || HttpStatus.BAD_REQUEST;
       const message =
-        error?.message || error?.response?.message || 'Failed to join live class';
+        error?.message ||
+        error?.response?.message ||
+        'Failed to join live class';
       return {
         status,
         message,
@@ -281,8 +283,11 @@ export class LiveClassesController {
           data: null,
         };
       }
-      const { attendees, total } =
-        await this.liveClassesService.getAttendance(id, page, limit);
+      const { attendees, total } = await this.liveClassesService.getAttendance(
+        id,
+        page,
+        limit,
+      );
       return {
         status: HttpStatus.OK,
         message: 'Live class attendance retrieved successfully',
@@ -293,7 +298,9 @@ export class LiveClassesController {
         status:
           error?.status || error?.response?.status || HttpStatus.BAD_REQUEST,
         message:
-          error?.message || error?.response?.message || 'Failed to load attendance',
+          error?.message ||
+          error?.response?.message ||
+          'Failed to load attendance',
         data: null,
       };
     }
@@ -343,9 +350,7 @@ export class LiveClassesController {
 
       const lines: string[] = [];
       lines.push('KEY,VALUE');
-      lines.push(
-        `Live Class Title,${escapeCsv(liveClass.title)}`,
-      );
+      lines.push(`Live Class Title,${escapeCsv(liveClass.title)}`);
       lines.push(
         `Class Date,${escapeCsv(
           new Date(liveClass.date).toLocaleDateString('en-GB'),

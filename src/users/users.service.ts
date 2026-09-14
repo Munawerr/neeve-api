@@ -590,7 +590,7 @@ export class UsersService {
       const studyTimeData = await this.loginHistoryModel.aggregate([
         {
           $match: {
-            userId: new Types.ObjectId(user._id.toString()),
+            userId: new Types.ObjectId(String(user._id)),
             loginTime: {
               $gte: new Date(new Date().getFullYear(), 0, 1),
               $lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59),
@@ -1281,7 +1281,7 @@ export class UsersService {
     const result: any[] = [];
     for (const institute of institutes) {
       const studentCount = await this.countInstituteUsers(
-        institute._id.toString(),
+        String(institute._id),
       );
       result.push({
         institute: institute.full_name,

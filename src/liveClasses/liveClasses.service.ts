@@ -27,9 +27,12 @@ export class LiveClassesService {
     userId?: string,
   ): Promise<Record<string, any>> {
     const query: Record<string, any> = {
-      institute,
       isDeleted: { $ne: true },
     };
+
+    if (institute) {
+      query.institute = institute;
+    }
 
     if (role === 'student' && userId) {
       const student = await this.userModel
@@ -89,6 +92,7 @@ export class LiveClassesService {
         ],
       })
       .populate('subject')
+      .populate('institute', 'full_name email')
       .lean()
       .exec();
     const total = await this.liveClassModel.countDocuments(query).exec();
@@ -98,21 +102,16 @@ export class LiveClassesService {
     };
   }
 
-  async findOne(
-    id: string,
-    role?: string,
-  ): Promise<LiveClass | null> {
+  async findOne(id: string, role?: string): Promise<LiveClass | null> {
     const liveClass = await this.liveClassModel
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate('package')
       .populate('subject')
+      .populate('institute', 'full_name email')
       .lean()
       .exec();
     if (!liveClass) return null;
-    return this.stripLinksForStudents(
-      liveClass,
-      role,
-    ) as unknown as LiveClass;
+    return this.stripLinksForStudents(liveClass, role) as unknown as LiveClass;
   }
 
   update(
@@ -196,7 +195,8 @@ export class LiveClassesService {
 
   private stripLink(item: any): any {
     if (!item) return item;
-    const { liveSessionUrl, ...rest } = item;
+    const rest = { ...item };
+    delete rest.liveSessionUrl;
     return rest;
   }
 
@@ -219,8 +219,7 @@ export class LiveClassesService {
     const userInstitute = user.institute?.toString();
 
     const belongsToInstitute =
-      userInstitute === liveClassInstitute ||
-      userId === liveClassInstitute;
+      userInstitute === liveClassInstitute || userId === liveClassInstitute;
 
     if (!belongsToInstitute) {
       throw new ForbiddenException(
@@ -246,10 +245,15 @@ export class LiveClassesService {
     }
 
     if (!liveClass.liveSessionUrl) {
-      throw new BadRequestException('Live session link has not been configured');
+      throw new BadRequestException(
+        'Live session link has not been configured',
+      );
     }
 
-    const { user, instituteId } = await this.resolveJoinContext(userId, liveClass);
+    const { user, instituteId } = await this.resolveJoinContext(
+      userId,
+      liveClass,
+    );
 
     // Join window: from 5 minutes before start until the end of the class.
     const now = new Date();
@@ -257,7 +261,10 @@ export class LiveClassesService {
       liveClass.date,
       liveClass.startTime,
     );
-    const endDateTime = this.combineDateAndTime(liveClass.date, liveClass.endTime);
+    const endDateTime = this.combineDateAndTime(
+      liveClass.date,
+      liveClass.endTime,
+    );
     const joinOpenAt = new Date(startDateTime.getTime() - 5 * 60 * 1000);
 
     if (now < joinOpenAt) {
@@ -272,10 +279,7 @@ export class LiveClassesService {
 
     // Upsert a single attendance record per student per live class.
     const studentName =
-      user.full_name ||
-      (user as any).name ||
-      user.email ||
-      'Unknown Student';
+      user.full_name || (user as any).name || user.email || 'Unknown Student';
     const attendance = await this.liveClassAttendanceModel
       .findOneAndUpdate(
         { liveClass: liveClassId, student: userId },
@@ -356,10 +360,7 @@ export class LiveClassesService {
     if (!liveClass) {
       throw new NotFoundException('Live class not found');
     }
-    const user = await this.userModel
-      .findById(userId)
-      .populate('role')
-      .lean();
+    const user = await this.userModel.findById(userId).populate('role').lean();
     if (!user) return false;
 
     const roleSlug = (user.role as any)?.slug;
