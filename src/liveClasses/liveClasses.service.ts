@@ -201,12 +201,22 @@ export class LiveClassesService {
   }
 
   // Combines the class date with a "HH:mm" time string into a Date.
+  // The stored date is a UTC-midnight calendar date, so the time is
+  // combined in UTC to avoid server-local-timezone drift.
   private combineDateAndTime(dateValue: Date, timeString: string): Date {
     const date = new Date(dateValue);
     const [hours, minutes] = timeString.split(':').map(Number);
-    const combined = new Date(date);
-    combined.setHours(hours || 0, minutes || 0, 0, 0);
-    return combined;
+    return new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        hours || 0,
+        minutes || 0,
+        0,
+        0,
+      ),
+    );
   }
 
   private async resolveJoinContext(userId: string, liveClass: any) {
@@ -255,21 +265,25 @@ export class LiveClassesService {
       liveClass,
     );
 
-    // Join window: from 5 minutes before start until the end of the class.
+    // Join window: opens 10 minutes before the scheduled start time and
+    // stays open until the class ends. Students may join anytime after the
+    // start while the class is ongoing. If no end time is defined, the class
+    // is considered over 1 hour after the scheduled start time (this keeps
+    // attendance collection within a valid window).
     const now = new Date();
     const startDateTime = this.combineDateAndTime(
       liveClass.date,
       liveClass.startTime,
     );
-    const endDateTime = this.combineDateAndTime(
-      liveClass.date,
-      liveClass.endTime,
-    );
-    const joinOpenAt = new Date(startDateTime.getTime() - 5 * 60 * 1000);
+    const joinOpenAt = new Date(startDateTime.getTime() - 10 * 60 * 1000);
+
+    const endDateTime = liveClass.endTime
+      ? this.combineDateAndTime(liveClass.date, liveClass.endTime)
+      : new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
     if (now < joinOpenAt) {
       throw new ForbiddenException(
-        'The live class is not open yet. It will open 5 minutes before the scheduled start time.',
+        'The live class is not open yet. It will open 10 minutes before the scheduled start time.',
       );
     }
 
