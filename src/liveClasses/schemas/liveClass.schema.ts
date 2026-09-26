@@ -9,11 +9,14 @@ export class LiveClass extends Document {
   @Prop({ required: true })
   date: Date;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: String })
   startTime: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: String })
   endTime: string;
+
+  @Prop({ type: Number, default: 0 })
+  timezoneOffsetMinutes: number;
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
