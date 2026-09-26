@@ -201,22 +201,28 @@ export class LiveClassesService {
   }
 
   // Combines the class date with a "HH:mm" time string into a Date.
-  // The stored date is a UTC-midnight calendar date, so the time is
-  // combined in UTC to avoid server-local-timezone drift.
-  private combineDateAndTime(dateValue: Date, timeString: string): Date {
+  // The stored date is a UTC-midnight calendar date and the time is the
+  // wall-clock value the class was scheduled with. When the client provides
+  // its timezone offset (JS Date.getTimezoneOffset(), minutes behind UTC),
+  // the wall-clock instant is converted to that zone; otherwise it is
+  // interpreted in UTC.
+  private combineDateAndTime(
+    dateValue: Date,
+    timeString: string,
+    timezoneOffsetMinutes?: number,
+  ): Date {
     const date = new Date(dateValue);
     const [hours, minutes] = timeString.split(':').map(Number);
-    return new Date(
-      Date.UTC(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate(),
-        hours || 0,
-        minutes || 0,
-        0,
-        0,
-      ),
+    const utcWallClockMs = Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      hours || 0,
+      minutes || 0,
+      0,
+      0,
     );
+    return new Date(utcWallClockMs + (timezoneOffsetMinutes ?? 0) * 60 * 1000);
   }
 
   private async resolveJoinContext(userId: string, liveClass: any) {
@@ -269,16 +275,23 @@ export class LiveClassesService {
     // stays open until the class ends. Students may join anytime after the
     // start while the class is ongoing. If no end time is defined, the class
     // is considered over 1 hour after the scheduled start time (this keeps
-    // attendance collection within a valid window).
+    // attendance collection within a valid window). The window is computed
+    // from the timezone the class was scheduled in, so it is identical for
+    // every student regardless of their own timezone.
     const now = new Date();
     const startDateTime = this.combineDateAndTime(
       liveClass.date,
       liveClass.startTime,
+      liveClass.timezoneOffsetMinutes,
     );
     const joinOpenAt = new Date(startDateTime.getTime() - 10 * 60 * 1000);
 
     const endDateTime = liveClass.endTime
-      ? this.combineDateAndTime(liveClass.date, liveClass.endTime)
+      ? this.combineDateAndTime(
+          liveClass.date,
+          liveClass.endTime,
+          liveClass.timezoneOffsetMinutes,
+        )
       : new Date(startDateTime.getTime() + 60 * 60 * 1000);
 
     if (now < joinOpenAt) {

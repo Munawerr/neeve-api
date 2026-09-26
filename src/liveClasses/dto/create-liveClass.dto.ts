@@ -13,6 +13,14 @@ export class CreateLiveClassDto {
   @ApiProperty({ example: '12:00' })
   readonly endTime: string;
 
+  @ApiProperty({
+    example: -330,
+    required: false,
+    description:
+      'Timezone offset (minutes behind UTC, JS Date.getTimezoneOffset()) of the person scheduling the class',
+  })
+  readonly timezoneOffsetMinutes?: number;
+
   @ApiProperty({ example: '60d21b4667d0d8992e610c85' })
   readonly package: string;
 
