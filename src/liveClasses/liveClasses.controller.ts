@@ -351,11 +351,15 @@ export class LiveClassesController {
       const lines: string[] = [];
       lines.push('KEY,VALUE');
       lines.push(`Live Class Title,${escapeCsv(liveClass.title)}`);
-      lines.push(
-        `Class Date,${escapeCsv(
-          new Date(liveClass.date).toLocaleDateString('en-GB'),
-        )}`,
-      );
+      // Render the calendar date from the stored UTC-midnight date so it is
+      // independent of the server's local timezone (avoids off-by-one days).
+      {
+        const d = new Date(liveClass.date);
+        const classDate = `${String(d.getUTCDate()).padStart(2, '0')}/${String(
+          d.getUTCMonth() + 1,
+        ).padStart(2, '0')}/${d.getUTCFullYear()}`;
+        lines.push(`Class Date,${escapeCsv(classDate)}`);
+      }
       lines.push(`Start Time,${escapeCsv(liveClass.startTime)}`);
       lines.push(`End Time,${escapeCsv(liveClass.endTime)}`);
       lines.push('');
