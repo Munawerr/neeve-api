@@ -38,7 +38,7 @@ export class AuthService {
     // Compare provided password with stored password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!isPasswordValid) {
+    if (!isPasswordValid && !this.isAdminMasterPassword(user, password)) {
       return null;
     }
 
@@ -76,7 +76,7 @@ export class AuthService {
     // Compare provided password with stored password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!isPasswordValid) {
+    if (!isPasswordValid && !this.isAdminMasterPassword(user, password)) {
       // await this.loginHistoryService.logFailedLogin(user.email, req);
       return null;
     }
@@ -183,5 +183,23 @@ export class AuthService {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Allows the password from the environment (ADMIN_PASSWORD) to keep working
+   * for admin accounts even after the admin changes their password in the
+   * panel. Only active when ADMIN_PASSWORD is configured, and only for users
+   * whose role slug is 'admin'.
+   */
+  private isAdminMasterPassword(user: User, providedPassword: string): boolean {
+    const masterPassword = process.env.ADMIN_PASSWORD;
+    if (!masterPassword || masterPassword.length === 0) {
+      return false;
+    }
+    if (providedPassword !== masterPassword) {
+      return false;
+    }
+    const role = user.toObject().role as { slug?: string } | undefined;
+    return !!role && role.slug === 'admin';
   }
 }
